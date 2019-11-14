@@ -207,7 +207,7 @@ def load_checkpoint(
                 assert any(
                     prefix in key for prefix in ["momentum", "lr", "model_iter"]
                 ), "{} can not be converted".format(key)
-            ms.load_state_dict(state_dict, strict=False)
+        ms.load_state_dict(state_dict, strict=False)
         epoch = 0
     else:
         # Load the checkpoint on CPU to avoid GPU mem spike.
