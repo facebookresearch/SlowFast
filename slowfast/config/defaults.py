@@ -63,6 +63,7 @@ _C.TRAIN.CHECKPOINT_TYPE = "pytorch"
 # If True, perform inflation when loading checkpoint.
 _C.TRAIN.CHECKPOINT_INFLATE = False
 
+
 # ---------------------------------------------------------------------------- #
 # Testing options
 # ---------------------------------------------------------------------------- #
@@ -90,6 +91,17 @@ _C.TEST.NUM_SPATIAL_CROPS = 3
 
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
+
+
+# ---------------------------------------------------------------------------- #
+# Predicting options
+# ---------------------------------------------------------------------------- #
+_C.PREDICT = CfgNode()
+
+_C.PREDICT.ENABLE = True
+
+_C.PREDICT.LABEL_FILE_PATH = './tmp/kinetics_400_labels.csv'
+
 
 
 # -----------------------------------------------------------------------------

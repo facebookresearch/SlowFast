@@ -57,3 +57,17 @@ python tools/run_net.py \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
 ```
+## Perform Prediction on Videos/Camera
+prepare a `<pretrained_model_config_file>.yaml` config file from one of those in `configs\Kinetics\` corresponding to the pretrained model you want to use and set the following settings:
+* `TRAIN.ENABLE: False`
+* `TEST.ENABLE: False`
+* `CHECKPOINT_TYPE: caffe2`
+* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"`
+* `NUM_GPUS: 1` (only if running on a single CPU)
+* `NUM_SHARDS: 1` (only if running on a single machine)
+
+### Run command
+```
+python \tools\run_net.py --predict_source <camera_id/path_to_video> \
+                         --cfg path/to/<pretrained_model_config_file>.yaml
+```

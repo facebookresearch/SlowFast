@@ -13,6 +13,7 @@ from slowfast.config.defaults import get_cfg
 
 from test_net import test
 from train_net import train
+from predict_net import predict
 
 
 def parse_args():
@@ -31,7 +32,13 @@ def parse_args():
             overwrites the config loaded from file.
         """
     parser = argparse.ArgumentParser(
-        description="Provide SlowFast video training and testing pipeline."
+        description="Provide SlowFast video training, testing, and predicting pipeline."
+    )
+    parser.add_argument(
+        '--predict_source',
+        help='the input source to perform prediction, \
+                can either be a path to a video or index of the camera',
+        default=0,
     )
     parser.add_argument(
         "--shard_id",
@@ -93,6 +100,8 @@ def load_config(args):
         cfg.RNG_SEED = args.rng_seed
     if hasattr(args, "output_dir"):
         cfg.OUTPUT_DIR = args.output_dir
+    if hasattr(args, 'predict_source'):
+        cfg.PREDICT.SOURCE = args.predict_source
 
     # Create the checkpoint dir.
     cu.make_checkpoint_dir(cfg.OUTPUT_DIR)
@@ -146,6 +155,24 @@ def main():
         else:
             test(cfg=cfg)
 
+    if cfg.PREDICT.ENABLE:
+        if cfg.NUM_GPUS > 1:
+            torch.multiprocessing.spawn(
+                mpu.run,
+                nprocs=cfg.NUM_GPUS,
+                args=(
+                    cfg.NUM_GPUS,
+                    predict,
+                    args.init_method,
+                    cfg.SHARD_ID,
+                    cfg.NUM_SHARDS,
+                    cfg.DIST_BACKEND,
+                    cfg,
+                ),
+                daemon=False,
+            )
+        else:
+            predict(cfg=cfg)
 
 if __name__ == "__main__":
     main()
