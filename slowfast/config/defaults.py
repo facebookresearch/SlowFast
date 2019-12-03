@@ -100,8 +100,7 @@ _C.PREDICT = CfgNode()
 
 _C.PREDICT.ENABLE = True
 
-_C.PREDICT.LABEL_FILE_PATH = './tmp/kinetics_400_labels.csv'
-
+_C.PREDICT.LABEL_FILE_PATH = './configs/Kinetics/demo/kinetics_400_labels.csv'
 
 
 # -----------------------------------------------------------------------------
