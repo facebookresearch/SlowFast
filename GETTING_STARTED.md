@@ -57,3 +57,17 @@ python tools/run_net.py \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
 ```
+## Run Classification on Videos/Camera
+modify a `<pretrained_model_config_file>.yaml` in `configs/Kinetics/` corresponding to the pretrained model you want to use and set the following settings (you can look at `demo/SLOWFAST_8x8_R50.yaml` for reference):
+* `TRAIN.ENABLE: False`
+* `TEST.ENABLE: False`
+* `DEMO.ENABLE: True`
+* `CHECKPOINT_TYPE: caffe2`
+* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
+* `NUM_GPUS: 1` (only if running on a single CPU)
+* `NUM_SHARDS: 1` (only if running on a single machine)
+
+### Run command
+```
+python \tools\run_net.py --cfg path/to/<pretrained_model_config_file>.yaml
+```
