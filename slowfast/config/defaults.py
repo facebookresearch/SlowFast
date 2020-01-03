@@ -430,6 +430,22 @@ _C.AVA.GROUNDTRUTH_FILE = "ava_val_v2.2.csv"
 _C.AVA.IMG_PROC_BACKEND = "cv2"
 
 
+# ---------------------------------------------------------------------------- #
+# Demo options
+# ---------------------------------------------------------------------------- #
+_C.DEMO = CfgNode()
+
+_C.DEMO.ENABLE = False
+
+_C.DEMO.LABEL_FILE_PATH = ""
+
+_C.DEMO.DATA_SOURCE = 0
+
+_C.DEMO.DISPLAY_WIDTH = 0
+
+_C.DEMO.DISPLAY_HEIGHT = 0
+
+
 def _assert_and_infer_cfg(cfg):
     # BN assertions.
     if cfg.BN.USE_PRECISE_STATS:

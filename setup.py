@@ -18,6 +18,8 @@ setup(
         "simplejson",
         "matplotlib",
         "detectron2",
+        "opencv-python",
+        "pandas",
     ],
     packages=find_packages(exclude=("configs", "tests")),
 )
