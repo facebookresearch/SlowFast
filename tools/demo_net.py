@@ -5,6 +5,11 @@ import pandas as pd
 import cv2
 import torch
 
+from detectron2 import model_zoo
+from detectron2.engine import DefaultPredictor
+from detectron2.config import get_cfg
+from detectron2.data import MetadataCatalog
+
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
@@ -87,6 +92,14 @@ def demo(cfg):
         inflation=False,
         convert_from_caffe2= "caffe2" in [cfg.TEST.CHECKPOINT_TYPE, cfg.TRAIN.CHECKPOINT_TYPE],
     )
+
+    # Load Faster-RNN object detector from detectron2
+    cfg_file = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+    cfg = get_cfg()
+    cfg.merge_from_file(model_zoo.get_config_file(cfg_file))
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .5
+    cfg.MODEL.WEIGHTS = "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+    predictor = DefaultPredictor(cfg)
 
     # Load the labels of Kinectics-400 dataset
     labels_df = pd.read_csv(cfg.DEMO.LABEL_FILE_PATH)
