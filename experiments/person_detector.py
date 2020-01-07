@@ -18,7 +18,7 @@ def main(args):
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .5
     cfg.MODEL.WEIGHTS = "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
     predictor = DefaultPredictor(cfg)
-    visualizer = VideoVisualizer(cfg.DATASETS.TRAIN[0])
+    visualizer = VideoVisualizer(MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
     cap = cv.VideoCapture(0)
     if not cap.isOpened():
         raise RuntimeError('Camera not found!')
@@ -26,14 +26,12 @@ def main(args):
     while cap.isOpened():
         _, frame = cap.read()
         outputs = predictor(frame)
-        frame_out = visualizer.draw_instance_predictions(frame[:, :, ::-1],outputs["instances"].to("cpu"))
-        cv.imshow('Detectron2: Object Detection', frame_out)
+        frame_out = visualizer.draw_instance_predictions(frame[:, :, ::-1], outputs["instances"].to("cpu"))
+        cv.imshow('Detectron2: Object Detection', frame_out.get_image()[:, :, ::-1])
         key = cv.waitKey(1)
         if key == 27:
             break
-        # print(type(outputs))
-        # print(outputs)
-        # sys.exit()
+
 
 
 if __name__ == "__main__":
