@@ -132,7 +132,8 @@ def demo(cfg):
             # T H W C -> C T H W.
             inputs = inputs.permute(3, 0, 1, 2)
             # 1 C T H W.
-            inputs = inputs[None, :, :, :, :]
+            # inputs = inputs[None, :, :, :, :]
+            inputs = inputs.unsqueeze(0)
             # Sample frames for the fast pathway.
             index = torch.linspace(0, inputs.shape[2] - 1, cfg.DATA.NUM_FRAMES).long()
             fast_pathway = torch.index_select(inputs, 2, index)
