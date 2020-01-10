@@ -5,7 +5,7 @@ TRAIN:
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  CHECKPOINT_FILE_PATH: "./SLOWFAST_8x8_R50.pkl" # path to the model to test 
+  CHECKPOINT_FILE_PATH: "./SLOWFAST_8x8_R50.pkl" # path to pretrain model to run demo
   CHECKPOINT_TYPE: caffe2
 DATA:
   NUM_FRAMES: 32
@@ -61,11 +61,11 @@ DATA_LOADER:
   PIN_MEMORY: True
 DEMO:
   ENABLE: True
-  LABEL_FILE_PATH: "./demo/kinetics_400_labels.csv"
-  DATA_SOURCE: 0
+  LABEL_FILE_PATH: "./demo/Kinetics/kinetics_400_labels.csv"
+  DATA_SOURCE: 2
   # DISPLAY_WIDTH: 640
   # DISPLAY_HEIGHT: 480
 NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
-OUTPUT_DIR: . # ./checkpoints/<MODEL>.pkl
+OUTPUT_DIR: .
