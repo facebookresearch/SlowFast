@@ -245,7 +245,7 @@ def train(cfg):
     # Build the video model and print model statistics.
     model = model_builder.build_model(cfg)
     if du.is_master_proc():
-        misc.log_model_info(model)
+        misc.log_model_info(model, cfg, is_train=True)
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
