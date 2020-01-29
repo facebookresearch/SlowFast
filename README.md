@@ -35,3 +35,6 @@ Please find installation instructions for PyTorch and PySlowFast in [INSTALL.md]
 ## Quick Start
 
 Follow the example in [GETTING_STARTED.md](GETTING_STARTED.md) to start playing video models with PySlowFast.
+
+## Contributors
+PySlowFast is written and maintained by [Haoqi Fan](https://research.fb.com/people/fan-haoqi/), [Yanghao Li](https://lyttonhao.github.io/), [Wan-Yen Lo](https://www.linkedin.com/in/wanyenlo/), [Christoph Feichtenhofer](https://feichtenhofer.github.io/).
