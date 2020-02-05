@@ -201,7 +201,7 @@ def load_checkpoint(
                         )
                     )
                 else:
-                    logger.info(
+                    logger.warn(
                         "!! {}: {} does not match {}: {}".format(
                             key,
                             caffe2_checkpoint["blobs"][key].shape,
@@ -210,9 +210,14 @@ def load_checkpoint(
                         )
                     )
             else:
-                assert any(
+                if not any(
                     prefix in key for prefix in ["momentum", "lr", "model_iter"]
-                ), "{} can not be converted, got {}".format(key, converted_key)
+                ):
+                    logger.warn(
+                        "!! {}: can not be converted, got {}".format(
+                            key, converted_key
+                        )
+                    )
         ms.load_state_dict(state_dict, strict=False)
         epoch = -1
     else:
