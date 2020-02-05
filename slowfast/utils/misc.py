@@ -81,7 +81,16 @@ def get_flop_stats(model, cfg, is_train):
     flop_inputs = pack_pathway_output(cfg, input_tensors)
     for i in range(len(flop_inputs)):
         flop_inputs[i] = flop_inputs[i].unsqueeze(0).cuda(non_blocking=True)
-    gflop_dict = flop_count(model, (flop_inputs,), whitelist_ops)
+
+    # If detection is enabled, count flops for one proposal.
+    if cfg.DETECTION.ENABLE:
+        bbox = torch.tensor([[0, 0, 1.0, 0, 1.0]])
+        bbox = bbox.cuda()
+        inputs = (flop_inputs, bbox)
+    else:
+        inputs = (flop_inputs,)
+
+    gflop_dict = flop_count(model, inputs, whitelist_ops)
     gflops = sum(gflop_dict.values())
     return gflops
 
