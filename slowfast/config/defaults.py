@@ -164,6 +164,9 @@ _C.MODEL = CfgNode()
 # Model architecture.
 _C.MODEL.ARCH = "slowfast"
 
+# Model name
+_C.MODEL.MODEL_NAME = "SlowFast"
+
 # The number of classes to predict for the model.
 _C.MODEL.NUM_CLASSES = 400
 

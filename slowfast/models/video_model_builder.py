@@ -7,7 +7,9 @@ import torch
 import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
-from slowfast.models import head_helper, resnet_helper, stem_helper
+
+from . import head_helper, resnet_helper, stem_helper
+from .build import MODEL_REGISTRY
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -123,7 +125,8 @@ class FuseFastToSlow(nn.Module):
         return [x_s_fuse, x_f]
 
 
-class SlowFastModel(nn.Module):
+@MODEL_REGISTRY.register()
+class SlowFast(nn.Module):
     """
     SlowFast model builder for SlowFast network.
 
@@ -140,7 +143,7 @@ class SlowFastModel(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
-        super(SlowFastModel, self).__init__()
+        super(SlowFast, self).__init__()
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
@@ -375,7 +378,8 @@ class SlowFastModel(nn.Module):
         return x
 
 
-class ResNetModel(nn.Module):
+@MODEL_REGISTRY.register()
+class ResNet(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
     lateral connection (C2D, I3D, SlowOnly).
@@ -398,7 +402,7 @@ class ResNetModel(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
-        super(ResNetModel, self).__init__()
+        super(ResNet, self).__init__()
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
         self._construct_network(cfg)

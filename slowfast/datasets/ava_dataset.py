@@ -9,7 +9,6 @@ from . import ava_helper as ava_helper
 from . import cv2_transform as cv2_transform
 from . import transform as transform
 from . import utils as utils
-
 from .build import DATASET_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -224,9 +223,7 @@ class Ava(torch.utils.data.Dataset):
         imgs = np.ascontiguousarray(imgs)
         imgs = torch.from_numpy(imgs)
         boxes = cv2_transform.clip_boxes_to_image(
-            boxes[0],
-            imgs[0].shape[1],
-            imgs[0].shape[2],
+            boxes[0], imgs[0].shape[1], imgs[0].shape[2]
         )
         return imgs, boxes
 

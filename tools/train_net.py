@@ -16,7 +16,7 @@ import slowfast.utils.logging as logging
 import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
 from slowfast.datasets import loader
-from slowfast.models import model_builder
+from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
 
 logger = logging.get_logger(__name__)
@@ -243,7 +243,7 @@ def train(cfg):
     logger.info(pprint.pformat(cfg))
 
     # Build the video model and print model statistics.
-    model = model_builder.build_model(cfg)
+    model = build_model(cfg)
     if du.is_master_proc():
         misc.log_model_info(model, cfg, is_train=True)
 

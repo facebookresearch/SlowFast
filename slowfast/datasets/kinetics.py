@@ -6,12 +6,12 @@ import random
 import torch
 import torch.utils.data
 
+import slowfast.utils.logging as logging
+
 from . import decoder as decoder
 from . import transform as transform
 from . import utils as utils
 from . import video_container as container
-import slowfast.utils.logging as logging
-
 from .build import DATASET_REGISTRY
 
 logger = logging.get_logger(__name__)

@@ -48,6 +48,7 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 400
   ARCH: slowfast
+  MODEL_NAME: SlowFast
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5
 TEST:

@@ -42,7 +42,8 @@ SOLVER:
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 400
-  ARCH: c2d_nopool
+  ARCH: c2d
+  MODEL_NAME: ResNet_nopool
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5
 TEST:

@@ -11,7 +11,7 @@ import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
 from slowfast.datasets import loader
-from slowfast.models import model_builder
+from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
@@ -123,7 +123,7 @@ def test(cfg):
     logger.info(cfg)
 
     # Build the video model and print model statistics.
-    model = model_builder.build_model(cfg)
+    model = build_model(cfg)
     if du.is_master_proc():
         misc.log_model_info(model, cfg, is_train=False)
 

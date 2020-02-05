@@ -57,6 +57,7 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 80
   ARCH: slowfast
+  MODEL_NAME: SlowFast
   LOSS_FUNC: bce
   DROPOUT_RATE: 0.5
 TEST:

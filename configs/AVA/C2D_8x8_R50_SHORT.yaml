@@ -57,6 +57,7 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 80
   ARCH: slowonly
+  MODEL_NAME: ResNet
   LOSS_FUNC: bce
   DROPOUT_RATE: 0.5
 TEST:
