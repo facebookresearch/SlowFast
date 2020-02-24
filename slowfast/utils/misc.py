@@ -72,12 +72,6 @@ def get_flop_stats(model, cfg, is_train):
             cfg.DATA.TEST_CROP_SIZE,
             cfg.DATA.TEST_CROP_SIZE,
         )
-    whitelist_ops = [
-        "aten::addmm",
-        "aten::_convolution",
-        "aten::einsum",
-        "aten::matmul",
-    ]
     flop_inputs = pack_pathway_output(cfg, input_tensors)
     for i in range(len(flop_inputs)):
         flop_inputs[i] = flop_inputs[i].unsqueeze(0).cuda(non_blocking=True)
@@ -90,7 +84,7 @@ def get_flop_stats(model, cfg, is_train):
     else:
         inputs = (flop_inputs,)
 
-    gflop_dict = flop_count(model, inputs, whitelist_ops)
+    gflop_dict, _ = flop_count(model, inputs)
     gflops = sum(gflop_dict.values())
     return gflops
 
