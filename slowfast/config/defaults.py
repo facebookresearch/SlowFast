@@ -245,6 +245,10 @@ _C.DATA.TRAIN_CROP_SIZE = 224
 # The spatial crop size for testing.
 _C.DATA.TEST_CROP_SIZE = 256
 
+# Input videos may has different fps, convert it to the target video fps before
+# frame sampling.
+_C.DATA.TARGET_FPS = 30
+
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options

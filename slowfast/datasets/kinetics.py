@@ -180,7 +180,7 @@ class Kinetics(torch.utils.data.Dataset):
                 temporal_sample_index,
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
                 video_meta=self._video_meta[index],
-                target_fps=30,
+                target_fps=self.cfg.DATA.TARGET_FPS,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
