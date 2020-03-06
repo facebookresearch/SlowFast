@@ -249,6 +249,8 @@ _C.DATA.TEST_CROP_SIZE = 256
 # frame sampling.
 _C.DATA.TARGET_FPS = 30
 
+# Decoding backend, options include `pyav` or `torchvision`
+_C.DATA.DECODING_BACKEND = "pyav"
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options

@@ -160,6 +160,7 @@ class Kinetics(torch.utils.data.Dataset):
                 video_container = container.get_video_container(
                     self._path_to_videos[index],
                     self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
+                    self.cfg.DATA.DECODING_BACKEND,
                 )
             except Exception as e:
                 logger.info(
@@ -181,6 +182,8 @@ class Kinetics(torch.utils.data.Dataset):
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
                 video_meta=self._video_meta[index],
                 target_fps=self.cfg.DATA.TARGET_FPS,
+                backend=self.cfg.DATA.DECODING_BACKEND,
+                max_spatial_scale=max_scale,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
