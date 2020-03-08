@@ -17,7 +17,7 @@ setup(
         "termcolor>=1.1",
         "simplejson",
         "matplotlib",
-        "detectron2",
+        "torchvision>=0.4.2",
     ],
     packages=find_packages(exclude=("configs", "tests")),
 )

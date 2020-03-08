@@ -13,6 +13,7 @@
 - ffmpeg (4.0 is prefereed, will be installed along with PyAV)
 - PyYaml: (will be installed along with fvcore)
 - OpenCV: `pip install opencv-python`
+- torchvision: `pip install torchvision` or `conda install torchvision -c pytorch`
 - [Detectron2](https://github.com/facebookresearch/detectron2): 
 ```
     pip install -U torch torchvision cython
