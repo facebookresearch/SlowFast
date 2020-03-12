@@ -255,7 +255,10 @@ class Kinetics(torch.utils.data.Dataset):
         assert spatial_idx in [-1, 0, 1, 2]
         if spatial_idx == -1:
             frames, _ = transform.random_short_side_scale_jitter(
-                frames, min_scale, max_scale
+                images=frames,
+                min_size=min_scale,
+                max_size=max_scale,
+                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
             frames, _ = transform.random_crop(frames, crop_size)
             frames, _ = transform.horizontal_flip(0.5, frames)

@@ -6,7 +6,13 @@ import numpy as np
 import torch
 
 
-def random_short_side_scale_jitter(images, min_size, max_size, boxes=None):
+def random_short_side_scale_jitter(
+    images,
+    min_size,
+    max_size,
+    boxes=None,
+    inverse_uniform_sampling=False,
+):
     """
     Perform a spatial short scale jittering on the given images and
     corresponding boxes.
@@ -17,13 +23,21 @@ def random_short_side_scale_jitter(images, min_size, max_size, boxes=None):
         max_size (int): the maximal size to scale the frames.
         boxes (ndarray): optional. Corresponding boxes to images.
             Dimension is `num boxes` x 4.
+        inverse_uniform_sampling (bool): if True, sample uniformly in
+            [1 / max_scale, 1 / min_scale] and take a reciprocal to get the
+            scale. If False, take a uniform sample from [min_scale, max_scale].
     Returns:
         (tensor): the scaled images with dimension of
             `num frames` x `channel` x `new height` x `new width`.
         (ndarray or None): the scaled boxes with dimension of
             `num boxes` x 4.
     """
-    size = int(round(np.random.uniform(min_size, max_size)))
+    if inverse_uniform_sampling:
+        size = int(
+            round(1.0 / np.random.uniform(1.0 / min_size, 1.0 / max_size))
+        )
+    else:
+        size = int(round(np.random.uniform(min_size, max_size)))
 
     height = images.shape[2]
     width = images.shape[3]

@@ -5,7 +5,11 @@
 
 import torch.nn as nn
 
-_LOSSES = {"cross_entropy": nn.CrossEntropyLoss, "bce": nn.BCELoss}
+_LOSSES = {
+    "cross_entropy": nn.CrossEntropyLoss,
+    "bce": nn.BCELoss,
+    "bce_logit": nn.BCEWithLogitsLoss,
+}
 
 
 def get_loss_func(loss_name):
