@@ -34,7 +34,7 @@ def random_short_side_scale_jitter(
     """
     if inverse_uniform_sampling:
         size = int(
-            round(1.0 / np.random.uniform(1.0 / min_size, 1.0 / max_size))
+            round(1.0 / np.random.uniform(1.0 / max_size, 1.0 / min_size))
         )
     else:
         size = int(round(np.random.uniform(min_size, max_size)))
