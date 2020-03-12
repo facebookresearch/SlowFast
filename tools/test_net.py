@@ -17,6 +17,7 @@ from slowfast.utils.meters import AVAMeter, TestMeter
 logger = logging.get_logger(__name__)
 
 
+@torch.no_grad()
 def perform_test(test_loader, model, test_meter, cfg):
     """
     For classification:
