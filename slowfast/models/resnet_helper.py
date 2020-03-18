@@ -339,7 +339,7 @@ class ResStage(nn.Module):
         More details can be found here:
 
         Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-        "Slowfast networks for video recognition."
+        "SlowFast networks for video recognition."
         https://arxiv.org/pdf/1812.03982.pdf
     """
 

@@ -131,7 +131,7 @@ class SlowFast(nn.Module):
     SlowFast model builder for SlowFast network.
 
     Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-    "Slowfast networks for video recognition."
+    "SlowFast networks for video recognition."
     https://arxiv.org/pdf/1812.03982.pdf
     """
 
@@ -385,7 +385,7 @@ class ResNet(nn.Module):
     lateral connection (C2D, I3D, SlowOnly).
 
     Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-    "Slowfast networks for video recognition."
+    "SlowFast networks for video recognition."
     https://arxiv.org/pdf/1812.03982.pdf
 
     Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
