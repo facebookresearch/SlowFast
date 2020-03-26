@@ -46,7 +46,7 @@ BN:
 SOLVER:
   BASE_LR: 0.1
   LR_POLICY: steps_with_relative_lrs
-  STEPS: [0, 10, 5, 5]
+  STEPS: [0, 10, 15, 20]
   LRS: [1, 0.1, 0.01, 0.001]
   MAX_EPOCH: 20
   MOMENTUM: 0.9

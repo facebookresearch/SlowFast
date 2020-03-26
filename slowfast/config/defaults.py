@@ -3,6 +3,7 @@
 
 """Configs."""
 from fvcore.common.config import CfgNode
+
 from . import custom_config
 
 # -----------------------------------------------------------------------------
@@ -444,7 +445,7 @@ _C.AVA.GROUNDTRUTH_FILE = "ava_val_v2.2.csv"
 # Backend to process image, includes `pytorch` and `cv2`.
 _C.AVA.IMG_PROC_BACKEND = "cv2"
 
-# Add custom config with default values
+# Add custom config with default values.
 custom_config.add_custom_config(_C)
 
 

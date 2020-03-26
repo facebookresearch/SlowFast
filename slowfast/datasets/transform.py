@@ -7,11 +7,7 @@ import torch
 
 
 def random_short_side_scale_jitter(
-    images,
-    min_size,
-    max_size,
-    boxes=None,
-    inverse_uniform_sampling=False,
+    images, min_size, max_size, boxes=None, inverse_uniform_sampling=False
 ):
     """
     Perform a spatial short scale jittering on the given images and
