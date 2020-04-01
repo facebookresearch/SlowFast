@@ -12,6 +12,7 @@ import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
 from slowfast.datasets import loader
 from slowfast.models import build_model
+from slowfast.utils.env import setup_environment
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
@@ -112,12 +113,11 @@ def test(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    # Set up environment.
+    setup_environment()
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
-
-    # Setup logging format.
-    logging.setup_logging()
 
     # Print config.
     logger.info("Test with config:")

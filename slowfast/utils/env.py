@@ -3,7 +3,9 @@
 
 """Set up Environment."""
 
+import slowfast.utils.logging as logging
 
-def setup_dist_environment():
-    # Add your own env setting.
-    pass
+
+def setup_environment():
+    # Setup logging format.
+    logging.setup_logging()
