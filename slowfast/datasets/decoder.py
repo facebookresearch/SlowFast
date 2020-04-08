@@ -147,7 +147,7 @@ def torchvision_decode(
     # The video_meta is empty, fetch the meta data from the raw video.
     if len(video_meta) == 0:
         # Tracking the meta info for selective decoding in the future.
-        meta = io.read_video_meta_data_from_memory(video_tensor)
+        meta = io._probe_video_from_memory(video_tensor)
         # Using the information from video_meta to perform selective decoding.
         video_meta["video_timebase"] = meta.video_timebase
         video_meta["video_numerator"] = meta.video_timebase.numerator
@@ -163,7 +163,7 @@ def torchvision_decode(
         video_meta["audio_sample_rate"] = meta.audio_sample_rate
 
     # Decode the raw video with the tv decoder.
-    v_frames, _ = io.read_video_from_memory(
+    v_frames, _ = io._read_video_from_memory(
         video_tensor,
         seek_frame_margin=1.0,
         read_video_stream="visual" in modalities,
