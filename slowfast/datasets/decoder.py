@@ -162,6 +162,23 @@ def torchvision_decode(
         video_meta["audio_duration"] = meta.audio_duration
         video_meta["audio_sample_rate"] = meta.audio_sample_rate
 
+    if (
+        video_meta["has_video"]
+        and video_meta["video_denominator"] > 0
+        and video_meta["video_duration"] > 0
+    ):
+        decode_all_video = False
+        start_idx, end_idx = get_start_end_idx(
+            video_meta["video_fps"] * video_meta["video_duration"],
+            sampling_rate * num_frames / target_fps * video_meta["video_fps"],
+            clip_idx,
+            num_clips,
+        )
+        # Convert frame index to pts.
+        pts_per_frame = video_meta["video_denominator"] / video_meta["video_fps"]
+        video_start_pts = int(start_idx * pts_per_frame)
+        video_end_pts = int(end_idx * pts_per_frame)
+
     # Decode the raw video with the tv decoder.
     v_frames, _ = io._read_video_from_memory(
         video_tensor,
