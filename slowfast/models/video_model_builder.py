@@ -44,7 +44,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[3, 1]],  # res4 temporal kernel.
         [[1, 3]],  # res5 temporal kernel.
     ],
-    "slowonly": [
+    "slow": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
         [[1]],  # res3 temporal kernel.
@@ -65,7 +65,7 @@ _POOL1 = {
     "c2d_nopool": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],
     "i3d_nopool": [[1, 1, 1]],
-    "slowonly": [[1, 1, 1]],
+    "slow": [[1, 1, 1]],
     "slowfast": [[1, 1, 1], [1, 1, 1]],
 }
 
@@ -382,7 +382,7 @@ class SlowFast(nn.Module):
 class ResNet(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
-    lateral connection (C2D, I3D, SlowOnly).
+    lateral connection (C2D, I3D, Slow).
 
     Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
     "SlowFast networks for video recognition."

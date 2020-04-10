@@ -1,12 +1,10 @@
 TRAIN:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 64
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  # CHECKPOINT_FILE_PATH: path to the model to test
-  CHECKPOINT_TYPE: caffe2
 DATA:
   NUM_FRAMES: 4
   SAMPLING_RATE: 16
@@ -42,7 +40,7 @@ SOLVER:
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 400
-  ARCH: slowonly
+  ARCH: slow
   MODEL_NAME: ResNet
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5

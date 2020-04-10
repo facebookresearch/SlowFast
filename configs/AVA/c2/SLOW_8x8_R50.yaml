@@ -1,11 +1,11 @@
 TRAIN:
-  ENABLE: True
+  ENABLE: False
   DATASET: ava
   BATCH_SIZE: 64
-  EVAL_PERIOD: 5
+  EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  # CHECKPOINT_FILE_PATH: path to the pretrain checkpoint file.
+  # CHECKPOINT_FILE_PATH: path to pretrain model
   CHECKPOINT_TYPE: caffe2
 DATA:
   NUM_FRAMES: 4
@@ -16,14 +16,11 @@ DATA:
   INPUT_CHANNEL_NUM: [3]
 DETECTION:
   ENABLE: True
-  ALIGNED: True
+  ALIGNED: False
 AVA:
+  BGR: False
   DETECTION_SCORE_THRESH: 0.9
-  TRAIN_PREDICT_BOX_LISTS: [
-    "ava_train_v2.2.csv",
-    "person_box_67091280_iou90/ava_detection_train_boxes_and_labels_include_negative_v2.2.csv",
-  ]
-  TEST_PREDICT_BOX_LISTS: ["person_box_67091280_iou90/ava_detection_val_boxes_and_labels.csv"]
+  TEST_PREDICT_BOX_LISTS: ["person_box_67091280_iou75/ava_detection_val_boxes_and_labels.csv"]
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64
@@ -44,19 +41,12 @@ BN:
   MOMENTUM: 0.1
   WEIGHT_DECAY: 0.0
 SOLVER:
-  BASE_LR: 0.1
-  LR_POLICY: steps_with_relative_lrs
-  STEPS: [0, 10, 15, 20]
-  LRS: [1, 0.1, 0.01, 0.001]
-  MAX_EPOCH: 20
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-7
-  WARMUP_EPOCHS: 5
-  WARMUP_START_LR: 0.000125
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 80
-  ARCH: slowonly
+  ARCH: slow
   MODEL_NAME: ResNet
   LOSS_FUNC: bce
   DROPOUT_RATE: 0.5

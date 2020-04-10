@@ -335,7 +335,7 @@ class ResBlock(nn.Module):
 class ResStage(nn.Module):
     """
     Stage of 3D ResNet. It expects to have one or more tensors as input for
-        single pathway (C2D, I3D, SlowOnly), and multi-pathway (SlowFast) cases.
+        single pathway (C2D, I3D, Slow), and multi-pathway (SlowFast) cases.
         More details can be found here:
 
         Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.

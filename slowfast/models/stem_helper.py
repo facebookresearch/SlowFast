@@ -25,7 +25,7 @@ class VideoModelStem(nn.Module):
     ):
         """
         The `__init__` method of any subclass should also contain these
-        arguments. List size of 1 for single pathway models (C2D, I3D, SlowOnly
+        arguments. List size of 1 for single pathway models (C2D, I3D, Slow
         and etc), list size of 2 for two pathway models (SlowFast).
 
         Args:

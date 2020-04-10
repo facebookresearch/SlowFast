@@ -1,13 +1,15 @@
 TRAIN:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 64
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
+  # CHECKPOINT_FILE_PATH: path to the model to test
+  CHECKPOINT_TYPE: caffe2
 DATA:
-  NUM_FRAMES: 4
-  SAMPLING_RATE: 16
+  NUM_FRAMES: 8
+  SAMPLING_RATE: 8
   TRAIN_JITTER_SCALES: [256, 320]
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 256
@@ -21,7 +23,7 @@ RESNET:
   STRIDE_1X1: False
   NUM_BLOCK_TEMP_KERNEL: [[3], [4], [6], [3]]
 NONLOCAL:
-  LOCATION: [[[]], [[1, 3]], [[1, 3, 5]], [[]]]
+  LOCATION: [[[]], [[]], [[]], [[]]]
   GROUP: [[1], [1], [1], [1]]
   INSTANTIATION: dot_product
 BN:
@@ -40,7 +42,7 @@ SOLVER:
   OPTIMIZING_METHOD: sgd
 MODEL:
   NUM_CLASSES: 400
-  ARCH: slowonly
+  ARCH: slow
   MODEL_NAME: ResNet
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5
