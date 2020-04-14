@@ -262,6 +262,9 @@ _C.DATA.DECODING_BACKEND = "pyav"
 # [min_scale, max_scale].
 _C.DATA.INV_UNIFORM_SAMPLE = False
 
+# If True, perform random horizontal flip on the video frames during training.
+_C.DATA.RANDOM_FLIP = True
+
 # ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #

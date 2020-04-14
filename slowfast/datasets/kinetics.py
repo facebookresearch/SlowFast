@@ -207,6 +207,7 @@ class Kinetics(torch.utils.data.Dataset):
                 min_scale=min_scale,
                 max_scale=max_scale,
                 crop_size=crop_size,
+                random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
             )
 
             label = self._labels[index]
@@ -233,6 +234,7 @@ class Kinetics(torch.utils.data.Dataset):
         min_scale=256,
         max_scale=320,
         crop_size=224,
+        random_horizontal_flip=True,
     ):
         """
         Perform spatial sampling on the given video frames. If spatial_idx is
@@ -262,7 +264,8 @@ class Kinetics(torch.utils.data.Dataset):
                 inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
             frames, _ = transform.random_crop(frames, crop_size)
-            frames, _ = transform.horizontal_flip(0.5, frames)
+            if random_horizontal_flip:
+                frames, _ = transform.horizontal_flip(0.5, frames)
         else:
             # The testing is deterministic and no jitter should be performed.
             # min_scale, max_scale, and crop_size are expect to be the same.

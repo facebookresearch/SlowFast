@@ -31,6 +31,7 @@ class Ava(torch.utils.data.Dataset):
         self._data_mean = cfg.DATA.MEAN
         self._data_std = cfg.DATA.STD
         self._use_bgr = cfg.AVA.BGR
+        self.random_horizontal_flip = cfg.DATA.RANDOM_FLIP
         if self._split == "train":
             self._crop_size = cfg.DATA.TRAIN_CROP_SIZE
             self._jitter_min_scale = cfg.DATA.TRAIN_JITTER_SCALES[0]
@@ -132,10 +133,11 @@ class Ava(torch.utils.data.Dataset):
                 imgs, self._crop_size, order="HWC", boxes=boxes
             )
 
-            # random flip
-            imgs, boxes = cv2_transform.horizontal_flip_list(
-                0.5, imgs, order="HWC", boxes=boxes
-            )
+            if self.random_horizontal_flip:
+                # random flip
+                imgs, boxes = cv2_transform.horizontal_flip_list(
+                    0.5, imgs, order="HWC", boxes=boxes
+                )
         elif self._split == "val":
             # Short side to test_scale. Non-local and STRG uses 256.
             imgs = [cv2_transform.scale(self._crop_size, img) for img in imgs]
