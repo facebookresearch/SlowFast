@@ -66,6 +66,7 @@ MODEL:
   MODEL_NAME: SlowFast
   LOSS_FUNC: bce
   DROPOUT_RATE: 0.5
+  HEAD_ACT: sigmoid
 TEST:
   ENABLE: True
   DATASET: ava

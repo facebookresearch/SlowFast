@@ -331,7 +331,7 @@ class SlowFast(nn.Module):
                 resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2] * 2,
                 scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR] * 2,
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func="sigmoid",
+                act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
             )
         else:
@@ -356,6 +356,7 @@ class SlowFast(nn.Module):
                     ],
                 ],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
             )
 
     def forward(self, x, bboxes=None):
@@ -531,7 +532,7 @@ class ResNet(nn.Module):
                 resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
                 scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func="sigmoid",
+                act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
             )
         else:
@@ -546,6 +547,7 @@ class ResNet(nn.Module):
                     ]
                 ],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
             )
 
     def forward(self, x, bboxes=None):
