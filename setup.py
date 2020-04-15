@@ -16,6 +16,8 @@ setup(
         "matplotlib",
         "termcolor>=1.1",
         "simplejson",
+        "tqdm",
+        "psutil",
         "matplotlib",
         "torchvision>=0.4.2",
     ],

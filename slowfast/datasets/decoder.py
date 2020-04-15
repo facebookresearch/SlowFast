@@ -175,7 +175,9 @@ def torchvision_decode(
             num_clips,
         )
         # Convert frame index to pts.
-        pts_per_frame = video_meta["video_denominator"] / video_meta["video_fps"]
+        pts_per_frame = (
+            video_meta["video_denominator"] / video_meta["video_fps"]
+        )
         video_start_pts = int(start_idx * pts_per_frame)
         video_end_pts = int(end_idx * pts_per_frame)
 

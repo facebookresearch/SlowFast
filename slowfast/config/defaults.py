@@ -342,6 +342,17 @@ _C.LOG_PERIOD = 10
 # Distributed backend.
 _C.DIST_BACKEND = "nccl"
 
+# ---------------------------------------------------------------------------- #
+# Benchmark options
+# ---------------------------------------------------------------------------- #
+_C.BENCHMARK = CfgNode()
+
+# Number of epochs for data loading benchmark.
+_C.BENCHMARK.NUM_EPOCHS = 5
+
+# Log period in iters for data loading benchmark.
+_C.BENCHMARK.LOG_PERIOD = 100
+
 
 # ---------------------------------------------------------------------------- #
 # Common train/test data loader options
