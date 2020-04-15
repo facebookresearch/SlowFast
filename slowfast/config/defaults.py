@@ -307,7 +307,7 @@ _C.SOLVER.WEIGHT_DECAY = 1e-4
 _C.SOLVER.WARMUP_FACTOR = 0.1
 
 # Gradually warm up the SOLVER.BASE_LR over this number of epochs.
-_C.SOLVER.WARMUP_EPOCHS = 0
+_C.SOLVER.WARMUP_EPOCHS = 0.0
 
 # The start learning rate of the warm up.
 _C.SOLVER.WARMUP_START_LR = 0.01
