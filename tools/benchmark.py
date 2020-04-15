@@ -27,6 +27,9 @@ def benchmark_data(cfg):
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
 
+    # Setup logging format.
+    logging.setup_logging()
+
     # Print config.
     logger.info("Benchmark data loading with config:")
     logger.info(pprint.pformat(cfg))
