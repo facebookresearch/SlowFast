@@ -265,6 +265,13 @@ _C.DATA.INV_UNIFORM_SAMPLE = False
 # If True, perform random horizontal flip on the video frames during training.
 _C.DATA.RANDOM_FLIP = True
 
+# If True, calculdate the map as metric.
+_C.DATA.MULTI_LABEL = False
+
+# Method to perform the ensemble, options include "sum" and "max".
+_C.DATA.ENSEMBLE_METHOD = "sum"
+
+
 # ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #

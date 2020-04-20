@@ -177,6 +177,8 @@ def test(cfg):
             cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
             cfg.MODEL.NUM_CLASSES,
             len(test_loader),
+            cfg.DATA.MULTI_LABEL,
+            cfg.DATA.ENSEMBLE_METHOD,
         )
 
     # # Perform multi-view test on the entire dataset.

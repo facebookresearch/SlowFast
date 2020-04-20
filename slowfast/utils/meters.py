@@ -21,6 +21,8 @@ from slowfast.utils.ava_eval_helper import (
     read_labelmap,
 )
 
+from sklearn.metrics import average_precision_score
+
 logger = logging.get_logger(__name__)
 
 
@@ -218,7 +220,15 @@ class TestMeter(object):
     The accuracy is calculated with the given ground truth labels.
     """
 
-    def __init__(self, num_videos, num_clips, num_cls, overall_iters):
+    def __init__(
+        self,
+        num_videos,
+        num_clips,
+        num_cls,
+        overall_iters,
+        multi_label=False,
+        ensemble_method="sum",
+    ):
         """
         Construct tensors to store the predictions and labels. Expect to get
         num_clips predictions from each video, and calculate the metrics on
@@ -229,14 +239,26 @@ class TestMeter(object):
                 aggregating the final prediction for the video.
             num_cls (int): number of classes for each prediction.
             overall_iters (int): overall iterations for testing.
+            multi_label (bool): if True, use map as the metric.
+            ensemble_method (str): method to perform the ensemble, options
+                include "sum", and "max".
         """
 
         self.iter_timer = Timer()
         self.num_clips = num_clips
         self.overall_iters = overall_iters
+        self.multi_label = multi_label
+        self.ensemble_method = ensemble_method
         # Initialize tensors.
         self.video_preds = torch.zeros((num_videos, num_cls))
-        self.video_labels = torch.zeros((num_videos)).long()
+        if multi_label:
+            self.video_preds -= 1e10
+
+        self.video_labels = (
+            torch.zeros((num_videos, num_cls))
+            if multi_label
+            else torch.zeros((num_videos)).long()
+        )
         self.clip_count = torch.zeros((num_videos)).long()
         # Reset metric.
         self.reset()
@@ -247,6 +269,8 @@ class TestMeter(object):
         """
         self.clip_count.zero_()
         self.video_preds.zero_()
+        if self.multi_label:
+            self.video_preds -= 1e10
         self.video_labels.zero_()
 
     def update_stats(self, preds, labels, clip_ids):
@@ -264,8 +288,24 @@ class TestMeter(object):
         """
         for ind in range(preds.shape[0]):
             vid_id = int(clip_ids[ind]) // self.num_clips
+            if self.video_labels[vid_id].sum() > 0:
+                assert torch.equal(
+                    self.video_labels[vid_id].type(torch.FloatTensor),
+                    labels[ind].type(torch.FloatTensor),
+                )
             self.video_labels[vid_id] = labels[ind]
-            self.video_preds[vid_id] += preds[ind]
+            if self.ensemble_method == "sum":
+                self.video_preds[vid_id] += preds[ind]
+            elif self.ensemble_method == "max":
+                self.video_preds[vid_id] = torch.max(
+                    self.video_preds[vid_id], preds[ind]
+                )
+            else:
+                raise NotImplementedError(
+                    "Ensemble Method {} is not supported".format(
+                        self.ensemble_method
+                    )
+                )
             self.clip_count[vid_id] += 1
 
     def log_iter_stats(self, cur_iter):
@@ -299,21 +339,35 @@ class TestMeter(object):
         if not all(self.clip_count == self.num_clips):
             logger.warning(
                 "clip count {} ~= num clips {}".format(
-                    self.clip_count, self.num_clips
+                    ", ".join(
+                        [
+                            "{}: {}".format(i, k)
+                            for i, k in enumerate(self.clip_count.tolist())
+                        ]
+                    ),
+                    self.num_clips,
                 )
             )
-            logger.warning(self.clip_count)
 
-        num_topks_correct = metrics.topks_correct(
-            self.video_preds, self.video_labels, ks
-        )
-        topks = [
-            (x / self.video_preds.size(0)) * 100.0 for x in num_topks_correct
-        ]
-        assert len({len(ks), len(topks)}) == 1
         stats = {"split": "test_final"}
-        for k, topk in zip(ks, topks):
-            stats["top{}_acc".format(k)] = "{:.{prec}f}".format(topk, prec=2)
+        if self.multi_label:
+            map = get_map(
+                self.video_preds.cpu().numpy(), self.video_labels.cpu().numpy()
+            )
+            stats["map"] = map
+        else:
+            num_topks_correct = metrics.topks_correct(
+                self.video_preds, self.video_labels, ks
+            )
+            topks = [
+                (x / self.video_preds.size(0)) * 100.0
+                for x in num_topks_correct
+            ]
+            assert len({len(ks), len(topks)}) == 1
+            for k, topk in zip(ks, topks):
+                stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
+                    topk, prec=2
+                )
         logging.log_json_stats(stats)
 
 
@@ -429,16 +483,18 @@ class TrainMeter(object):
             lr (float): learning rate.
             mb_size (int): mini batch size.
         """
-        # Current minibatch stats
-        self.mb_top1_err.add_value(top1_err)
-        self.mb_top5_err.add_value(top5_err)
         self.loss.add_value(loss)
         self.lr = lr
-        # Aggregate stats
-        self.num_top1_mis += top1_err * mb_size
-        self.num_top5_mis += top5_err * mb_size
         self.loss_total += loss * mb_size
         self.num_samples += mb_size
+
+        if not self._cfg.DATA.MULTI_LABEL:
+            # Current minibatch stats
+            self.mb_top1_err.add_value(top1_err)
+            self.mb_top5_err.add_value(top5_err)
+            # Aggregate stats
+            self.num_top1_mis += top1_err * mb_size
+            self.num_top5_mis += top5_err * mb_size
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
@@ -460,12 +516,13 @@ class TrainMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_err": self.mb_top1_err.get_win_median(),
-            "top5_err": self.mb_top5_err.get_win_median(),
             "loss": self.loss.get_win_median(),
             "lr": self.lr,
             "mem": int(np.ceil(mem_usage)),
         }
+        if not self._cfg.DATA.MULTI_LABEL:
+            stats["top1_err"] = self.mb_top1_err.get_win_median()
+            stats["top5_err"] = self.mb_top5_err.get_win_median()
         logging.log_json_stats(stats)
 
     def log_epoch_stats(self, cur_epoch):
@@ -479,20 +536,21 @@ class TrainMeter(object):
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         mem_usage = misc.gpu_mem_usage()
-        top1_err = self.num_top1_mis / self.num_samples
-        top5_err = self.num_top5_mis / self.num_samples
-        avg_loss = self.loss_total / self.num_samples
         stats = {
             "_type": "train_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_err": top1_err,
-            "top5_err": top5_err,
-            "loss": avg_loss,
             "lr": self.lr,
             "mem": int(np.ceil(mem_usage)),
         }
+        if not self._cfg.DATA.MULTI_LABEL:
+            top1_err = self.num_top1_mis / self.num_samples
+            top5_err = self.num_top5_mis / self.num_samples
+            avg_loss = self.loss_total / self.num_samples
+            stats["top1_err"] = top1_err
+            stats["top5_err"] = top5_err
+            stats["loss"] = avg_loss
         logging.log_json_stats(stats)
 
 
@@ -520,6 +578,8 @@ class ValMeter(object):
         self.num_top1_mis = 0
         self.num_top5_mis = 0
         self.num_samples = 0
+        self.all_preds = []
+        self.all_labels = []
 
     def reset(self):
         """
@@ -531,6 +591,8 @@ class ValMeter(object):
         self.num_top1_mis = 0
         self.num_top5_mis = 0
         self.num_samples = 0
+        self.all_preds = []
+        self.all_labels = []
 
     def iter_tic(self):
         """
@@ -558,6 +620,17 @@ class ValMeter(object):
         self.num_top5_mis += top5_err * mb_size
         self.num_samples += mb_size
 
+    def update_predictions(self, preds, labels):
+        """
+        Update predictions and labels.
+        Args:
+            preds (tensor): model output predictions.
+            labels (tensor): labels.
+        """
+        # TODO: merge update_prediction with update_stats.
+        self.all_preds.append(preds)
+        self.all_labels.append(labels)
+
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
         log the stats of the current iteration.
@@ -576,10 +649,11 @@ class ValMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_err": self.mb_top1_err.get_win_median(),
-            "top5_err": self.mb_top5_err.get_win_median(),
             "mem": int(np.ceil(mem_usage)),
         }
+        if not self._cfg.DATA.MULTI_LABEL:
+            stats["top1_err"] = self.mb_top1_err.get_win_median()
+            stats["top5_err"] = self.mb_top5_err.get_win_median()
         logging.log_json_stats(stats)
 
     def log_epoch_stats(self, cur_epoch):
@@ -588,19 +662,54 @@ class ValMeter(object):
         Args:
             cur_epoch (int): the number of current epoch.
         """
-        top1_err = self.num_top1_mis / self.num_samples
-        top5_err = self.num_top5_mis / self.num_samples
-        self.min_top1_err = min(self.min_top1_err, top1_err)
-        self.min_top5_err = min(self.min_top5_err, top5_err)
         mem_usage = misc.gpu_mem_usage()
         stats = {
             "_type": "val_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
-            "top1_err": top1_err,
-            "top5_err": top5_err,
-            "min_top1_err": self.min_top1_err,
-            "min_top5_err": self.min_top5_err,
             "mem": int(np.ceil(mem_usage)),
         }
+        if self._cfg.DATA.MULTI_LABEL:
+            stats["map"] = get_map(
+                torch.cat(self.all_preds).cpu().numpy(),
+                torch.cat(self.all_labels).cpu().numpy(),
+            )
+        else:
+            top1_err = self.num_top1_mis / self.num_samples
+            top5_err = self.num_top5_mis / self.num_samples
+            self.min_top1_err = min(self.min_top1_err, top1_err)
+            self.min_top5_err = min(self.min_top5_err, top5_err)
+
+            stats["top1_err"] = top1_err
+            stats["top5_err"] = top5_err
+            stats["min_top1_err"] = self.min_top1_err
+            stats["min_top5_err"] = self.min_top5_err
+
         logging.log_json_stats(stats)
+
+
+def get_map(preds, labels):
+    """
+    Compute mAP for multi-label case.
+    Args:
+        preds (numpy tensor): num_examples x num_classes.
+        labels (numpy tensor): num_examples x num_classes.
+    Returns:
+        mean_ap (int): final mAP score.
+    """
+
+    logger.info("Getting mAP for {} examples".format(preds.shape[0]))
+
+    preds = preds[:, ~np.all(labels == 0, axis=0)]
+    labels = labels[:, ~np.all(labels == 0, axis=0)]
+    aps = [0]
+    try:
+        aps = average_precision_score(labels, preds, average=None)
+    except ValueError:
+        print(
+            "Average precision requires a sufficient number of samples \
+            in a batch which are missing in this sample."
+        )
+
+    mean_ap = np.mean(aps)
+    return mean_ap
