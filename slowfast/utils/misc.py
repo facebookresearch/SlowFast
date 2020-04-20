@@ -13,6 +13,7 @@ from torch import nn
 
 import slowfast.utils.logging as logging
 from slowfast.datasets.utils import pack_pathway_output
+from slowfast.models.batchnorm_helper import SubBatchNorm3d
 
 logger = logging.get_logger(__name__)
 
@@ -160,3 +161,21 @@ def frozen_bn_stats(model):
     for m in model.modules():
         if isinstance(m, nn.BatchNorm3d):
             m.eval()
+
+
+def aggregate_split_bn_stats(module):
+    """
+    Recursively find all SubBN modules and aggregate sub-BN stats.
+    Args:
+        module (nn.Module)
+    Returns:
+        count (int): number of SubBN module found.
+    """
+    count = 0
+    for child in module.children():
+        if isinstance(child, SubBatchNorm3d):
+            child.aggregate_stats()
+            count += 1
+        else:
+            count += aggregate_split_bn_stats(child)
+    return count

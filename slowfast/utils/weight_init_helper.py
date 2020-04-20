@@ -34,8 +34,10 @@ def init_weights(model, fc_init_std=0.01, zero_init_final_bn=True):
                 batchnorm_weight = 0.0
             else:
                 batchnorm_weight = 1.0
-            m.weight.data.fill_(batchnorm_weight)
-            m.bias.data.zero_()
+            if m.weight is not None:
+                m.weight.data.fill_(batchnorm_weight)
+            if m.bias is not None:
+                m.bias.data.zero_()
         if isinstance(m, nn.Linear):
             m.weight.data.normal_(mean=0.0, std=fc_init_std)
             m.bias.data.zero_()

@@ -243,6 +243,8 @@ def train(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    # Set up environment.
+    du.init_distributed_training(cfg)
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
@@ -256,7 +258,7 @@ def train(cfg):
 
     # Build the video model and print model statistics.
     model = build_model(cfg)
-    if du.is_master_proc():
+    if du.is_master_proc() and cfg.LOG_MODEL_INFO:
         misc.log_model_info(model, cfg, is_train=True)
 
     # Construct the optimizer.
@@ -310,6 +312,7 @@ def train(cfg):
             calculate_and_update_precise_bn(
                 train_loader, model, cfg.BN.NUM_BATCHES_PRECISE
             )
+        _ = misc.aggregate_split_bn_stats(model, 0)
 
         # Save a checkpoint.
         if cu.is_checkpoint_epoch(cur_epoch, cfg.TRAIN.CHECKPOINT_PERIOD):

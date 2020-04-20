@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
+from slowfast.models.batchnorm_helper import get_norm
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
@@ -86,6 +87,7 @@ class FuseFastToSlow(nn.Module):
         eps=1e-5,
         bn_mmt=0.1,
         inplace_relu=True,
+        norm_module=nn.BatchNorm3d,
     ):
         """
         Args:
@@ -100,6 +102,8 @@ class FuseFastToSlow(nn.Module):
                 PyTorch = 1 - BN momentum in Caffe2.
             inplace_relu (bool): if True, calculate the relu on the original
                 input without allocating new memory.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(FuseFastToSlow, self).__init__()
         self.conv_f2s = nn.Conv3d(
@@ -110,8 +114,10 @@ class FuseFastToSlow(nn.Module):
             padding=[fusion_kernel // 2, 0, 0],
             bias=False,
         )
-        self.bn = nn.BatchNorm3d(
-            dim_in * fusion_conv_channel_ratio, eps=eps, momentum=bn_mmt
+        self.bn = norm_module(
+            num_features=dim_in * fusion_conv_channel_ratio,
+            eps=eps,
+            momentum=bn_mmt,
         )
         self.relu = nn.ReLU(inplace_relu)
 
@@ -144,6 +150,7 @@ class SlowFast(nn.Module):
                 comments of the config file.
         """
         super(SlowFast, self).__init__()
+        self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
@@ -155,7 +162,6 @@ class SlowFast(nn.Module):
         """
         Builds a SlowFast model. The first pathway is the Slow pathway and the
             second pathway is the Fast pathway.
-
         Args:
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
@@ -185,12 +191,14 @@ class SlowFast(nn.Module):
                 [temp_kernel[0][0][0] // 2, 3, 3],
                 [temp_kernel[0][1][0] // 2, 3, 3],
             ],
+            norm_module=self.norm_module,
         )
         self.s1_fuse = FuseFastToSlow(
             width_per_group // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s2 = resnet_helper.ResStage(
@@ -214,12 +222,14 @@ class SlowFast(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
         )
         self.s2_fuse = FuseFastToSlow(
             width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         for pathway in range(self.num_pathways):
@@ -251,12 +261,14 @@ class SlowFast(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
         )
         self.s3_fuse = FuseFastToSlow(
             width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s4 = resnet_helper.ResStage(
@@ -280,12 +292,14 @@ class SlowFast(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
         )
         self.s4_fuse = FuseFastToSlow(
             width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s5 = resnet_helper.ResStage(
@@ -309,6 +323,7 @@ class SlowFast(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
         )
 
         if cfg.DETECTION.ENABLE:
@@ -404,6 +419,7 @@ class ResNet(nn.Module):
                 comments of the config file.
         """
         super(ResNet, self).__init__()
+        self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
         self._construct_network(cfg)
@@ -438,6 +454,7 @@ class ResNet(nn.Module):
             kernel=[temp_kernel[0][0] + [7, 7]],
             stride=[[1, 2, 2]],
             padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
         )
 
         self.s2 = resnet_helper.ResStage(
@@ -457,6 +474,7 @@ class ResNet(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
         )
 
         for pathway in range(self.num_pathways):
@@ -484,6 +502,7 @@ class ResNet(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
         )
 
         self.s4 = resnet_helper.ResStage(
@@ -503,6 +522,7 @@ class ResNet(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
         )
 
         self.s5 = resnet_helper.ResStage(
@@ -522,6 +542,7 @@ class ResNet(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
         )
 
         if self.enable_detection:

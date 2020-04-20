@@ -23,11 +23,11 @@ class Nonlocal(nn.Module):
         dim_inner,
         pool_size=None,
         instantiation="softmax",
-        norm_type="batchnorm",
         zero_init_final_conv=False,
         zero_init_final_norm=True,
         norm_eps=1e-5,
         norm_momentum=0.1,
+        norm_module=nn.BatchNorm3d,
     ):
         """
         Args:
@@ -40,23 +40,19 @@ class Nonlocal(nn.Module):
             instantiation (string): supports two different instantiation method:
                 "dot_product": normalizing correlation matrix with L2.
                 "softmax": normalizing correlation matrix with Softmax.
-            norm_type (string): support BatchNorm and LayerNorm for
-                normalization.
-                "batchnorm": using BatchNorm for normalization.
-                "layernorm": using LayerNorm for normalization.
-                "none": not using any normalization.
             zero_init_final_conv (bool): If true, zero initializing the final
                 convolution of the Non-local block.
             zero_init_final_norm (bool):
                 If true, zero initializing the final batch norm of the Non-local
                 block.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(Nonlocal, self).__init__()
         self.dim = dim
         self.dim_inner = dim_inner
         self.pool_size = pool_size
         self.instantiation = instantiation
-        self.norm_type = norm_type
         self.use_pool = (
             False
             if pool_size is None
@@ -64,9 +60,13 @@ class Nonlocal(nn.Module):
         )
         self.norm_eps = norm_eps
         self.norm_momentum = norm_momentum
-        self._construct_nonlocal(zero_init_final_conv, zero_init_final_norm)
+        self._construct_nonlocal(
+            zero_init_final_conv, zero_init_final_norm, norm_module
+        )
 
-    def _construct_nonlocal(self, zero_init_final_conv, zero_init_final_norm):
+    def _construct_nonlocal(
+        self, zero_init_final_conv, zero_init_final_norm, norm_module
+    ):
         # Three convolution heads: theta, phi, and g.
         self.conv_theta = nn.Conv3d(
             self.dim, self.dim_inner, kernel_size=1, stride=1, padding=0
@@ -85,26 +85,14 @@ class Nonlocal(nn.Module):
         # Zero initializing the final convolution output.
         self.conv_out.zero_init = zero_init_final_conv
 
-        if self.norm_type == "batchnorm":
-            self.bn = nn.BatchNorm3d(
-                self.dim, eps=self.norm_eps, momentum=self.norm_momentum
-            )
-            # Zero initializing the final bn.
-            self.bn.transform_final_bn = zero_init_final_norm
-        elif self.norm_type == "layernorm":
-            # In Caffe2 the LayerNorm op does not contain the scale an bias
-            # terms described in the paper:
-            # https://caffe2.ai/docs/operators-catalogue.html#layernorm
-            # Builds LayerNorm as GroupNorm with one single group.
-            # Setting Affine to false to align with Caffe2.
-            self.ln = nn.GroupNorm(1, self.dim, eps=self.norm_eps, affine=False)
-        elif self.norm_type == "none":
-            # Does not use any norm.
-            pass
-        else:
-            raise NotImplementedError(
-                "Norm type {} is not supported".format(self.norm_type)
-            )
+        # TODO: change the name to `norm`
+        self.bn = norm_module(
+            num_features=self.dim,
+            eps=self.norm_eps,
+            momentum=self.norm_momentum,
+        )
+        # Zero initializing the final bn.
+        self.bn.transform_final_bn = zero_init_final_norm
 
         # Optional to add the spatial-temporal pooling.
         if self.use_pool:
@@ -156,8 +144,5 @@ class Nonlocal(nn.Module):
         theta_phi_g = theta_phi_g.view(N, self.dim_inner, T, H, W)
 
         p = self.conv_out(theta_phi_g)
-        if self.norm_type == "batchnorm":
-            p = self.bn(p)
-        elif self.norm_type == "layernorm":
-            p = self.ln(p)
+        p = self.bn(p)
         return x_identity + p

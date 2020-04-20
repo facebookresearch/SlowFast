@@ -32,6 +32,17 @@ _C.BN.NUM_BATCHES_PRECISE = 200
 # Weight decay value that applies on BN.
 _C.BN.WEIGHT_DECAY = 0.0
 
+# Norm type, options include `batchnorm`, `sub_batchnorm`, `sync_batchnorm`
+_C.BN.NORM_TYPE = "batchnorm"
+
+# Parameter for SplitBatchNorm, where it splits the batch dimension into
+# NUM_SPLITS splits, and run BN on each of them separately independently.
+_C.BN.NUM_SPLITS = 1
+
+# Parameter for NaiveSyncBatchNorm3d, where the stats across `NUM_SYNC_DEVICES`
+# devices will be synchronized.
+_C.BN.NUM_SYNC_DEVICES = 1
+
 
 # ---------------------------------------------------------------------------- #
 # Training options.
@@ -345,6 +356,9 @@ _C.RNG_SEED = 1
 
 # Log period in iters.
 _C.LOG_PERIOD = 10
+
+# If True, log the model info.
+_C.LOG_MODEL_INFO = True
 
 # Distributed backend.
 _C.DIST_BACKEND = "nccl"
