@@ -20,6 +20,7 @@ setup(
         "psutil",
         "matplotlib",
         "torchvision>=0.4.2",
+        "sklearn"
     ],
     packages=find_packages(exclude=("configs", "tests")),
 )
