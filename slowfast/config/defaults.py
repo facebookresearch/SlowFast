@@ -282,6 +282,9 @@ _C.DATA.MULTI_LABEL = False
 # Method to perform the ensemble, options include "sum" and "max".
 _C.DATA.ENSEMBLE_METHOD = "sum"
 
+# If True, revert the default input channel (RBG <-> BGR).
+_C.DATA.REVERSE_INPUT_CHANNEL = False
+
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options

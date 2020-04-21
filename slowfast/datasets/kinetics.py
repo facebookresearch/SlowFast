@@ -10,7 +10,6 @@ from fvcore.common.file_io import PathManager
 import slowfast.utils.logging as logging
 
 from . import decoder as decoder
-from . import transform as transform
 from . import utils as utils
 from . import video_container as container
 from .build import DATASET_REGISTRY
@@ -194,20 +193,20 @@ class Kinetics(torch.utils.data.Dataset):
                 continue
 
             # Perform color normalization.
-            frames = frames.float()
-            frames = frames / 255.0
-            frames = frames - torch.tensor(self.cfg.DATA.MEAN)
-            frames = frames / torch.tensor(self.cfg.DATA.STD)
+            frames = utils.tensor_normalize(
+                frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
+            )
             # T H W C -> C T H W.
             frames = frames.permute(3, 0, 1, 2)
             # Perform data augmentation.
-            frames = self.spatial_sampling(
+            frames = utils.spatial_sampling(
                 frames,
                 spatial_idx=spatial_sample_index,
                 min_scale=min_scale,
                 max_scale=max_scale,
                 crop_size=crop_size,
                 random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
 
             label = self._labels[index]
@@ -226,52 +225,3 @@ class Kinetics(torch.utils.data.Dataset):
             (int): the number of videos in the dataset.
         """
         return len(self._path_to_videos)
-
-    def spatial_sampling(
-        self,
-        frames,
-        spatial_idx=-1,
-        min_scale=256,
-        max_scale=320,
-        crop_size=224,
-        random_horizontal_flip=True,
-    ):
-        """
-        Perform spatial sampling on the given video frames. If spatial_idx is
-        -1, perform random scale, random crop, and random flip on the given
-        frames. If spatial_idx is 0, 1, or 2, perform spatial uniform sampling
-        with the given spatial_idx.
-        Args:
-            frames (tensor): frames of images sampled from the video. The
-                dimension is `num frames` x `height` x `width` x `channel`.
-            spatial_idx (int): if -1, perform random spatial sampling. If 0, 1,
-                or 2, perform left, center, right crop if width is larger than
-                height, and perform top, center, buttom crop if height is larger
-                than width.
-            min_scale (int): the minimal size of scaling.
-            max_scale (int): the maximal size of scaling.
-            crop_size (int): the size of height and width used to crop the
-                frames.
-        Returns:
-            frames (tensor): spatially sampled frames.
-        """
-        assert spatial_idx in [-1, 0, 1, 2]
-        if spatial_idx == -1:
-            frames, _ = transform.random_short_side_scale_jitter(
-                images=frames,
-                min_size=min_scale,
-                max_size=max_scale,
-                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-            )
-            frames, _ = transform.random_crop(frames, crop_size)
-            if random_horizontal_flip:
-                frames, _ = transform.horizontal_flip(0.5, frames)
-        else:
-            # The testing is deterministic and no jitter should be performed.
-            # min_scale, max_scale, and crop_size are expect to be the same.
-            assert len({min_scale, max_scale, crop_size}) == 1
-            frames, _ = transform.random_short_side_scale_jitter(
-                frames, min_scale, max_scale
-            )
-            frames, _ = transform.uniform_crop(frames, crop_size, spatial_idx)
-        return frames
