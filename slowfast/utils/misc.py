@@ -6,6 +6,7 @@ import math
 import numpy as np
 import os
 from datetime import datetime
+import psutil
 import torch
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
@@ -39,10 +40,24 @@ def params_count(model):
 
 def gpu_mem_usage():
     """
-    Compute the GPU memory usage for the current device (MB).
+    Compute the GPU memory usage for the current device (GB).
     """
     mem_usage_bytes = torch.cuda.max_memory_allocated()
-    return mem_usage_bytes / (1024 * 1024)
+    return mem_usage_bytes / 1024 ** 3
+
+
+def cpu_mem_usage():
+    """
+    Compute the system memory (RAM) usage for the current device (GB).
+    Returns:
+        usage (float): used memory (GB).
+        total (float): total memory (GB).
+    """
+    vram = psutil.virtual_memory()
+    usage = (vram.total - vram.available) / 1024 ** 3
+    total = vram.total / 1024 ** 3
+
+    return usage, total
 
 
 def get_flop_stats(model, cfg, is_train):

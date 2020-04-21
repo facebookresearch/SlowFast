@@ -6,12 +6,12 @@ A script to benchmark data loading.
 
 import numpy as np
 import pprint
-import psutil
 import torch
 import tqdm
 from fvcore.common.timer import Timer
 
 import slowfast.utils.logging as logging
+import slowfast.utils.misc as misc
 import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets import loader
 from slowfast.utils.env import setup_environment
@@ -50,7 +50,7 @@ def benchmark_data(cfg):
         for cur_iter, _ in enumerate(tqdm.tqdm(dataloader)):
             if cur_iter > 0 and cur_iter % log_period == 0:
                 iter_times.append(timer.seconds())
-                vram = psutil.virtual_memory()
+                ram_usage, ram_total = misc.cpu_mem_usage()
                 logger.info(
                     "Epoch {}: {} iters ({} videos) in {:.2f} seconds. "
                     "RAM Usage: {:.2f}/{:.2f} GB.".format(
@@ -58,13 +58,13 @@ def benchmark_data(cfg):
                         log_period,
                         log_period * batch_size,
                         iter_times[-1],
-                        (vram.total - vram.available) / 1024 ** 3,
-                        vram.total / 1024 ** 3,
+                        ram_usage,
+                        ram_total,
                     )
                 )
                 timer.reset()
         epoch_times.append(timer_epoch.seconds())
-        vram = psutil.virtual_memory()
+        ram_usage, ram_total = misc.cpu_mem_usage()
         logger.info(
             "Epoch {}: in total {} iters ({} videos) in {:.2f} seconds. "
             "RAM Usage: {:.2f}/{:.2f} GB.".format(
@@ -72,8 +72,8 @@ def benchmark_data(cfg):
                 len(dataloader),
                 len(dataloader) * batch_size,
                 epoch_times[-1],
-                (vram.total - vram.available) / 1024 ** 3,
-                vram.total / 1024 ** 3,
+                ram_usage,
+                ram_total,
             )
         )
         logger.info(

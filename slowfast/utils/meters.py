@@ -208,6 +208,8 @@ class AVAMeter(object):
                 "cur_epoch": "{}".format(cur_epoch + 1),
                 "mode": self.mode,
                 "map": self.full_map,
+                "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
+                "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
             }
             logging.log_json_stats(stats)
 
@@ -509,7 +511,6 @@ class TrainMeter(object):
             self.MAX_EPOCH - (cur_epoch * self.epoch_iters + cur_iter + 1)
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
-        mem_usage = misc.gpu_mem_usage()
         stats = {
             "_type": "train_iter",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
@@ -518,7 +519,7 @@ class TrainMeter(object):
             "eta": eta,
             "loss": self.loss.get_win_median(),
             "lr": self.lr,
-            "mem": int(np.ceil(mem_usage)),
+            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
@@ -535,14 +536,14 @@ class TrainMeter(object):
             self.MAX_EPOCH - (cur_epoch + 1) * self.epoch_iters
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
-        mem_usage = misc.gpu_mem_usage()
         stats = {
             "_type": "train_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
             "lr": self.lr,
-            "mem": int(np.ceil(mem_usage)),
+            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
+            "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             top1_err = self.num_top1_mis / self.num_samples
@@ -642,14 +643,13 @@ class ValMeter(object):
             return
         eta_sec = self.iter_timer.seconds() * (self.max_iter - cur_iter - 1)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
-        mem_usage = misc.gpu_mem_usage()
         stats = {
             "_type": "val_iter",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "mem": int(np.ceil(mem_usage)),
+            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
@@ -662,12 +662,12 @@ class ValMeter(object):
         Args:
             cur_epoch (int): the number of current epoch.
         """
-        mem_usage = misc.gpu_mem_usage()
         stats = {
             "_type": "val_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
-            "mem": int(np.ceil(mem_usage)),
+            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
+            "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
         }
         if self._cfg.DATA.MULTI_LABEL:
             stats["map"] = get_map(
