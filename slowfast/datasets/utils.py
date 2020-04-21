@@ -8,7 +8,7 @@ from collections import defaultdict
 import torch
 from fvcore.common.file_io import PathManager
 
-import slowfast.datasets.transform as transform
+from . import transform as transform
 
 import cv2
 
