@@ -121,6 +121,11 @@ class Charades(torch.utils.data.Dataset):
             label (int): the label of the current video.
             index (int): the index of the video.
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(index, tuple):
+            index, short_cycle_idx = index
+
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
             temporal_sample_index = -1
@@ -128,6 +133,23 @@ class Charades(torch.utils.data.Dataset):
             min_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
             max_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[1]
             crop_size = self.cfg.DATA.TRAIN_CROP_SIZE
+            if short_cycle_idx in [0, 1]:
+                crop_size = int(
+                    round(
+                        self.cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
+                        * self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
+            if self.cfg.MULTIGRID.DEFAULT_S > 0:
+                # Decreasing the scale is equivalent to using a larger "span"
+                # in a sampling grid.
+                min_scale = int(
+                    round(
+                        float(min_scale)
+                        * crop_size
+                        / self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
         elif self.mode in ["test"]:
             temporal_sample_index = (
                 self._spatial_temporal_idx[index]
@@ -150,7 +172,10 @@ class Charades(torch.utils.data.Dataset):
             )
 
         num_frames = self.cfg.DATA.NUM_FRAMES
-        sampling_rate = self.cfg.DATA.SAMPLING_RATE
+        sampling_rate = utils.get_random_sampling_rate(
+            self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
+            self.cfg.DATA.SAMPLING_RATE
+        )
         video_length = len(self._path_to_videos[index])
         assert video_length == len(self._labels[index])
 
