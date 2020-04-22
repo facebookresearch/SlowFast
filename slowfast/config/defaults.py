@@ -76,9 +76,6 @@ _C.TRAIN.CHECKPOINT_TYPE = "pytorch"
 # If True, perform inflation when loading checkpoint.
 _C.TRAIN.CHECKPOINT_INFLATE = False
 
-# For Something-Something we disable random flipping during training,
-# because some of the actions require distinguishing between directions.
-_C.TRAIN.DISABLE_FLIP = False
 
 # ---------------------------------------------------------------------------- #
 # Testing options
