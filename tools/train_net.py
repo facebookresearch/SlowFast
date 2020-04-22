@@ -312,7 +312,7 @@ def train(cfg):
             calculate_and_update_precise_bn(
                 train_loader, model, cfg.BN.NUM_BATCHES_PRECISE
             )
-        _ = misc.aggregate_split_bn_stats(model, 0)
+        _ = misc.aggregate_split_bn_stats(model)
 
         # Save a checkpoint.
         if cu.is_checkpoint_epoch(cur_epoch, cfg.TRAIN.CHECKPOINT_PERIOD):
