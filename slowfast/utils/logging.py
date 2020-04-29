@@ -5,10 +5,13 @@
 
 import builtins
 import decimal
+import functools
 import logging
+import os
 import sys
 import simplejson
 
+from fvcore.common.file_io import PathManager
 import slowfast.utils.distributed as du
 
 
@@ -23,7 +26,12 @@ def _suppress_print():
     builtins.print = print_pass
 
 
-def setup_logging():
+@functools.lru_cache(maxsize=None)
+def _cached_log_stream(filename):
+    return PathManager.open(filename, "a")
+
+
+def setup_logging(output_dir=None):
     """
     Sets up the logging for multiple processes. Only enable the logging for the
     master process, and suppress logging for the non-master processes.
@@ -40,6 +48,27 @@ def setup_logging():
     else:
         # Suppress logging for non-master processes.
         _suppress_print()
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
+    plain_formatter = logging.Formatter(
+        "[%(asctime)s][%(levelname)s] %(name)s: %(lineno)4d: %(message)s",
+        datefmt="%m/%d %H:%M:%S",
+    )
+
+    if du.is_master_proc():
+        ch = logging.StreamHandler(stream=sys.stdout)
+        ch.setLevel(logging.DEBUG)
+        ch.setFormatter(plain_formatter)
+        logger.addHandler(ch)
+
+    if output_dir is not None and du.is_master_proc(du.get_world_size()):
+        filename = os.path.join(output_dir, "stdout.log")
+        fh = logging.StreamHandler(_cached_log_stream(filename))
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(plain_formatter)
+        logger.addHandler(fh)
 
 
 def get_logger(name):
