@@ -28,7 +28,12 @@ def retry_load_images(image_paths, retry=10, backend="pytorch"):
         imgs (list): list of loaded images.
     """
     for i in range(retry):
-        imgs = [cv2.imread(image_path) for image_path in image_paths]
+        imgs = []
+        for image_path in image_paths:
+            with PathManager.open(image_path, "rb") as f:
+                img_str = np.frombuffer(f.read(), np.uint8)
+                img = cv2.imdecode(img_str, flags=cv2.IMREAD_COLOR)
+            imgs.append(img)
 
         if all(img is not None for img in imgs):
             if backend == "pytorch":

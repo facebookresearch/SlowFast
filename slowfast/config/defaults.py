@@ -377,6 +377,9 @@ _C.BENCHMARK.NUM_EPOCHS = 5
 # Log period in iters for data loading benchmark.
 _C.BENCHMARK.LOG_PERIOD = 100
 
+# If True, shuffle dataloader for epoch during benchmark.
+_C.BENCHMARK.SHUFFLE = True
+
 
 # ---------------------------------------------------------------------------- #
 # Common train/test data loader options

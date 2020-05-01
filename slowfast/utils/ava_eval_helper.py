@@ -35,6 +35,7 @@ import numpy as np
 import pprint
 import time
 from collections import defaultdict
+from fvcore.common.file_io import PathManager
 
 from slowfast.utils.ava_evaluation import (
     object_detection_evaluation,
@@ -68,7 +69,7 @@ def read_csv(csv_file, class_whitelist=None, load_score=False):
     boxes = defaultdict(list)
     labels = defaultdict(list)
     scores = defaultdict(list)
-    with open(csv_file, "r") as f:
+    with PathManager.open(csv_file, "r") as f:
         reader = csv.reader(f)
         for row in reader:
             assert len(row) in [7, 8], "Wrong number of columns: " + row
@@ -96,7 +97,7 @@ def read_exclusions(exclusions_file):
     """
     excluded = set()
     if exclusions_file:
-        with open(exclusions_file, "r") as f:
+        with PathManager.open(exclusions_file, "r") as f:
             reader = csv.reader(f)
             for row in reader:
                 assert len(row) == 2, "Expected only 2 columns, got: " + row
@@ -111,7 +112,7 @@ def read_labelmap(labelmap_file):
     class_ids = set()
     name = ""
     class_id = ""
-    with open(labelmap_file, "r") as f:
+    with PathManager.open(labelmap_file, "r") as f:
         for line in f:
             if line.startswith("  name:"):
                 name = line.split('"')[1]
@@ -289,7 +290,7 @@ def write_results(detections, filename):
     start = time.time()
 
     boxes, labels, scores = detections
-    with open(filename, "w") as f:
+    with PathManager.open(filename, "w") as f:
         for key in boxes.keys():
             for box, label, score in zip(boxes[key], labels[key], scores[key]):
                 f.write(

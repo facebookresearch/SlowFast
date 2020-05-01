@@ -52,6 +52,8 @@ def benchmark_data_loading(cfg):
         timer = Timer()
         timer_epoch = Timer()
         iter_times = []
+        if cfg.BENCHMARK.SHUFFLE:
+            loader.shuffle_dataset(dataloader, cur_epoch)
         for cur_iter, _ in enumerate(tqdm.tqdm(dataloader)):
             if cur_iter > 0 and cur_iter % log_period == 0:
                 iter_times.append(timer.seconds())
