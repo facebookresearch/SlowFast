@@ -8,9 +8,9 @@ from collections import defaultdict
 import torch
 from fvcore.common.file_io import PathManager
 
-from . import transform as transform
-
 import cv2
+
+from . import transform as transform
 
 logger = logging.getLogger(__name__)
 

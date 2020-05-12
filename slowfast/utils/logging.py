@@ -10,8 +10,8 @@ import logging
 import os
 import sys
 import simplejson
-
 from fvcore.common.file_io import PathManager
+
 import slowfast.utils.distributed as du
 
 
