@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 import psutil
 import torch
+from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
 from torch import nn
@@ -60,18 +61,18 @@ def cpu_mem_usage():
     return usage, total
 
 
-def get_flop_stats(model, cfg, is_train):
+def _get_model_analysis_input(cfg, is_train):
     """
-    Compute the gflops for the current model given the config.
+    Return a dummy input for model analysis with batch size 1. The input is
+        used for analyzing the model (counting flops and activations etc.).
     Args:
-        model (model): model to compute the flop counts.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        is_train (bool): if True, compute flops for training. Otherwise,
-            compute flops for testing.
+        is_train (bool): if True, return the input for training. Otherwise,
+            return the input for testing.
 
     Returns:
-        float: the total number of gflops of the given model.
+        inputs: the input for model analysis.
     """
     rgb_dimension = 3
     if is_train:
@@ -88,21 +89,56 @@ def get_flop_stats(model, cfg, is_train):
             cfg.DATA.TEST_CROP_SIZE,
             cfg.DATA.TEST_CROP_SIZE,
         )
-    flop_inputs = pack_pathway_output(cfg, input_tensors)
-    for i in range(len(flop_inputs)):
-        flop_inputs[i] = flop_inputs[i].unsqueeze(0).cuda(non_blocking=True)
+    model_inputs = pack_pathway_output(cfg, input_tensors)
+    for i in range(len(model_inputs)):
+        model_inputs[i] = model_inputs[i].unsqueeze(0).cuda(non_blocking=True)
 
     # If detection is enabled, count flops for one proposal.
     if cfg.DETECTION.ENABLE:
         bbox = torch.tensor([[0, 0, 1.0, 0, 1.0]])
         bbox = bbox.cuda()
-        inputs = (flop_inputs, bbox)
+        inputs = (model_inputs, bbox)
     else:
-        inputs = (flop_inputs,)
+        inputs = (model_inputs,)
+    return inputs
 
+
+def get_flop_stats(model, cfg, is_train):
+    """
+    Compute the gflops for the current model given the config.
+    Args:
+        model (model): model to compute the flop counts.
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+        is_train (bool): if True, compute flops for training. Otherwise,
+            compute flops for testing.
+
+    Returns:
+        float: the total number of gflops of the given model.
+    """
+    inputs = _get_model_analysis_input(cfg, is_train)
     gflop_dict, _ = flop_count(model, inputs)
     gflops = sum(gflop_dict.values())
     return gflops
+
+
+def get_activation_stats(model, cfg, is_train):
+    """
+    Compute the activation count (mega) for the current model given the config.
+    Args:
+        model (model): model to compute the activation counts.
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+        is_train (bool): if True, compute activation for training. Otherwise,
+            compute activation for testing.
+
+    Returns:
+        float: the total number of activation (mega) of the given model.
+    """
+    inputs = _get_model_analysis_input(cfg, is_train)
+    activation_dict, _ = activation_count(model, inputs)
+    activation = sum(activation_dict.values())
+    return activation
 
 
 def log_model_info(model, cfg, is_train=True):
@@ -118,8 +154,9 @@ def log_model_info(model, cfg, is_train=True):
     logger.info("Model:\n{}".format(model))
     logger.info("Params: {:,}".format(params_count(model)))
     logger.info("Mem: {:,} MB".format(gpu_mem_usage()))
+    logger.info("Flops: {:,} G".format(get_flop_stats(model, cfg, is_train)))
     logger.info(
-        "FLOPs: {:,} GFLOPs".format(get_flop_stats(model, cfg, is_train))
+        "Activations: {:,} M".format(get_activation_stats(model, cfg, is_train))
     )
     logger.info("nvidia-smi")
     os.system("nvidia-smi")
