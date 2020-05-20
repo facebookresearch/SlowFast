@@ -297,7 +297,7 @@ def train(cfg):
     torch.manual_seed(cfg.RNG_SEED)
 
     # Setup logging format.
-    logging.setup_logging()
+    logging.setup_logging(cfg.OUTPUT_DIR)
 
     # Init multigrid.
     multigrid = None

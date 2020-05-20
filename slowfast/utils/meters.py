@@ -700,8 +700,8 @@ def get_map(preds, labels):
 
     logger.info("Getting mAP for {} examples".format(preds.shape[0]))
 
-    preds = preds[:, ~np.all(labels == 0, axis=0)]
-    labels = labels[:, ~np.all(labels == 0, axis=0)]
+    preds = preds[:, ~(np.all(labels == 0, axis=0))]
+    labels = labels[:, ~(np.all(labels == 0, axis=0))]
     aps = [0]
     try:
         aps = average_precision_score(labels, preds, average=None)

@@ -54,9 +54,10 @@ class Ava(torch.utils.data.Dataset):
             cfg (CfgNode): config
         """
         # Loading frame paths.
-        self._image_paths, self._video_idx_to_name = ava_helper.load_image_lists(
-            cfg, is_train=(self._split == "train")
-        )
+        (
+            self._image_paths,
+            self._video_idx_to_name,
+        ) = ava_helper.load_image_lists(cfg, is_train=(self._split == "train"))
 
         # Loading annotations for boxes and labels.
         boxes_and_labels = ava_helper.load_boxes_and_labels(

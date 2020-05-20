@@ -1,6 +1,6 @@
 # A Multigrid Method for Efficiently Training Video Models
 [Chao-Yuan Wu](https://www.cs.utexas.edu/~cywu/),
-[Ross Girshick](http://rossgirshick.info)
+[Ross Girshick](http://rossgirshick.info),
 [Kaiming He](http://kaiminghe.com),
 [Christoph Feichtenhofer](http://feichtenhofer.github.io/),
 [Philipp Kr&auml;henb&uuml;hl](http://www.philkr.net/)
