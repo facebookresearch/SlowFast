@@ -3,6 +3,8 @@
 
 """Functions that handle saving and loading of checkpoints."""
 
+import copy
+import numpy as np
 import os
 import pickle
 from collections import OrderedDict
@@ -79,14 +81,27 @@ def has_checkpoint(path_to_job):
     return any("checkpoint" in f for f in files)
 
 
-def is_checkpoint_epoch(cur_epoch, checkpoint_period):
+def is_checkpoint_epoch(cfg, cur_epoch, multigrid_schedule=None):
     """
     Determine if a checkpoint should be saved on current epoch.
     Args:
+        cfg (CfgNode): configs to save.
         cur_epoch (int): current number of epoch of the model.
-        checkpoint_period (int): the frequency of checkpointing.
+        multigrid_schedule (List): schedule for multigrid training.
     """
-    return (cur_epoch + 1) % checkpoint_period == 0
+    if cur_epoch + 1 == cfg.SOLVER.MAX_EPOCH:
+        return True
+    if multigrid_schedule is not None:
+        prev_epoch = 0
+        for s in multigrid_schedule:
+            if cur_epoch < s[-1]:
+                period = max(
+                    (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
+                )
+                return (s[-1] - 1 - cur_epoch) % period == 0
+            prev_epoch = s[-1]
+
+    return (cur_epoch + 1) % cfg.TRAIN.CHECKPOINT_PERIOD == 0
 
 
 def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
@@ -105,10 +120,12 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
     PathManager.mkdirs(get_checkpoint_dir(path_to_job))
     # Omit the DDP wrapper in the multi-gpu setting.
     sd = model.module.state_dict() if cfg.NUM_GPUS > 1 else model.state_dict()
+    normalized_sd = sub_to_normal_bn(sd)
+
     # Record the state.
     checkpoint = {
         "epoch": epoch,
-        "model_state": sd,
+        "model_state": normalized_sd,
         "optimizer_state": optimizer.state_dict(),
         "cfg": cfg.dump(),
     }
@@ -146,8 +163,14 @@ def inflate_weight(state_dict_2d, state_dict_3d):
             v3d = (
                 v2d.unsqueeze(2).repeat(1, 1, v3d.shape[2], 1, 1) / v3d.shape[2]
             )
-        if v2d.shape == v3d.shape:
+        elif v2d.shape == v3d.shape:
             v3d = v2d
+        else:
+            logger.info(
+                "Unexpected {}: {} -|> {}: {}".format(
+                    k, v2d.shape, k, v3d.shape
+                )
+            )
         state_dict_inflated[k] = v3d.clone()
     return state_dict_inflated
 
@@ -187,28 +210,44 @@ def load_checkpoint(
         name_convert_func = get_name_convert_func()
         for key in caffe2_checkpoint["blobs"].keys():
             converted_key = name_convert_func(key)
+            converted_key = c2_normal_to_sub_bn(
+                converted_key, ms.state_dict()
+            )
             if converted_key in ms.state_dict():
-                if caffe2_checkpoint["blobs"][key].shape == tuple(
-                    ms.state_dict()[converted_key].shape
+                c2_blob_shape = caffe2_checkpoint["blobs"][key].shape
+                model_blob_shape = ms.state_dict()[converted_key].shape
+                # Load BN stats to Sub-BN.
+                if (
+                    len(model_blob_shape) == 1
+                    and len(c2_blob_shape) == 1
+                    and model_blob_shape[0] > c2_blob_shape[0]
+                    and model_blob_shape[0] % c2_blob_shape[0] == 0
                 ):
+                    caffe2_checkpoint["blobs"][key] = np.concatenate(
+                        [caffe2_checkpoint["blobs"][key]]
+                        * (model_blob_shape[0] // c2_blob_shape[0])
+                    )
+                    c2_blob_shape = caffe2_checkpoint["blobs"][key].shape
+
+                if c2_blob_shape == tuple(model_blob_shape):
                     state_dict[converted_key] = torch.tensor(
                         caffe2_checkpoint["blobs"][key]
                     ).clone()
                     logger.info(
                         "{}: {} => {}: {}".format(
                             key,
-                            caffe2_checkpoint["blobs"][key].shape,
+                            c2_blob_shape,
                             converted_key,
-                            tuple(ms.state_dict()[converted_key].shape),
+                            tuple(model_blob_shape),
                         )
                     )
                 else:
                     logger.warn(
                         "!! {}: {} does not match {}: {}".format(
                             key,
-                            caffe2_checkpoint["blobs"][key].shape,
+                            c2_blob_shape,
                             converted_key,
-                            tuple(ms.state_dict()[converted_key].shape),
+                            tuple(model_blob_shape),
                         )
                     )
             else:
@@ -226,13 +265,14 @@ def load_checkpoint(
         # Load the checkpoint on CPU to avoid GPU mem spike.
         with PathManager.open(path_to_checkpoint, "rb") as f:
             checkpoint = torch.load(f, map_location="cpu")
+        model_state_dict_3d = (
+            model.module.state_dict() if data_parallel else model.state_dict()
+        )
+        checkpoint["model_state"] = normal_to_sub_bn(
+            checkpoint["model_state"], model_state_dict_3d
+        )
         if inflation:
             # Try to inflate the model.
-            model_state_dict_3d = (
-                model.module.state_dict()
-                if data_parallel
-                else model.state_dict()
-            )
             inflated_model_dict = inflate_weight(
                 checkpoint["model_state"], model_state_dict_3d
             )
@@ -247,3 +287,105 @@ def load_checkpoint(
         else:
             epoch = -1
     return epoch
+
+
+def sub_to_normal_bn(sd):
+    """
+    Convert the Sub-BN paprameters to normal BN parameters in a state dict.
+    There are two copies of BN layers in a Sub-BN implementation: `bn.bn` and
+    `bn.split_bn`. `bn.split_bn` is used during training and
+    "compute_precise_bn". Before saving or evaluation, its stats are copied to
+    `bn.bn`. We rename `bn.bn` to `bn` and store it to be consistent with normal
+    BN layers.
+    Args:
+        sd (OrderedDict): a dict of parameters whitch might contain Sub-BN
+        parameters.
+    Returns:
+        new_sd (OrderedDict): a dict with Sub-BN parameters reshaped to
+        normal parameters.
+    """
+    new_sd = copy.deepcopy(sd)
+    modifications = [
+        ("bn.bn.running_mean", "bn.running_mean"),
+        ("bn.bn.running_var", "bn.running_var"),
+        ("bn.split_bn.num_batches_tracked", "bn.num_batches_tracked"),
+    ]
+    to_remove = ["bn.bn.", ".split_bn."]
+    for key in sd:
+        for before, after in modifications:
+            if key.endswith(before):
+                new_key = key.split(before)[0] + after
+                new_sd[new_key] = new_sd.pop(key)
+
+        for rm in to_remove:
+            if rm in key and key in new_sd:
+                del new_sd[key]
+
+    for key in new_sd:
+        if key.endswith("bn.weight") or key.endswith("bn.bias"):
+            if len(new_sd[key].size()) == 4:
+                assert all(d == 1 for d in new_sd[key].size()[1:])
+                new_sd[key] = new_sd[key][:, 0, 0, 0]
+
+    return new_sd
+
+
+def c2_normal_to_sub_bn(key, model_keys):
+    """
+    Convert BN parameters to Sub-BN parameters if model contains Sub-BNs.
+    Args:
+        key (OrderedDict): source dict of parameters.
+        mdoel_key (OrderedDict): target dict of parameters.
+    Returns:
+        new_sd (OrderedDict): converted dict of parameters.
+    """
+    if "bn.running_" in key:
+        if key in model_keys:
+            return key
+
+        new_key = key.replace("bn.running_", "bn.split_bn.running_")
+        if new_key in model_keys:
+            return new_key
+    else:
+        return key
+
+
+def normal_to_sub_bn(checkpoint_sd, model_sd):
+    """
+    Convert BN parameters to Sub-BN parameters if model contains Sub-BNs.
+    Args:
+        checkpoint_sd (OrderedDict): source dict of parameters.
+        model_sd (OrderedDict): target dict of parameters.
+    Returns:
+        new_sd (OrderedDict): converted dict of parameters.
+    """
+    for key in model_sd:
+        if key not in checkpoint_sd:
+            if "bn.split_bn." in key:
+                load_key = key.replace("bn.split_bn.", "bn.")
+                bn_key = key.replace("bn.split_bn.", "bn.bn.")
+                checkpoint_sd[key] = checkpoint_sd.pop(load_key)
+                checkpoint_sd[bn_key] = checkpoint_sd[key]
+
+    for key in model_sd:
+        if key in checkpoint_sd:
+            model_blob_shape = model_sd[key].shape
+            c2_blob_shape = checkpoint_sd[key].shape
+
+            if (
+                len(model_blob_shape) == 1
+                and len(c2_blob_shape) == 1
+                and model_blob_shape[0] > c2_blob_shape[0]
+                and model_blob_shape[0] % c2_blob_shape[0] == 0
+            ):
+                before_shape = checkpoint_sd[key].shape
+                checkpoint_sd[key] = torch.cat(
+                    [checkpoint_sd[key]]
+                    * (model_blob_shape[0] // c2_blob_shape[0])
+                )
+                logger.info(
+                    "{} {} -> {}".format(
+                        key, before_shape, checkpoint_sd[key].shape
+                    )
+                )
+    return checkpoint_sd

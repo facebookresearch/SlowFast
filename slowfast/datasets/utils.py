@@ -3,6 +3,7 @@
 import logging
 import numpy as np
 import os
+import random
 import time
 from collections import defaultdict
 import torch
@@ -269,3 +270,15 @@ def tensor_normalize(tensor, mean, std):
     tensor = tensor - mean
     tensor = tensor / std
     return tensor
+
+
+def get_random_sampling_rate(long_cycle_sampling_rate, sampling_rate):
+    """
+    When multigrid training uses a fewer number of frames, we randomly
+    increase the sampling rate so that some clips cover the original span.
+    """
+    if long_cycle_sampling_rate > 0:
+        assert long_cycle_sampling_rate >= sampling_rate
+        return random.randint(sampling_rate, long_cycle_sampling_rate)
+    else:
+        return sampling_rate

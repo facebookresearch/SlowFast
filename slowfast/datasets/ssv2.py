@@ -168,6 +168,10 @@ class Ssv2(torch.utils.data.Dataset):
             label (int): the label of the current video.
             index (int): the index of the video.
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(index, tuple):
+            index, short_cycle_idx = index
 
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
@@ -175,6 +179,23 @@ class Ssv2(torch.utils.data.Dataset):
             min_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
             max_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[1]
             crop_size = self.cfg.DATA.TRAIN_CROP_SIZE
+            if short_cycle_idx in [0, 1]:
+                crop_size = int(
+                    round(
+                        self.cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
+                        * self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
+            if self.cfg.MULTIGRID.DEFAULT_S > 0:
+                # Decreasing the scale is equivalent to using a larger "span"
+                # in a sampling grid.
+                min_scale = int(
+                    round(
+                        float(min_scale)
+                        * crop_size
+                        / self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
         elif self.mode in ["test"]:
             # spatial_sample_index is in [0, 1, 2]. Corresponding to left,
             # center, or right if width is larger than height, and top, middle,

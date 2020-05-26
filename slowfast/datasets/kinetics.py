@@ -124,6 +124,11 @@ class Kinetics(torch.utils.data.Dataset):
                 decoded, then return the index of the video. If not, return the
                 index of the video replacement that can be decoded.
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(index, tuple):
+            index, short_cycle_idx = index
+
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
             temporal_sample_index = -1
@@ -131,6 +136,23 @@ class Kinetics(torch.utils.data.Dataset):
             min_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
             max_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[1]
             crop_size = self.cfg.DATA.TRAIN_CROP_SIZE
+            if short_cycle_idx in [0, 1]:
+                crop_size = int(
+                    round(
+                        self.cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
+                        * self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
+            if self.cfg.MULTIGRID.DEFAULT_S > 0:
+                # Decreasing the scale is equivalent to using a larger "span"
+                # in a sampling grid.
+                min_scale = int(
+                    round(
+                        float(min_scale)
+                        * crop_size
+                        / self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
         elif self.mode in ["test"]:
             temporal_sample_index = (
                 self._spatial_temporal_idx[index]
@@ -151,7 +173,10 @@ class Kinetics(torch.utils.data.Dataset):
             raise NotImplementedError(
                 "Does not support {} mode".format(self.mode)
             )
-
+        sampling_rate = utils.get_random_sampling_rate(
+            self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
+            self.cfg.DATA.SAMPLING_RATE,
+        )
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
         for _ in range(self._num_retries):
@@ -176,7 +201,7 @@ class Kinetics(torch.utils.data.Dataset):
             # Decode video. Meta info is used to perform selective decoding.
             frames = decoder.decode(
                 video_container,
-                self.cfg.DATA.SAMPLING_RATE,
+                sampling_rate,
                 self.cfg.DATA.NUM_FRAMES,
                 temporal_sample_index,
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
