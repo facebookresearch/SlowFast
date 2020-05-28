@@ -210,9 +210,7 @@ def load_checkpoint(
         name_convert_func = get_name_convert_func()
         for key in caffe2_checkpoint["blobs"].keys():
             converted_key = name_convert_func(key)
-            converted_key = c2_normal_to_sub_bn(
-                converted_key, ms.state_dict()
-            )
+            converted_key = c2_normal_to_sub_bn(converted_key, ms.state_dict())
             if converted_key in ms.state_dict():
                 c2_blob_shape = caffe2_checkpoint["blobs"][key].shape
                 model_blob_shape = ms.state_dict()[converted_key].shape
