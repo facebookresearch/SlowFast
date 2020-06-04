@@ -7,7 +7,10 @@ import torch
 import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
-from slowfast.models import head_helper, resnet_helper, stem_helper
+from slowfast.models.batchnorm_helper import get_norm
+
+from . import head_helper, resnet_helper, stem_helper
+from .build import MODEL_REGISTRY
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -42,7 +45,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[3, 1]],  # res4 temporal kernel.
         [[1, 3]],  # res5 temporal kernel.
     ],
-    "slowonly": [
+    "slow": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
         [[1]],  # res3 temporal kernel.
@@ -63,7 +66,7 @@ _POOL1 = {
     "c2d_nopool": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],
     "i3d_nopool": [[1, 1, 1]],
-    "slowonly": [[1, 1, 1]],
+    "slow": [[1, 1, 1]],
     "slowfast": [[1, 1, 1], [1, 1, 1]],
 }
 
@@ -84,6 +87,7 @@ class FuseFastToSlow(nn.Module):
         eps=1e-5,
         bn_mmt=0.1,
         inplace_relu=True,
+        norm_module=nn.BatchNorm3d,
     ):
         """
         Args:
@@ -98,6 +102,8 @@ class FuseFastToSlow(nn.Module):
                 PyTorch = 1 - BN momentum in Caffe2.
             inplace_relu (bool): if True, calculate the relu on the original
                 input without allocating new memory.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(FuseFastToSlow, self).__init__()
         self.conv_f2s = nn.Conv3d(
@@ -108,8 +114,10 @@ class FuseFastToSlow(nn.Module):
             padding=[fusion_kernel // 2, 0, 0],
             bias=False,
         )
-        self.bn = nn.BatchNorm3d(
-            dim_in * fusion_conv_channel_ratio, eps=eps, momentum=bn_mmt
+        self.bn = norm_module(
+            num_features=dim_in * fusion_conv_channel_ratio,
+            eps=eps,
+            momentum=bn_mmt,
         )
         self.relu = nn.ReLU(inplace_relu)
 
@@ -123,12 +131,13 @@ class FuseFastToSlow(nn.Module):
         return [x_s_fuse, x_f]
 
 
-class SlowFastModel(nn.Module):
+@MODEL_REGISTRY.register()
+class SlowFast(nn.Module):
     """
     SlowFast model builder for SlowFast network.
 
     Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-    "Slowfast networks for video recognition."
+    "SlowFast networks for video recognition."
     https://arxiv.org/pdf/1812.03982.pdf
     """
 
@@ -140,7 +149,8 @@ class SlowFastModel(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
-        super(SlowFastModel, self).__init__()
+        super(SlowFast, self).__init__()
+        self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
@@ -152,7 +162,6 @@ class SlowFastModel(nn.Module):
         """
         Builds a SlowFast model. The first pathway is the Slow pathway and the
             second pathway is the Fast pathway.
-
         Args:
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
@@ -182,12 +191,14 @@ class SlowFastModel(nn.Module):
                 [temp_kernel[0][0][0] // 2, 3, 3],
                 [temp_kernel[0][1][0] // 2, 3, 3],
             ],
+            norm_module=self.norm_module,
         )
         self.s1_fuse = FuseFastToSlow(
             width_per_group // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s2 = resnet_helper.ResStage(
@@ -211,12 +222,14 @@ class SlowFastModel(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
         )
         self.s2_fuse = FuseFastToSlow(
             width_per_group * 4 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         for pathway in range(self.num_pathways):
@@ -248,12 +261,14 @@ class SlowFastModel(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
         )
         self.s3_fuse = FuseFastToSlow(
             width_per_group * 8 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s4 = resnet_helper.ResStage(
@@ -277,12 +292,14 @@ class SlowFastModel(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
         )
         self.s4_fuse = FuseFastToSlow(
             width_per_group * 16 // cfg.SLOWFAST.BETA_INV,
             cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO,
             cfg.SLOWFAST.FUSION_KERNEL_SZ,
             cfg.SLOWFAST.ALPHA,
+            norm_module=self.norm_module,
         )
 
         self.s5 = resnet_helper.ResStage(
@@ -306,6 +323,7 @@ class SlowFastModel(nn.Module):
             instantiation=cfg.NONLOCAL.INSTANTIATION,
             trans_func_name=cfg.RESNET.TRANS_FUNC,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
         )
 
         if cfg.DETECTION.ENABLE:
@@ -328,7 +346,7 @@ class SlowFastModel(nn.Module):
                 resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2] * 2,
                 scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR] * 2,
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func="sigmoid",
+                act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
             )
         else:
@@ -338,7 +356,9 @@ class SlowFastModel(nn.Module):
                     width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
                 ],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[
+                pool_size=[None, None]
+                if cfg.MULTIGRID.SHORT_CYCLE
+                else [
                     [
                         cfg.DATA.NUM_FRAMES
                         // cfg.SLOWFAST.ALPHA
@@ -351,8 +371,9 @@ class SlowFastModel(nn.Module):
                         cfg.DATA.CROP_SIZE // 32 // pool_size[1][1],
                         cfg.DATA.CROP_SIZE // 32 // pool_size[1][2],
                     ],
-                ],
+                ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
             )
 
     def forward(self, x, bboxes=None):
@@ -375,13 +396,14 @@ class SlowFastModel(nn.Module):
         return x
 
 
-class ResNetModel(nn.Module):
+@MODEL_REGISTRY.register()
+class ResNet(nn.Module):
     """
     ResNet model builder. It builds a ResNet like network backbone without
-    lateral connection (C2D, I3D, SlowOnly).
+    lateral connection (C2D, I3D, Slow).
 
     Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and Kaiming He.
-    "Slowfast networks for video recognition."
+    "SlowFast networks for video recognition."
     https://arxiv.org/pdf/1812.03982.pdf
 
     Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming He.
@@ -398,7 +420,8 @@ class ResNetModel(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
-        super(ResNetModel, self).__init__()
+        super(ResNet, self).__init__()
+        self.norm_module = get_norm(cfg)
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 1
         self._construct_network(cfg)
@@ -433,6 +456,7 @@ class ResNetModel(nn.Module):
             kernel=[temp_kernel[0][0] + [7, 7]],
             stride=[[1, 2, 2]],
             padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
+            norm_module=self.norm_module,
         )
 
         self.s2 = resnet_helper.ResStage(
@@ -452,6 +476,7 @@ class ResNetModel(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
+            norm_module=self.norm_module,
         )
 
         for pathway in range(self.num_pathways):
@@ -479,6 +504,7 @@ class ResNetModel(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[1],
+            norm_module=self.norm_module,
         )
 
         self.s4 = resnet_helper.ResStage(
@@ -498,6 +524,7 @@ class ResNetModel(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[2],
+            norm_module=self.norm_module,
         )
 
         self.s5 = resnet_helper.ResStage(
@@ -517,6 +544,7 @@ class ResNetModel(nn.Module):
             stride_1x1=cfg.RESNET.STRIDE_1X1,
             inplace_relu=cfg.RESNET.INPLACE_RELU,
             dilation=cfg.RESNET.SPATIAL_DILATIONS[3],
+            norm_module=self.norm_module,
         )
 
         if self.enable_detection:
@@ -527,21 +555,24 @@ class ResNetModel(nn.Module):
                 resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
                 scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                act_func="sigmoid",
+                act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[width_per_group * 32],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[
+                pool_size=[None, None]
+                if cfg.MULTIGRID.SHORT_CYCLE
+                else [
                     [
                         cfg.DATA.NUM_FRAMES // pool_size[0][0],
                         cfg.DATA.CROP_SIZE // 32 // pool_size[0][1],
                         cfg.DATA.CROP_SIZE // 32 // pool_size[0][2],
                     ]
-                ],
+                ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
             )
 
     def forward(self, x, bboxes=None):

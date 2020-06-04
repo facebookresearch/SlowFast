@@ -100,7 +100,12 @@ class PerImageEvaluation(object):
           is of shape [K, 1], representing K True/False positive label of
           object instances detected with class label c
     """
-        detected_boxes, detected_scores, detected_class_labels, detected_masks = self._remove_invalid_boxes(
+        (
+            detected_boxes,
+            detected_scores,
+            detected_class_labels,
+            detected_masks,
+        ) = self._remove_invalid_boxes(
             detected_boxes,
             detected_scores,
             detected_class_labels,

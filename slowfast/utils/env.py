@@ -3,7 +3,13 @@
 
 """Set up Environment."""
 
+import slowfast.utils.logging as logging
 
-def setup_dist_environment():
-    # Add your own env setting.
-    pass
+_ENV_SETUP_DONE = False
+
+
+def setup_environment():
+    global _ENV_SETUP_DONE
+    if _ENV_SETUP_DONE:
+        return
+    _ENV_SETUP_DONE = True

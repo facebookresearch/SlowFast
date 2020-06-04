@@ -5,13 +5,13 @@ import os
 import random
 import torch
 import torch.utils.data
+from fvcore.common.file_io import PathManager
 
-from . import decoder as decoder
-from . import transform as transform
-from . import utils as utils
-from . import video_container as container
 import slowfast.utils.logging as logging
 
+from . import decoder as decoder
+from . import utils as utils
+from . import video_container as container
 from .build import DATASET_REGISTRY
 
 logger = logging.get_logger(__name__)
@@ -80,14 +80,14 @@ class Kinetics(torch.utils.data.Dataset):
         path_to_file = os.path.join(
             self.cfg.DATA.PATH_TO_DATA_DIR, "{}.csv".format(self.mode)
         )
-        assert os.path.exists(path_to_file), "{} dir not found".format(
+        assert PathManager.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
 
         self._path_to_videos = []
         self._labels = []
         self._spatial_temporal_idx = []
-        with open(path_to_file, "r") as f:
+        with PathManager.open(path_to_file, "r") as f:
             for clip_idx, path_label in enumerate(f.read().splitlines()):
                 assert len(path_label.split()) == 2
                 path, label = path_label.split()
@@ -124,6 +124,11 @@ class Kinetics(torch.utils.data.Dataset):
                 decoded, then return the index of the video. If not, return the
                 index of the video replacement that can be decoded.
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(index, tuple):
+            index, short_cycle_idx = index
+
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
             temporal_sample_index = -1
@@ -131,6 +136,23 @@ class Kinetics(torch.utils.data.Dataset):
             min_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
             max_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[1]
             crop_size = self.cfg.DATA.TRAIN_CROP_SIZE
+            if short_cycle_idx in [0, 1]:
+                crop_size = int(
+                    round(
+                        self.cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
+                        * self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
+            if self.cfg.MULTIGRID.DEFAULT_S > 0:
+                # Decreasing the scale is equivalent to using a larger "span"
+                # in a sampling grid.
+                min_scale = int(
+                    round(
+                        float(min_scale)
+                        * crop_size
+                        / self.cfg.MULTIGRID.DEFAULT_S
+                    )
+                )
         elif self.mode in ["test"]:
             temporal_sample_index = (
                 self._spatial_temporal_idx[index]
@@ -151,7 +173,10 @@ class Kinetics(torch.utils.data.Dataset):
             raise NotImplementedError(
                 "Does not support {} mode".format(self.mode)
             )
-
+        sampling_rate = utils.get_random_sampling_rate(
+            self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
+            self.cfg.DATA.SAMPLING_RATE,
+        )
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
         for _ in range(self._num_retries):
@@ -160,6 +185,7 @@ class Kinetics(torch.utils.data.Dataset):
                 video_container = container.get_video_container(
                     self._path_to_videos[index],
                     self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
+                    self.cfg.DATA.DECODING_BACKEND,
                 )
             except Exception as e:
                 logger.info(
@@ -175,12 +201,14 @@ class Kinetics(torch.utils.data.Dataset):
             # Decode video. Meta info is used to perform selective decoding.
             frames = decoder.decode(
                 video_container,
-                self.cfg.DATA.SAMPLING_RATE,
+                sampling_rate,
                 self.cfg.DATA.NUM_FRAMES,
                 temporal_sample_index,
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
                 video_meta=self._video_meta[index],
-                target_fps=30,
+                target_fps=self.cfg.DATA.TARGET_FPS,
+                backend=self.cfg.DATA.DECODING_BACKEND,
+                max_spatial_scale=max_scale,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
@@ -190,19 +218,20 @@ class Kinetics(torch.utils.data.Dataset):
                 continue
 
             # Perform color normalization.
-            frames = frames.float()
-            frames = frames / 255.0
-            frames = frames - torch.tensor(self.cfg.DATA.MEAN)
-            frames = frames / torch.tensor(self.cfg.DATA.STD)
+            frames = utils.tensor_normalize(
+                frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
+            )
             # T H W C -> C T H W.
             frames = frames.permute(3, 0, 1, 2)
             # Perform data augmentation.
-            frames = self.spatial_sampling(
+            frames = utils.spatial_sampling(
                 frames,
                 spatial_idx=spatial_sample_index,
                 min_scale=min_scale,
                 max_scale=max_scale,
                 crop_size=crop_size,
+                random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
 
             label = self._labels[index]
@@ -221,47 +250,3 @@ class Kinetics(torch.utils.data.Dataset):
             (int): the number of videos in the dataset.
         """
         return len(self._path_to_videos)
-
-    def spatial_sampling(
-        self,
-        frames,
-        spatial_idx=-1,
-        min_scale=256,
-        max_scale=320,
-        crop_size=224,
-    ):
-        """
-        Perform spatial sampling on the given video frames. If spatial_idx is
-        -1, perform random scale, random crop, and random flip on the given
-        frames. If spatial_idx is 0, 1, or 2, perform spatial uniform sampling
-        with the given spatial_idx.
-        Args:
-            frames (tensor): frames of images sampled from the video. The
-                dimension is `num frames` x `height` x `width` x `channel`.
-            spatial_idx (int): if -1, perform random spatial sampling. If 0, 1,
-                or 2, perform left, center, right crop if width is larger than
-                height, and perform top, center, buttom crop if height is larger
-                than width.
-            min_scale (int): the minimal size of scaling.
-            max_scale (int): the maximal size of scaling.
-            crop_size (int): the size of height and width used to crop the
-                frames.
-        Returns:
-            frames (tensor): spatially sampled frames.
-        """
-        assert spatial_idx in [-1, 0, 1, 2]
-        if spatial_idx == -1:
-            frames, _ = transform.random_short_side_scale_jitter(
-                frames, min_scale, max_scale
-            )
-            frames, _ = transform.random_crop(frames, crop_size)
-            frames, _ = transform.horizontal_flip(0.5, frames)
-        else:
-            # The testing is deterministic and no jitter should be performed.
-            # min_scale, max_scale, and crop_size are expect to be the same.
-            assert len({min_scale, max_scale, crop_size}) == 1
-            frames, _ = transform.random_short_side_scale_jitter(
-                frames, min_scale, max_scale
-            )
-            frames, _ = transform.uniform_crop(frames, crop_size, spatial_idx)
-        return frames

@@ -44,6 +44,7 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 400
   ARCH: c2d
+  MODEL_NAME: ResNet
   LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.5
 TEST:

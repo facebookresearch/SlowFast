@@ -4,16 +4,15 @@
 """Model construction functions."""
 
 import torch
+from fvcore.common.registry import Registry
 
-from slowfast.models.video_model_builder import ResNetModel, SlowFastModel
+MODEL_REGISTRY = Registry("MODEL")
+MODEL_REGISTRY.__doc__ = """
+Registry for video model.
 
-# Supported model types
-_MODEL_TYPES = {
-    "slowfast": SlowFastModel,
-    "slowonly": ResNetModel,
-    "c2d": ResNetModel,
-    "i3d": ResNetModel,
-}
+The registered object will be called with `obj(cfg)`.
+The call should return a `torch.nn.Module` object.
+"""
 
 
 def build_model(cfg):
@@ -24,14 +23,12 @@ def build_model(cfg):
         backbone. Details can be seen in slowfast/config/defaults.py.
     """
     assert (
-        cfg.MODEL.ARCH in _MODEL_TYPES.keys()
-    ), "Model type '{}' not supported".format(cfg.MODEL.ARCH)
-    assert (
         cfg.NUM_GPUS <= torch.cuda.device_count()
     ), "Cannot use more GPU devices than available"
 
     # Construct the model
-    model = _MODEL_TYPES[cfg.MODEL.ARCH](cfg)
+    name = cfg.MODEL.MODEL_NAME
+    model = MODEL_REGISTRY.get(name)(cfg)
     # Determine the GPU used by the current process
     cur_device = torch.cuda.current_device()
     # Transfer the model to the current GPU device

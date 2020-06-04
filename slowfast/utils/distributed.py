@@ -9,9 +9,7 @@ import pickle
 import torch
 import torch.distributed as dist
 
-from slowfast.utils.env import setup_dist_environment
-
-setup_dist_environment()
+_LOCAL_PROCESS_GROUP = None
 
 
 def all_gather(tensors):
@@ -255,3 +253,47 @@ def all_gather_unaligned(data, group=None):
         data_list.append(pickle.loads(buffer))
 
     return data_list
+
+
+def init_distributed_training(cfg):
+    """
+    Initialize variables needed for distributed training.
+    """
+    if cfg.NUM_GPUS == 1:
+        return
+    num_gpus_per_machine = cfg.NUM_GPUS
+    num_machines = dist.get_world_size() // num_gpus_per_machine
+    for i in range(num_machines):
+        ranks_on_i = list(
+            range(i * num_gpus_per_machine, (i + 1) * num_gpus_per_machine)
+        )
+        pg = dist.new_group(ranks_on_i)
+        if i == cfg.SHARD_ID:
+            global _LOCAL_PROCESS_GROUP
+            _LOCAL_PROCESS_GROUP = pg
+
+
+def get_local_size() -> int:
+    """
+    Returns:
+        The size of the per-machine process group,
+        i.e. the number of processes per machine.
+    """
+    if not dist.is_available():
+        return 1
+    if not dist.is_initialized():
+        return 1
+    return dist.get_world_size(group=_LOCAL_PROCESS_GROUP)
+
+
+def get_local_rank() -> int:
+    """
+    Returns:
+        The rank of the current process within the local (per-machine) process group.
+    """
+    if not dist.is_available():
+        return 0
+    if not dist.is_initialized():
+        return 0
+    assert _LOCAL_PROCESS_GROUP is not None
+    return dist.get_rank(group=_LOCAL_PROCESS_GROUP)

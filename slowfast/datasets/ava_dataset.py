@@ -9,7 +9,6 @@ from . import ava_helper as ava_helper
 from . import cv2_transform as cv2_transform
 from . import transform as transform
 from . import utils as utils
-
 from .build import DATASET_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -32,6 +31,7 @@ class Ava(torch.utils.data.Dataset):
         self._data_mean = cfg.DATA.MEAN
         self._data_std = cfg.DATA.STD
         self._use_bgr = cfg.AVA.BGR
+        self.random_horizontal_flip = cfg.DATA.RANDOM_FLIP
         if self._split == "train":
             self._crop_size = cfg.DATA.TRAIN_CROP_SIZE
             self._jitter_min_scale = cfg.DATA.TRAIN_JITTER_SCALES[0]
@@ -54,9 +54,10 @@ class Ava(torch.utils.data.Dataset):
             cfg (CfgNode): config
         """
         # Loading frame paths.
-        self._image_paths, self._video_idx_to_name = ava_helper.load_image_lists(
-            cfg, is_train=(self._split == "train")
-        )
+        (
+            self._image_paths,
+            self._video_idx_to_name,
+        ) = ava_helper.load_image_lists(cfg, is_train=(self._split == "train"))
 
         # Loading annotations for boxes and labels.
         boxes_and_labels = ava_helper.load_boxes_and_labels(
@@ -133,10 +134,11 @@ class Ava(torch.utils.data.Dataset):
                 imgs, self._crop_size, order="HWC", boxes=boxes
             )
 
-            # random flip
-            imgs, boxes = cv2_transform.horizontal_flip_list(
-                0.5, imgs, order="HWC", boxes=boxes
-            )
+            if self.random_horizontal_flip:
+                # random flip
+                imgs, boxes = cv2_transform.horizontal_flip_list(
+                    0.5, imgs, order="HWC", boxes=boxes
+                )
         elif self._split == "val":
             # Short side to test_scale. Non-local and STRG uses 256.
             imgs = [cv2_transform.scale(self._crop_size, img) for img in imgs]
@@ -224,9 +226,7 @@ class Ava(torch.utils.data.Dataset):
         imgs = np.ascontiguousarray(imgs)
         imgs = torch.from_numpy(imgs)
         boxes = cv2_transform.clip_boxes_to_image(
-            boxes[0],
-            imgs[0].shape[1],
-            imgs[0].shape[2],
+            boxes[0], imgs[0].shape[1], imgs[0].shape[2]
         )
         return imgs, boxes
 

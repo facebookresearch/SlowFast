@@ -11,12 +11,13 @@ import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
 from slowfast.datasets import loader
-from slowfast.models import model_builder
+from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
 
 
+@torch.no_grad()
 def perform_test(test_loader, model, test_meter, cfg):
     """
     For classification:
@@ -111,21 +112,23 @@ def test(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    # Set up environment.
+    du.init_distributed_training(cfg)
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
 
     # Setup logging format.
-    logging.setup_logging()
+    logging.setup_logging(cfg.OUTPUT_DIR)
 
     # Print config.
     logger.info("Test with config:")
     logger.info(cfg)
 
     # Build the video model and print model statistics.
-    model = model_builder.build_model(cfg)
-    if du.is_master_proc():
-        misc.log_model_info(model)
+    model = build_model(cfg)
+    if du.is_master_proc() and cfg.LOG_MODEL_INFO:
+        misc.log_model_info(model, cfg, is_train=False)
 
     # Load a checkpoint to test if applicable.
     if cfg.TEST.CHECKPOINT_FILE_PATH != "":
@@ -176,6 +179,8 @@ def test(cfg):
             cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
             cfg.MODEL.NUM_CLASSES,
             len(test_loader),
+            cfg.DATA.MULTI_LABEL,
+            cfg.DATA.ENSEMBLE_METHOD,
         )
 
     # # Perform multi-view test on the entire dataset.

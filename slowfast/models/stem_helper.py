@@ -22,10 +22,11 @@ class VideoModelStem(nn.Module):
         inplace_relu=True,
         eps=1e-5,
         bn_mmt=0.1,
+        norm_module=nn.BatchNorm3d,
     ):
         """
         The `__init__` method of any subclass should also contain these
-        arguments. List size of 1 for single pathway models (C2D, I3D, SlowOnly
+        arguments. List size of 1 for single pathway models (C2D, I3D, Slow
         and etc), list size of 2 for two pathway models (SlowFast).
 
         Args:
@@ -46,6 +47,8 @@ class VideoModelStem(nn.Module):
             eps (float): epsilon for batch norm.
             bn_mmt (float): momentum for batch norm. Noted that BN momentum in
                 PyTorch = 1 - BN momentum in Caffe2.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(VideoModelStem, self).__init__()
 
@@ -68,11 +71,10 @@ class VideoModelStem(nn.Module):
         self.inplace_relu = inplace_relu
         self.eps = eps
         self.bn_mmt = bn_mmt
-
         # Construct the stem layer.
-        self._construct_stem(dim_in, dim_out)
+        self._construct_stem(dim_in, dim_out, norm_module)
 
-    def _construct_stem(self, dim_in, dim_out):
+    def _construct_stem(self, dim_in, dim_out, norm_module):
         for pathway in range(len(dim_in)):
             stem = ResNetBasicStem(
                 dim_in[pathway],
@@ -83,6 +85,7 @@ class VideoModelStem(nn.Module):
                 self.inplace_relu,
                 self.eps,
                 self.bn_mmt,
+                norm_module,
             )
             self.add_module("pathway{}_stem".format(pathway), stem)
 
@@ -113,6 +116,7 @@ class ResNetBasicStem(nn.Module):
         inplace_relu=True,
         eps=1e-5,
         bn_mmt=0.1,
+        norm_module=nn.BatchNorm3d,
     ):
         """
         The `__init__` method of any subclass should also contain these arguments.
@@ -136,6 +140,8 @@ class ResNetBasicStem(nn.Module):
             eps (float): epsilon for batch norm.
             bn_mmt (float): momentum for batch norm. Noted that BN momentum in
                 PyTorch = 1 - BN momentum in Caffe2.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(ResNetBasicStem, self).__init__()
         self.kernel = kernel
@@ -144,11 +150,10 @@ class ResNetBasicStem(nn.Module):
         self.inplace_relu = inplace_relu
         self.eps = eps
         self.bn_mmt = bn_mmt
-
         # Construct the stem layer.
-        self._construct_stem(dim_in, dim_out)
+        self._construct_stem(dim_in, dim_out, norm_module)
 
-    def _construct_stem(self, dim_in, dim_out):
+    def _construct_stem(self, dim_in, dim_out, norm_module):
         self.conv = nn.Conv3d(
             dim_in,
             dim_out,
@@ -157,7 +162,9 @@ class ResNetBasicStem(nn.Module):
             padding=self.padding,
             bias=False,
         )
-        self.bn = nn.BatchNorm3d(dim_out, eps=self.eps, momentum=self.bn_mmt)
+        self.bn = norm_module(
+            num_features=dim_out, eps=self.eps, momentum=self.bn_mmt
+        )
         self.relu = nn.ReLU(self.inplace_relu)
         self.pool_layer = nn.MaxPool3d(
             kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]
