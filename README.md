@@ -1,6 +1,10 @@
 # PySlowFast
 
-PySlowFast is an open source video understanding codebase from FAIR that provides state-of-the-art video classification models, including papers "[SlowFast Networks for Video Recognition](https://arxiv.org/abs/1812.03982)", and "[Non-local Neural Networks](https://arxiv.org/abs/1711.07971)". 
+PySlowFast is an open source video understanding codebase from FAIR that provides state-of-the-art video classification models with efficient training. This repository includes implementations of the following methods:
+
+- [SlowFast Networks for Video Recognition](https://arxiv.org/abs/1812.03982)
+- [Non-local Neural Networks](https://arxiv.org/abs/1711.07971)
+- [A Multigrid Method for Efficiently Training Video Models](https://arxiv.org/abs/1912.00998)
 
 <div align="center">
   <img src="demo/ava_demo.gif" width="600px"/>
@@ -10,19 +14,19 @@ PySlowFast is an open source video understanding codebase from FAIR that provide
 
 The goal of PySlowFast is to provide a high-performance, light-weight pytorch codebase provides state-of-the-art video backbones for video understanding research on different tasks (classification, detection, and etc). It is designed in order to support rapid implementation and evaluation of novel video research ideas. PySlowFast includes implementations of the following backbone network architectures:
 
-- SlowFast 
+- SlowFast
 - Slow
 - C2D
 - I3D
 - Non-local Network
 
 ## Updates
-
-PySlowFast is released in conjunction with our [ICCV 2019 Tutorial](https://alexander-kirillov.github.io/tutorials/visual-recognition-iccv19/).
+ - We now support [Multigrid Training](https://arxiv.org/abs/1912.00998) for efficiently training video models. See [`projects/multigrid`](./projects/multigrid/README.md) for more information.
+ - PySlowFast is released in conjunction with our [ICCV 2019 Tutorial](https://alexander-kirillov.github.io/tutorials/visual-recognition-iccv19/).
 
 ## License
 
-PySlowFast is released under the [Apache 2.0 license](LICENSE). 
+PySlowFast is released under the [Apache 2.0 license](LICENSE).
 
 ## Model Zoo and Baselines
 
