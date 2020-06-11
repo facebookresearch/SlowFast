@@ -197,7 +197,9 @@ def torchvision_decode(
 
 
 def pyav_decode(
-    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30
+    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30,
+    decode_audio=False, extract_logmel=True, decode_all_audio=False, 
+    au_sr=16000, au_win_sz=32, au_step_sz=16, au_n_mels=40,
 ):
     """
     Convert the video from its original fps to the target_fps. If the video
@@ -230,7 +232,7 @@ def pyav_decode(
     fps = float(container.streams.video[0].average_rate)
     frames_length = container.streams.video[0].frames
     duration = container.streams.video[0].duration
-
+    
     if duration is None:
         # If failed to fetch the decoding information, decode the entire video.
         decode_all_video = True
@@ -248,7 +250,9 @@ def pyav_decode(
         video_start_pts = int(start_idx * timebase)
         video_end_pts = int(end_idx * timebase)
 
-    frames = None
+    frames, audio_frames, au_raw_sr = None, None, None
+    meta = {}
+    
     # If video stream was found, fetch video frames from the video.
     if container.streams.video:
         video_frames, max_pts = pyav_decode_stream(
@@ -258,11 +262,62 @@ def pyav_decode(
             container.streams.video[0],
             {"video": 0},
         )
-        container.close()
-
         frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
         frames = torch.as_tensor(np.stack(frames))
-    return frames, fps, decode_all_video
+    
+    meta.update({
+        'video_start': video_start_pts / duration,
+        'video_end': video_end_pts / duration,
+    })
+    
+    if decode_audio and container.streams.audio:
+        au_raw_sr = container.streams.audio[0].codec_context.sample_rate
+        audio_duration = container.streams.audio[0].duration
+        # audio_frames_length = container.streams.audio[0].frames
+        # audio_timebase = audio_duration / audio_frames_length
+        if decode_all_video or decode_all_audio:
+            audio_start_pts = 0
+            audio_end_pts = math.inf
+        else:
+            audio_start_pts = int(start_idx / frames_length * audio_duration)
+            audio_end_pts = int(end_idx / frames_length * audio_duration)
+        audio_frames, audio_max_pts = pyav_decode_stream(
+            container,
+            audio_start_pts,
+            audio_end_pts,
+            container.streams.audio[0],
+            {"audio": 0},
+        )
+        
+        audio_frames = [frame.to_ndarray() for frame in audio_frames]
+        if len({x.shape[1] for x in audio_frames}) == 1:
+            # This is a bit faster then the alternative
+            audio_frames = np.concatenate([x[None] for x in audio_frames], axis=0)
+            audio_frames = np.mean(audio_frames, axis=1)
+            audio_frames = audio_frames.reshape(-1)
+        else:
+            audio_frames = [np.mean(x, axis=0) for x in audio_frames]
+            audio_frames = np.concatenate(audio_frames, axis=0)
+        meta.update({
+            'audio_start': audio_start_pts / audio_duration,
+            'audio_end': audio_end_pts / audio_duration,
+        })
+    
+        # extract logmel
+        if extract_logmel:
+            audio_frames = gen_logmel(audio_frames, au_raw_sr, au_sr, 
+                                      au_win_sz, au_step_sz, au_n_mels)
+            audio_frames = audio_frames.transpose(1, 0) # [F,T]->[T,F]
+        audio_frames = torch.as_tensor(audio_frames)
+    
+    meta.update({
+        'decode_all_video': decode_all_video,
+        'decode_all_audio': decode_all_audio,
+    })
+    
+    container.close() # FYXTODO: maybe need to check if it's open?
+    
+    return frames, fps, audio_frames, au_raw_sr, meta
 
 
 def decode(
@@ -275,6 +330,16 @@ def decode(
     target_fps=30,
     backend="pyav",
     max_spatial_scale=0,
+    # audio-related
+    decode_audio=False,
+    get_misaligned_audio=False,
+    extract_logmel=False,
+    au_sr=16000,
+    au_win_sz=32, 
+    au_step_sz=16, 
+    num_audio_frames=128,
+    au_n_mels=40,
+    au_misaligned_gap=32,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -303,6 +368,7 @@ def decode(
     """
     # Currently support two decoders: 1) PyAV, and 2) TorchVision.
     assert clip_idx >= -1, "Not valied clip_idx {}".format(clip_idx)
+    if decode_audio: assert backend == "pyav", 'Use PyAV for audio decoding'
     try:
         if backend == "pyav":
             frames, fps, decode_all_video = pyav_decode(
@@ -312,6 +378,13 @@ def decode(
                 clip_idx,
                 num_clips,
                 target_fps,
+                decode_audio=decode_audio,
+                extract_logmel=extract_logmel,
+                decode_all_audio=get_misaligned_audio,
+                au_sr=au_sr, 
+                au_win_sz=au_win_sz, 
+                au_step_sz=au_step_sz, 
+                au_n_mels=au_n_mels,
             )
         elif backend == "torchvision":
             frames, fps, decode_all_video = torchvision_decode(

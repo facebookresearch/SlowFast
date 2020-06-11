@@ -23,6 +23,7 @@ class VideoModelStem(nn.Module):
         eps=1e-5,
         bn_mmt=0.1,
         norm_module=nn.BatchNorm3d,
+        stride_pool=[True, True, True],
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -72,11 +73,15 @@ class VideoModelStem(nn.Module):
         self.eps = eps
         self.bn_mmt = bn_mmt
         # Construct the stem layer.
-        self._construct_stem(dim_in, dim_out, norm_module)
+        self._construct_stem(dim_in, dim_out, norm_module, stride_pool)
 
-    def _construct_stem(self, dim_in, dim_out, norm_module):
+    def _construct_stem(self, dim_in, dim_out, norm_module, stride_pool):
         for pathway in range(len(dim_in)):
-            stem = ResNetBasicStem(
+            if pathway == 2:
+                stem_func = AudioTFBasicStem
+            else:
+                stem_func = ResNetBasicStem
+            stem = stem_func(
                 dim_in[pathway],
                 dim_out[pathway],
                 self.kernel[pathway],
@@ -86,6 +91,7 @@ class VideoModelStem(nn.Module):
                 self.eps,
                 self.bn_mmt,
                 norm_module,
+                stride_pool=stride_pool[pathway],
             )
             self.add_module("pathway{}_stem".format(pathway), stem)
 
@@ -96,6 +102,67 @@ class VideoModelStem(nn.Module):
         for pathway in range(len(x)):
             m = getattr(self, "pathway{}_stem".format(pathway))
             x[pathway] = m(x[pathway])
+        return x
+
+
+class AudioTFBasicStem(nn.Module):
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        kernel,
+        stride,
+        padding,
+        inplace_relu=True,
+        eps=1e-5,
+        bn_mmt=0.1,
+        norm_module=nn.BatchNorm3d,
+        stride_pool=True,
+    ):
+        super(AudioTFBasicStem, self).__init__()
+        self.kernel = kernel
+        self.stride = stride
+        self.padding = padding
+        self.inplace_relu = inplace_relu
+        self.eps = eps
+        self.bn_mmt = bn_mmt
+        self.stride_pool = stride_pool
+
+        # Construct the stem layer.
+        self._construct_stem(dim_in, dim_out, norm_module)
+
+    def _construct_stem(self, dim_in, dim_out, norm_module):
+        self.conv_t = nn.Conv3d(
+            dim_in,
+            dim_out,
+            self.kernel[0],
+            stride=self.stride[0],
+            padding=self.padding[0],
+            bias=False,
+        )
+        self.conv_f = nn.Conv3d(
+            dim_in,
+            dim_out,
+            self.kernel[1],
+            stride=self.stride[1],
+            padding=self.padding[1],
+            bias=False,
+        )
+        self.bn = norm_module(dim_out, eps=self.eps, momentum=self.bn_mmt)
+        self.relu = nn.ReLU(self.inplace_relu)
+        if self.stride_pool:
+            self.pool_layer = nn.MaxPool3d(
+                kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]
+            )
+
+    def forward(self, x):
+        x_t = self.conv_t(x)
+        x_f = self.conv_f(x)
+        x = x_t + x_f
+        x = self.bn(x)
+        x = self.relu(x)
+        if self.stride_pool:
+            x = self.pool_layer(x)
         return x
 
 
@@ -117,6 +184,7 @@ class ResNetBasicStem(nn.Module):
         eps=1e-5,
         bn_mmt=0.1,
         norm_module=nn.BatchNorm3d,
+        stride_pool=True,
     ):
         """
         The `__init__` method of any subclass should also contain these arguments.
@@ -150,6 +218,7 @@ class ResNetBasicStem(nn.Module):
         self.inplace_relu = inplace_relu
         self.eps = eps
         self.bn_mmt = bn_mmt
+        self.stride_pool = stride_pool
         # Construct the stem layer.
         self._construct_stem(dim_in, dim_out, norm_module)
 
@@ -166,13 +235,15 @@ class ResNetBasicStem(nn.Module):
             num_features=dim_out, eps=self.eps, momentum=self.bn_mmt
         )
         self.relu = nn.ReLU(self.inplace_relu)
-        self.pool_layer = nn.MaxPool3d(
-            kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]
-        )
+        if self.stride_pool:
+            self.pool_layer = nn.MaxPool3d(
+                kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]
+            )
 
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
         x = self.relu(x)
-        x = self.pool_layer(x)
+        if self.stride_pool:
+            x = self.pool_layer(x)
         return x

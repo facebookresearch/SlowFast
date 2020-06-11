@@ -1,0 +1,112 @@
+TRAIN:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 64 # 64
+  EVAL_PERIOD: 3
+  CHECKPOINT_PERIOD: 1
+  AUTO_RESUME: True
+  # CHECKPOINT_FILE_PATH: ../../data/output/checkpoints/avslowfast.pth
+  # CHECKPOINT_TYPE: pytorch # caffe2 or pytorch
+  
+DATA:
+  USE_BGR_ORDER: True # False
+  NUM_FRAMES: 32
+  SAMPLING_RATE: 2
+  TRAIN_JITTER_SCALES: [256, 320]
+  TRAIN_CROP_SIZE: 224
+  TEST_CROP_SIZE: 256
+  INPUT_CHANNEL_NUM: [3, 3, 1]
+  USE_OPENCV_RESIZE: False
+  USE_AUDIO: True
+  GET_MISALIGNED_AUDIO: False
+  AUDIO_SAMPLE_RATE: 16000
+  AUDIO_WIN_SZ: 32
+  AUDIO_STEP_SZ: 16
+  AUDIO_FRAME_NUM: 128
+  AUDIO_MEL_NUM: 80
+  AUDIO_MISALIGNED_GAP: 32 # half second
+  LOGMEL_MEAN: -24.227
+  LOGMEL_STD: 1.0
+  EASY_NEG_RATIO: 0.75
+  MIX_NEG_EPOCH: 0
+SLOWFAST:
+  ALPHA: 8
+  BETA_INV: 8
+  FUSION_CONV_CHANNEL_RATIO: 2
+  FUSION_KERNEL_SZ: 5
+  AU_ALPHA: 32
+  AU_BETA_INV: 2
+  AU_FUSION_CONV_CHANNEL_MODE: ByDim # ByDim, ByRatio
+  AU_FUSION_CONV_CHANNEL_RATIO: 0.25
+  AU_FUSION_CONV_CHANNEL_DIM: 64
+  AU_FUSION_KERNEL_SZ: 5
+  AU_FUSION_CONV_NUM: 2
+  AU_REDUCE_TF_DIM: True
+  FS_FUSION: [False, False, True, True]
+  AFS_FUSION: [False, False, True, True]
+  AVS_FLAG: [False, False, True, True, True]
+  AVS_PROJ_DIM: 64
+  AVS_VAR_THRESH: 0.01
+  AVS_DUPLICATE_THRESH: 0.99999
+  DROPPATHWAY_RATE: 0.0 # 0.8
+RESNET:
+  ZERO_INIT_FINAL_BN: True
+  WIDTH_PER_GROUP: 64
+  NUM_GROUPS: 1
+  DEPTH: 50
+  TRANS_FUNC: bottleneck_transform
+  AUDIO_TRANS_FUNC: tf_bottleneck_transform_v1
+  AUDIO_TRANS_NUM: 2
+  STRIDE_1X1: False
+  # 18: [[2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
+  # 34: [[3, 3, 3], [4, 4, 4], [6, 6, 6], [3, 3, 3]]
+  # 50: [[3, 3, 3], [4, 4, 4], [6, 6, 6], [3, 3, 3]]
+  # 101: [[3, 3, 3], [4, 4, 4], [23, 23, 23], [3, 3, 3]]
+  # 152: [[3, 3, 3], [8, 8, 8], [36, 36, 36], [3, 3, 3]]
+  NUM_BLOCK_TEMP_KERNEL: [[3, 3, 3], [4, 4, 4], [6, 6, 6], [3, 3, 3]]
+  SPATIAL_DILATIONS: [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]]
+NONLOCAL:
+  LOCATION: [[[], [], []], [[], [], []], [[], [], []], [[], [], []]]
+  GROUP: [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]]
+  POOL: [
+    [[1, 2, 2], [1, 2, 2], [1, 2, 2]], 
+    [[1, 2, 2], [1, 2, 2], [1, 2, 2]], 
+    [[1, 2, 2], [1, 2, 2], [1, 2, 2]], 
+    [[1, 2, 2], [1, 2, 2], [1, 2, 2]],
+  ]
+  INSTANTIATION: dot_product
+BN:
+  USE_PRECISE_STATS: True
+  NUM_BATCHES_PRECISE: 200 # 267, 200
+  MOMENTUM: 0.1
+  WEIGHT_DECAY: 0.0
+SOLVER:
+  BASE_LR: 0.1 # 0.1
+  LR_POLICY: cosine
+  MAX_EPOCH: 50
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 1e-4
+  WARMUP_EPOCHS: 10.0 # 34
+  WARMUP_START_LR: 0.01 # 0.01
+  OPTIMIZING_METHOD: sgd
+MODEL:
+  NUM_CLASSES: 400
+  MODEL_NAME: AVSlowFast
+  ARCH: avslowfast
+  LOSS_FUNC: cross_entropy
+  DROPOUT_RATE: 0.5
+TEST:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 32
+  # SPLIT: val
+  # CHECKPOINT_FILE_PATH: ../../data/output/checkpoints/avslowfast.pth
+  # CHECKPOINT_TYPE: pytorch # caffe2 or pytorch
+DATA_LOADER:
+  NUM_WORKERS: 8 # 8
+  PIN_MEMORY: True
+NUM_GPUS: 8
+NUM_SHARDS: 1
+RNG_SEED: 0
+OUTPUT_DIR: ../../data/output/ft_audio
+# DEBUG: False
