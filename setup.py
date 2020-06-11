@@ -21,6 +21,7 @@ setup(
         "matplotlib",
         "torchvision>=0.4.2",
         "sklearn",
+        "tensorboard",
     ],
     packages=find_packages(exclude=("configs", "tests")),
 )

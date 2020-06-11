@@ -533,6 +533,20 @@ _C.MULTIGRID.DEFAULT_B = 0
 _C.MULTIGRID.DEFAULT_T = 0
 _C.MULTIGRID.DEFAULT_S = 0
 
+# -----------------------------------------------------------------------------
+# Tensorboard Visualization Options
+# -----------------------------------------------------------------------------
+_C.TENSORBOARD = CfgNode()
+
+# Log to summary writer, this will automatically.
+# log loss, lr and metrics during train/eval.
+_C.TENSORBOARD.ENABLE = False
+
+# Path to directory for tensorboard logs
+# Default to to cfg.OUTPUT_DIR/runs-{cfg.TRAIN.DATASET}.
+_C.TENSORBOARD.LOG_DIR = ""
+
+
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
 
