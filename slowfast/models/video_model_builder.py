@@ -97,12 +97,13 @@ class AVS(nn.Module):
         self.num_gpus = num_gpus
         self.num_shards = num_shards
     
+    
     def contrastive_loss(self, ref, pos, neg, audio_mask, margin):
         """
         https://arxiv.org/abs/1807.00230
         """
-        assert pos.shape[0] == neg.shape[0]
-        N = torch.sum(audio_mask).item()
+        # assert pos.shape[0] == neg.shape[0]
+        N = torch.sum(audio_mask)
         
         pos_dist = ref - pos
         neg_dist = ref - neg
@@ -114,6 +115,7 @@ class AVS(nn.Module):
         neg_loss = torch.sum(torch.clamp(margin - neg_dist, min=0)**2)
         loss = (pos_loss + neg_loss) / (2*N + 1e-8)
         return loss
+        
         
     def forward(self, ref, pos, neg, audio_mask, norm='L2', margin=0.99):
         # reduce T, H, W dims
@@ -149,6 +151,7 @@ class AVS(nn.Module):
         loss = loss / float(self.num_shards)
         
         return loss
+
 
 class FuseAV(nn.Module):
     """
@@ -254,6 +257,7 @@ class FuseAV(nn.Module):
                 num_shards,
             )
             
+            
     def forward(self, x, get_misaligned_audio=False, mode='AFS'):
         """
         Forward function for audiovisual fusion, note that it currently only 
@@ -298,8 +302,7 @@ class FuseAV(nn.Module):
                     afs_proc = bn(afs_proc)
                     afs_proc = relu(afs_proc)
                 if get_misaligned_audio:
-                    afs_proc_pos = afs_proc[:afs_proc.shape[0] // 2, ...]
-                    afs_proc_neg = afs_proc[afs_proc.shape[0] // 2:, ...]
+                    afs_proc_pos, afs_proc_neg = torch.chunk(afs_proc, 2, dim=0)
                     cache['a_pos'] = afs_proc_pos
                     cache['a_neg'] = afs_proc_neg
                 else:
@@ -311,6 +314,7 @@ class FuseAV(nn.Module):
                     fuse = afs_proc_pos
                 
         return [fuse, x_f, x_a], cache
+
 
 class FuseFastToSlow(nn.Module):
     """
@@ -357,6 +361,7 @@ class FuseFastToSlow(nn.Module):
         )
         self.relu = nn.ReLU(inplace_relu)
 
+
     def forward(self, x):
         x_s = x[0]
         x_f = x[1]
@@ -365,6 +370,7 @@ class FuseFastToSlow(nn.Module):
         fuse = self.relu(fuse)
         x_s_fuse = torch.cat([x_s, fuse], 1)
         return [x_s_fuse, x_f]
+
 
 @MODEL_REGISTRY.register()
 class AVSlowFast(nn.Module):
@@ -389,6 +395,7 @@ class AVSlowFast(nn.Module):
         init_helper.init_weights(
             self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
         )
+
 
     def _construct_network(self, cfg):
         """
@@ -764,6 +771,7 @@ class AVSlowFast(nn.Module):
             dropout_rate=cfg.MODEL.DROPOUT_RATE,
         )
     
+    
     def freeze_bn(self, freeze_bn_affine):
         """
         Freeze the BN parameters
@@ -781,6 +789,7 @@ class AVSlowFast(nn.Module):
                 if freeze_bn_affine:
                     m.weight.requires_grad = False
                     m.bias.requires_grad = False
+    
     
     def gen_fusion_avs_pattern(self):
         """
@@ -834,6 +843,7 @@ class AVSlowFast(nn.Module):
         
         return fusion_pattern, avs_pattern
     
+    
     def move_C_to_N(self, x):
         """
         Assume x is with shape [N C T H W], this function merges C into N which 
@@ -842,6 +852,7 @@ class AVSlowFast(nn.Module):
         N, C, T, H, W = x[2].size()
         x[2] = x[2].reshape(N*C, 1, T, H, W)
         return x
+    
     
     def filter_duplicates(self, x):
         """
@@ -867,13 +878,15 @@ class AVSlowFast(nn.Module):
                 # mask = mask.float()
         return mask
     
+    
     def get_pos_audio(self, x):
         """
         Slice the data and only take the first half 
         along the first dim for positive data
         """
-        x[2] = x[2][:x[2].shape[0] // 2, ...]
+        x[2], _ = torch.chunk(x[2], 2, dim=0)
         return x
+    
     
     def avs_forward(self, features, audio_mask):
         """
@@ -891,6 +904,7 @@ class AVSlowFast(nn.Module):
                 loss = avs(fs, a_pos, a_neg, audio_mask)
                 loss_list['s{}_avs'.format(idx + 1)] = loss
         return loss_list
+        
         
     def forward(self, x):
         # generate fusion pattern
@@ -977,12 +991,13 @@ class AVSlowFast(nn.Module):
         
         x = self.head(x)
         
-        # compute loss if in training
-        loss = {}
         if self.training and self.GET_MISALIGNED_AUDIO:
+            # compute loss if in training
             loss = self.avs_forward(features, audio_mask)
-            
-        return x, loss
+            return x, loss
+        else:
+            return x
+
 
 class FuseFastToSlow(nn.Module):
     """

@@ -203,6 +203,15 @@ class ResNetBasicHead(nn.Module):
         for pathway in range(self.num_pathways):
             m = getattr(self, "pathway{}_avgpool".format(pathway))
             pool_out.append(m(inputs[pathway]))
+        # check if audio pathway is compatible with visual ones
+        if len(pool_out) > 2:
+            a_H, a_W = pool_out[2].size(-2), pool_out[2].size(-1)
+            v_H, v_W = pool_out[0].size(-2), pool_out[0].size(-1)
+            if a_H != v_H or a_W != v_W:
+                assert v_H % a_H == 0 and v_W % a_W == 0, \
+                    'Visual pool output should be divisible by audio pool output size'
+                a_N, a_C, a_T, _, _ = pool_out[2].shape
+                pool_out[2] = pool_out[2].expand([a_N, a_C, a_T, v_H, v_W])
         x = torch.cat(pool_out, 1)
         # (N, C, T, H, W) -> (N, T, H, W, C).
         x = x.permute((0, 2, 3, 4, 1))
