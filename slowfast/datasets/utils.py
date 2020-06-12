@@ -70,7 +70,7 @@ def get_sequence(center_idx, half_len, sample_rate, num_frames):
     return seq
 
 
-def pack_pathway_output(cfg, frames):
+def pack_pathway_output(cfg, frames, audio_frames=None):
     """
     Prepare output as a list of tensors. Each tensor corresponding to a
     unique pathway.
@@ -95,7 +95,10 @@ def pack_pathway_output(cfg, frames):
                 0, frames.shape[1] - 1, frames.shape[1] // cfg.SLOWFAST.ALPHA
             ).long(),
         )
-        frame_list = [slow_pathway, fast_pathway]
+        if cfg.MODEL.ARCH == "slowfast":
+            frame_list = [slow_pathway, fast_pathway]
+        elif cfg.MODEL.ARCH == "avslowfast":
+            frame_list = [slow_pathway, fast_pathway, audio_frames]
     else:
         raise NotImplementedError(
             "Model arch {} is not in {}".format(

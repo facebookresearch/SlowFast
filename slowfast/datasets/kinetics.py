@@ -252,17 +252,17 @@ class Kinetics(torch.utils.data.Dataset):
                 frames = frames[[2, 1, 0], ...]
             
             if self.cfg.DATA.USE_AUDIO:
-                audio_frames = audio_frames.float()
-                audio_frames = audio_frames - \
-                    torch.tensor(self.cfg.DATA.LOGMEL_MEAN)
-                audio_frames = audio_frames / \
-                    torch.tensor(self.cfg.DATA.LOGMEL_STD)
+                audio_frames = utils.tensor_normalize(
+                    audio_frames, 
+                    self.cfg.DATA.LOGMEL_MEAN, 
+                    self.cfg.DATA.LOGMEL_STD
+                )
                 if self.cfg.DATA.GET_MISALIGNED_AUDIO:
-                    misaligned_audio_frames = misaligned_audio_frames.float()
-                    misaligned_audio_frames = misaligned_audio_frames - \
-                        torch.tensor(self.cfg.DATA.LOGMEL_MEAN)
-                    misaligned_audio_frames = misaligned_audio_frames / \
-                        torch.tensor(self.cfg.DATA.LOGMEL_STD)
+                    misaligned_audio_frames = utils.tensor_normalize(
+                        misaligned_audio_frames, 
+                        self.cfg.DATA.LOGMEL_MEAN, 
+                        self.cfg.DATA.LOGMEL_STD
+                    )
                     audio_frames = torch.cat([audio_frames, \
                                     misaligned_audio_frames], dim=0)
 

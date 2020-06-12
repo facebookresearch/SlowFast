@@ -1,0 +1,1 @@
+python run_net.py --cfg ../configs/Kinetics/AVSLOWFAST.yaml DATA_LOADER.NUM_WORKERS 0 NUM_GPUS 1 TRAIN.BATCH_SIZE 8 SOLVER.BASE_LR 0.0125 DATA.PATH_TO_DATA_DIR ../../data/kinetics400/res320/ DATA.PATH_PREFIX ../../data/kinetics400/res320/

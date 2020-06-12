@@ -5,10 +5,12 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import random
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
+from slowfast.utils import misc
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY

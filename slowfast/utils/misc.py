@@ -90,7 +90,16 @@ def _get_model_analysis_input(cfg, is_train):
             cfg.DATA.TEST_CROP_SIZE,
             cfg.DATA.TEST_CROP_SIZE,
         )
-    model_inputs = pack_pathway_output(cfg, input_tensors)
+    input_audio = None
+    if cfg.DATA.USE_AUDIO:
+        chn = 2 if cfg.DATA.GET_MISALIGNED_AUDIO else 1
+        input_audio = torch.rand(
+            chn,
+            1,
+            cfg.DATA.AUDIO_FRAME_NUM,
+            cfg.DATA.AUDIO_MEL_NUM,
+        )
+    model_inputs = pack_pathway_output(cfg, input_tensors, input_audio)
     for i in range(len(model_inputs)):
         model_inputs[i] = model_inputs[i].unsqueeze(0).cuda(non_blocking=True)
 
@@ -245,6 +254,20 @@ def aggregate_sub_bn_stats(module):
     return count
 
 
+def update_dict_with_prefix(dict_dst, dict_src, prefix=''):
+    """
+    Update a dictionary with the contents of another dictionary, with its keys
+    augmented with a prefix 
+    Args: 
+        dict_dst: destination dictionary
+        dict_src: source dictionary
+        prefix: the prefix to be inserted
+    """
+    for k, v in dict_src.items():
+        dict_dst[prefix + k] = v
+    return dict_dst
+
+
 def launch_job(cfg, init_method, func, daemon=False):
     """
     Run 'func' on one or more GPUs, specified in cfg
@@ -274,3 +297,4 @@ def launch_job(cfg, init_method, func, daemon=False):
         )
     else:
         func(cfg=cfg)
+

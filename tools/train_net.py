@@ -59,6 +59,9 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
         optim.set_lr(optimizer, lr)
+        
+        # Auxilliary losses.
+        aux_loss = {}
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
@@ -67,12 +70,21 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
         else:
             # Perform the forward pass.
             preds = model(inputs)
-
+        
+        # Fetch actual preds.
+        if type(preds) == type(()):
+            preds, avs_loss = preds
+            aux_loss.update(avs_loss)
+        
         # Explicitly declare reduction to mean.
         loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
 
         # Compute the loss.
         loss = loss_fun(preds, labels)
+        
+        # Accumulate auxilliary losses.
+        if len(aux_loss) > 0:
+            loss = loss + sum(aux_loss.values())
 
         # check Nan Loss.
         misc.check_nan_losses(loss)

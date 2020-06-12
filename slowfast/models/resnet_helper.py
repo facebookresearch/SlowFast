@@ -4,6 +4,7 @@
 """Video models."""
 
 import torch.nn as nn
+from torch import cat
 
 from slowfast.models.nonlocal_helper import Nonlocal
 

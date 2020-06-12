@@ -6,6 +6,7 @@ import numpy as np
 import random
 import torch
 import torchvision.io as io
+import librosa
 
 
 def temporal_sampling(frames, start_idx, end_idx, num_samples):
@@ -196,6 +197,22 @@ def torchvision_decode(
     return v_frames, video_meta["video_fps"], decode_all_video
 
 
+def gen_logmel(y, orig_sr, sr, win_sz, step_sz, n_mels):
+    n_fft = int(float(sr) / 1000 * win_sz)
+    hop_length = int(float(sr) / 1000 * step_sz)
+    win_length = int(float(sr) / 1000 * win_sz)
+    eps = 1e-8
+    y = y.reshape(-1)
+    y = np.asfortranarray(y)
+    y_resample = librosa.resample(y, orig_sr, sr, res_type='polyphase')
+    T = len(y_resample) / sr
+    S = librosa.feature.melspectrogram(y=y_resample, sr=sr, n_fft=n_fft, 
+                                   win_length=win_length, hop_length=hop_length, 
+                                   n_mels=n_mels, htk=True, center=False)
+    logS = np.log(S+eps)
+    return logS
+
+
 def pyav_decode(
     container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30,
     decode_audio=False, extract_logmel=True, decode_all_audio=False, 
@@ -315,9 +332,21 @@ def pyav_decode(
         'decode_all_audio': decode_all_audio,
     })
     
-    container.close() # FYXTODO: maybe need to check if it's open?
+    container.close()
     
     return frames, fps, audio_frames, au_raw_sr, meta
+
+
+def sample_misaligned_start(start_idx, length, gap, frames):
+    total_frames = frames.shape[0]
+    pre_sample_region = (0, max(start_idx - gap, 0))
+    post_sample_region = (min(start_idx + gap, total_frames), total_frames)
+    pre_size = pre_sample_region[1] - pre_sample_region[0]
+    post_size = post_sample_region[1] - post_sample_region[0]
+    misaligned_start = random.random() * (pre_size + post_size)
+    if misaligned_start > pre_size:
+        misaligned_start = misaligned_start - pre_size + post_sample_region[0]
+    return misaligned_start
 
 
 def decode(
@@ -369,9 +398,10 @@ def decode(
     # Currently support two decoders: 1) PyAV, and 2) TorchVision.
     assert clip_idx >= -1, "Not valied clip_idx {}".format(clip_idx)
     if decode_audio: assert backend == "pyav", 'Use PyAV for audio decoding'
+    frames, audio_frames, misaligned_audio_frames = None, None, None
     try:
         if backend == "pyav":
-            frames, fps, decode_all_video = pyav_decode(
+            frames, fps, audio_frames, au_raw_sr, meta = pyav_decode(
                 container,
                 sampling_rate,
                 num_frames,
@@ -386,6 +416,7 @@ def decode(
                 au_step_sz=au_step_sz, 
                 au_n_mels=au_n_mels,
             )
+            decode_all_video = meta['decode_all_video']
         elif backend == "torchvision":
             frames, fps, decode_all_video = torchvision_decode(
                 container,
@@ -408,7 +439,7 @@ def decode(
 
     # Return None if the frames was not decoded successfully.
     if frames is None or frames.size(0) == 0:
-        return None
+        return frames, audio_frames, misaligned_audio_frames
 
     start_idx, end_idx = get_start_end_idx(
         frames.shape[0],
@@ -416,6 +447,49 @@ def decode(
         clip_idx if decode_all_video else 0,
         num_clips if decode_all_video else 1,
     )
+    if decode_audio and audio_frames is not None:
+        if get_misaligned_audio:
+            video_start = meta['video_start']
+            video_end = meta['video_end']
+            video_duration = video_end - video_start
+            audio_start_idx = (video_start + start_idx / frames.shape[0] * \
+                               video_duration) * audio_frames.shape[0]
+            audio_end_idx = (video_start + end_idx / frames.shape[0] * \
+                             video_duration) * audio_frames.shape[0]
+        else:
+            audio_start_idx = start_idx / frames.shape[0] * audio_frames.shape[0]
+            audio_end_idx = end_idx / frames.shape[0] * audio_frames.shape[0]
+            # audio_end_idx = audio_start_idx + num_audio_frames - 1
+    
     # Perform temporal sampling from the decoded video.
     frames = temporal_sampling(frames, start_idx, end_idx, num_frames)
-    return frames
+    
+    # Perform temporal sampling from the decoded audio.
+    if decode_audio and audio_frames is not None:
+        if get_misaligned_audio:
+            audio_frame_len = audio_end_idx - audio_start_idx
+            misaligned_audio_start_idx = sample_misaligned_start(
+                audio_start_idx, 
+                audio_frame_len,
+                au_misaligned_gap, 
+                audio_frames,
+            )
+            misaligned_audio_end_idx = misaligned_audio_start_idx + audio_frame_len
+            misaligned_audio_frames = temporal_sampling(
+                audio_frames, 
+                misaligned_audio_start_idx, 
+                misaligned_audio_end_idx, 
+                num_audio_frames
+            )
+            misaligned_audio_frames = misaligned_audio_frames.reshape(
+                1, 
+                1, 
+                misaligned_audio_frames.size(0), 
+                misaligned_audio_frames.size(1)
+            )        
+        audio_frames = temporal_sampling(audio_frames, audio_start_idx, 
+                                         audio_end_idx, num_audio_frames)
+        audio_frames = audio_frames.reshape(1, 1, \
+                        audio_frames.size(0), audio_frames.size(1))
+    
+    return frames, audio_frames, misaligned_audio_frames
