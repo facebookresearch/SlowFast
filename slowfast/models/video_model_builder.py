@@ -282,13 +282,11 @@ class FuseAV(nn.Module):
             
             # F->S
             if self.use_fs_fusion:
-                if 'F' in mode:
-                    fs_proc = self.conv_f2s(x_f)
-                    fs_proc = self.bn_f2s(fs_proc)
-                    fs_proc = self.relu_f2s(fs_proc)
-                    fs_proc = torch.cat([fuse, fs_proc], 1)
-                    fuse = fs_proc
-                    cache['fs'] = fs_proc
+                fs_proc = self.conv_f2s(x_f)
+                fs_proc = self.bn_f2s(fs_proc)
+                fs_proc = self.relu_f2s(fs_proc)
+                fuse = torch.cat([fuse, fs_proc], 1)
+                cache['fs'] = fuse
                     
             # A->FS
             if self.use_afs_fusion:
@@ -307,12 +305,12 @@ class FuseAV(nn.Module):
                     cache['a_neg'] = afs_proc_neg
                 else:
                     afs_proc_pos = afs_proc
+                # [N C 1 T 1] -> [N C T 1 1]
+                afs_proc_pos = afs_proc_pos.permute(0, 1, 3, 2, 4) 
                 if 'A' in mode:
-                    # [N C 1 T 1] -> [N C T 1 1]
-                    afs_proc_pos = afs_proc_pos.permute(0, 1, 3, 2, 4) 
-                    afs_proc_pos = afs_proc_pos + fuse
-                    fuse = afs_proc_pos
-                
+                    fuse = afs_proc_pos + fuse
+                else:
+                    fuse = afs_proc_pos * 0.0 + fuse
         return [fuse, x_f, x_a], cache
 
 
@@ -895,13 +893,15 @@ class AVSlowFast(nn.Module):
         loss_list = {}
         avs_pattern = features['avs_pattern']
         for idx in range(5):
-            if avs_pattern[idx]:
+            if self.AVS_FLAG[idx]:
                 a_pos = features['s{}_a_pos'.format(idx + 1)]
                 a_neg = features['s{}_a_neg'.format(idx + 1)]
                 fs = features['s{}_fs'.format(idx + 1)]
                 fuse = getattr(self, 's{}_fuse'.format(idx + 1))
                 avs = getattr(fuse, 'avs')
                 loss = avs(fs, a_pos, a_neg, audio_mask)
+                if not avs_pattern[idx]:
+                    loss = loss * 0.0
                 loss_list['s{}_avs'.format(idx + 1)] = loss
         return loss_list
         

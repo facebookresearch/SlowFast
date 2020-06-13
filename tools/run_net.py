@@ -27,6 +27,6 @@ def main():
         launch_job(cfg=cfg, init_method=args.init_method, func=test)
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":  
     torch.multiprocessing.set_start_method("forkserver")
     main()

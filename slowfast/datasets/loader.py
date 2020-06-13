@@ -52,6 +52,18 @@ def detection_collate(batch):
     return inputs, labels, video_idx, collated_extra_data
 
 
+def shuffle_misaligned_audio(epoch, inputs, cfg):
+    if len(inputs) > 2 and cfg.DATA.GET_MISALIGNED_AUDIO:
+        N = inputs[2].size(0)
+        SN = max(int(cfg.DATA.EASY_NEG_RATIO * N), 1) if \
+                epoch >= cfg.DATA.MIX_NEG_EPOCH else N
+        with torch.no_grad(): 
+            idx = torch.arange(N)
+            idx[:SN] = torch.arange(1, SN+1) % SN
+            inputs[2][:, 1, ...] = inputs[2][idx, 1, ...]
+    return inputs
+
+
 def construct_loader(cfg, split, is_precise_bn=False):
     """
     Constructs the data loader for the given dataset.

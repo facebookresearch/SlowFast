@@ -55,6 +55,9 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
                     val[i] = val[i].cuda(non_blocking=True)
             else:
                 meta[key] = val.cuda(non_blocking=True)
+        
+        # Optionally shuffle misaligned audio data
+        inputs = loader.shuffle_misaligned_audio(cur_epoch, inputs, cfg)
 
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)

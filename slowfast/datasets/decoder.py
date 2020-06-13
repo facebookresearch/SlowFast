@@ -435,7 +435,7 @@ def decode(
             )
     except Exception as e:
         print("Failed to decode by {} with exception: {}".format(backend, e))
-        return None
+        return frames, audio_frames, misaligned_audio_frames
 
     # Return None if the frames was not decoded successfully.
     if frames is None or frames.size(0) == 0:
