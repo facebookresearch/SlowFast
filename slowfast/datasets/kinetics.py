@@ -72,6 +72,7 @@ class Kinetics(torch.utils.data.Dataset):
 
         logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
+        
 
     def _construct_loader(self):
         """
