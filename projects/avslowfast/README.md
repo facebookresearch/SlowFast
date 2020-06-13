@@ -7,7 +7,7 @@ First, a note that `DATA.ANNOT_DIR` points to the directory where annotation csv
 Then, issue the following training command
 ```
 python tools/run_net.py \
-  --cfg configs/Kinetics/AVSLOWFAST.yaml \
+  --cfg configs/Kinetics/AVSLOWFAST_4x16_R50.yaml \
   DATA.ANNOT_DIR path_to_your_annotation \
   DATA.DATA_DIR path_to_your_dataset_root \
   NUM_GPUS 8 \
@@ -15,13 +15,12 @@ python tools/run_net.py \
   TRAIN.BATCH_SIZE 64 \
 ```
 
-For testing (here we are testing on validation set by setting TEST.SPLIT to val)
+For testing, run the following
 ```
 python tools/run_net.py \
-  --cfg configs/Kinetics/AVSLOWFAST.yaml \
+  --cfg configs/Kinetics/AVSLOWFAST_4x16_R50.yaml \
   DATA.ANNOT_DIR path_to_your_annotation \
   DATA.DATA_DIR path_to_your_dataset_root \
-  TEST.SPLIT val \ 
   TEST.BATCH_SIZE 32 \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
