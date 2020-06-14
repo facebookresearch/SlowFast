@@ -337,7 +337,7 @@ def pyav_decode(
     return frames, fps, audio_frames, au_raw_sr, meta
 
 
-def sample_misaligned_start(start_idx, length, gap, frames):
+def sample_misaligned_start(start_idx, gap, frames):
     total_frames = frames.shape[0]
     pre_sample_region = (0, max(start_idx - gap, 0))
     post_sample_region = (min(start_idx + gap, total_frames), total_frames)
@@ -470,7 +470,6 @@ def decode(
             audio_frame_len = audio_end_idx - audio_start_idx
             misaligned_audio_start_idx = sample_misaligned_start(
                 audio_start_idx, 
-                audio_frame_len,
                 au_misaligned_gap, 
                 audio_frames,
             )
