@@ -77,9 +77,15 @@ def pack_pathway_output(cfg, frames, audio_frames=None):
     Args:
         frames (tensor): frames of images sampled from the video. The
             dimension is `channel` x `num frames` x `height` x `width`.
+        audio_frames (tensor): audio inputs in log-mel-spectrogram
+            of shape C x 1 x T x F. Where C is 2 if misaligned audio
+            samples are extracted (1st and 2nd channels correspond to 
+            pos and neg audio samples) otherwise C is 1. T corresponds
+            to cfg.DATA.AUDIO_FRAME_NUM and F is cfg.DATA.AUDIO_MEL_NUM.
     Returns:
         frame_list (list): list of tensors with the dimension of
-            `channel` x `num frames` x `height` x `width`.
+            `channel` x `num frames` x `height` x `width`. audio_frames
+            is untouched.
     """
     if cfg.DATA.REVERSE_INPUT_CHANNEL:
         frames = frames[[2, 1, 0], :, :, :]

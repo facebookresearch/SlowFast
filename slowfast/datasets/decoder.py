@@ -198,6 +198,19 @@ def torchvision_decode(
 
 
 def gen_logmel(y, orig_sr, sr, win_sz, step_sz, n_mels):
+	"""
+    Generate log-mel-spectrogram features from audio waveform
+
+    Args:
+        y (ndarray): audio waveform input.
+        orig_sr (int): original sampling rate of audio inputs.
+        sr (int): targeted sampling rate.
+        win_sz (int): window step size in ms.
+        step_sz (int): step size in ms.
+        n_mels (int): number of frequency bins.
+    Returns:
+        logS (ndarray): log-mel-spectrogram computed from the input waveform.
+    """
     n_fft = int(float(sr) / 1000 * win_sz)
     hop_length = int(float(sr) / 1000 * step_sz)
     win_length = int(float(sr) / 1000 * win_sz)
@@ -287,6 +300,7 @@ def pyav_decode(
         'video_end': video_end_pts / duration,
     })
     
+    # If audio stream was found, extract audio waveform from the video.
     if decode_audio and container.streams.audio:
         au_raw_sr = container.streams.audio[0].codec_context.sample_rate
         audio_duration = container.streams.audio[0].duration
@@ -320,7 +334,7 @@ def pyav_decode(
             'audio_end': audio_end_pts / audio_duration,
         })
     
-        # extract logmel
+        # Extract log-mel-spectrogram features.
         if extract_logmel:
             audio_frames = gen_logmel(audio_frames, au_raw_sr, au_sr, 
                                       au_win_sz, au_step_sz, au_n_mels)
@@ -338,6 +352,18 @@ def pyav_decode(
 
 
 def sample_misaligned_start(start_idx, gap, frames):
+	"""
+    Decide the starting point of a misaligned (i.e., negative) audio sample,
+    which can be used for audiovisual synchronization training for self and 
+    semi-supervised training.
+
+    Args:
+        start_idx (float): starting point of the positive sample.
+        gap (int): the minimal gap to maintain between positive and negative samples.
+        frames (tensor): decoded log-mel-spectrogram features.
+    Returns:
+        misaligned_start (float): starting point of the misaligned sample.
+    """
     total_frames = frames.shape[0]
     pre_sample_region = (0, max(start_idx - gap, 0))
     post_sample_region = (min(start_idx + gap, total_frames), total_frames)

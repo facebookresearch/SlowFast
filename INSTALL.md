@@ -16,6 +16,7 @@
 - psutil: `pip install psutil`
 - OpenCV: `pip install opencv-python`
 - torchvision: `pip install torchvision` or `conda install torchvision -c pytorch`
+- librosa: `pip install librosa` (if using Audiovisual SlowFast Networks)
 - [Detectron2](https://github.com/facebookresearch/detectron2):
 ```
     pip install -U torch torchvision cython

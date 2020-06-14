@@ -106,6 +106,12 @@ class VideoModelStem(nn.Module):
 
 
 class AudioTFBasicStem(nn.Module):
+    """
+    Audio time-frequency stem module.
+    Performs separate time and frequency Convolution, 
+        BN, and Relu following by a spatiotemporal pooling.
+    """
+
     def __init__(
         self,
         dim_in,
@@ -119,6 +125,32 @@ class AudioTFBasicStem(nn.Module):
         norm_module=nn.BatchNorm3d,
         stride_pool=True,
     ):
+        """
+        The `__init__` method of any subclass should also contain these arguments.
+
+        Args:
+            dim_in (int): the channel dimension of the input. Normally 1 is used
+                for audio log-mel-spectrogram input.
+            dim_out (int): the output dimension of the convolution in the stem
+                layer.
+            kernel (list): the kernel size of the convolution in the stem layer.
+                temporal kernel size, height kernel size, width kernel size in
+                order.
+            stride (list): the stride size of the convolution in the stem layer.
+                temporal kernel stride, height kernel size, width kernel size in
+                order.
+            padding (int): the padding size of the convolution in the stem
+                layer, temporal padding size, height padding size, width
+                padding size in order.
+            inplace_relu (bool): calculate the relu on the original input
+                without allocating new memory.
+            eps (float): epsilon for batch norm.
+            bn_mmt (float): momentum for batch norm. Noted that BN momentum in
+                PyTorch = 1 - BN momentum in Caffe2.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
+        """
+
         super(AudioTFBasicStem, self).__init__()
         self.kernel = kernel
         self.stride = stride

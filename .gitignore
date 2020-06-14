@@ -14,6 +14,8 @@ supp.pdf
 **/*.fls
 **/*.toc
 
+tools/debug.sh
+
 # MacOS stuff
 .DS_Store
 **/.DS_Store

@@ -84,10 +84,21 @@ _POOL1 = {
 
 class AVS(nn.Module):
     """
-    Compute Audio-Visual synchronization loss
+    Compute Audio-Visual synchronization loss.
     """
     
     def __init__(self, ref_dim, query_dim, proj_dim, num_gpus, num_shards):
+        """
+        Args:
+            ref_dim (int): the channel dimension of the reference data point
+                (usually a visual input).
+            query_dim (int): the channel dimension of the query data point
+                (usually an audio input).
+            proj_dim (int): the channel dimension of the projected codes.
+            num_gpus (int): number of gpus used.
+            num_shards (int): number of shards used.
+        """
+
         super(AVS, self).__init__()
         
         # initialize fc projection layers
@@ -100,9 +111,8 @@ class AVS(nn.Module):
     
     def contrastive_loss(self, ref, pos, neg, audio_mask, margin):
         """
-        https://arxiv.org/abs/1807.00230
+        Implement the contrastive loss used in https://arxiv.org/abs/1807.00230
         """
-        # assert pos.shape[0] == neg.shape[0]
         N = torch.sum(audio_mask)
         
         pos_dist = ref - pos
@@ -155,7 +165,7 @@ class AVS(nn.Module):
 
 class FuseAV(nn.Module):
     """
-    Fuses the information from audio to visual pathways.
+    Fuses information from audio to visual pathways.
     """
     
     def __init__(
@@ -190,6 +200,39 @@ class FuseAV(nn.Module):
     ):
         """
         Perform A2TS fusion described in AVSlowFast paper.
+
+        Args:
+            dim_in_s (int): channel dimension of the slow pathway.
+            dim_in_f (int): channel dimension of the fast pathway.
+            fusion_conv_channel_ratio_f (int): channel ratio for the convolution
+                used to fuse from Fast pathway to Slow pathway.
+            fusion_kernel_f (int): kernel size of the convolution used to fuse
+                from Fast pathway to Slow pathway.
+            alpha_f (int): the frame rate ratio between the Fast and Slow pathway.
+            dim_in_a (int): channel dimension of audio inputs.
+            fusion_conv_channel_mode_a (str): 'ByDim' or 'ByRatio'. Decide how to
+                compute intermediate feature dimension for Audiovisual fusion.
+            fusion_conv_channel_dim_a (int): used when 'fusion_conv_channel_mode_a'
+                == 'ByDim', decide intermediate feature dimension for Audiovisual fusion.
+            fusion_conv_channel_ratio_a (float): used when 'fusion_conv_channel_mode_a'
+                == 'ByRatio', decide intermediate feature dimension for Audiovisual fusion.
+            fusion_kernel_a (int): kernel size of the convolution used to fuse
+                from Audio pathway to SlowFast pathways.
+            alpha_a (int): the frame rate ratio between the Audio and Slow pathway.
+            conv_num_a (int): number of convs applied on audio, before fusing into
+                SlowFast pathways.
+            use_fs_fusion (bool): whether use Fast->Slow fusion.
+            use_afs_fusion (bool): whether use Audio->SlowFast fusion.
+            use_avs (bool): whether compute audiovisual synchronization loss.
+            avs_proj_dim (int): channel dimension of the projection codes for audiovisual
+                synchronization loss.
+            num_gpus (int): number of gpus used.
+            num_shards (int): number of shards used.            
+            eps (float): epsilon for batch norm.
+            bn_mmt (float): momentum for batch norm. Noted that BN momentum in
+                PyTorch = 1 - BN momentum in Caffe2.
+            inplace_relu (bool): if True, calculate the relu on the original
+                input without allocating new memory.
         """
         super(FuseAV, self).__init__()
         self.conv_num_a = conv_num_a
@@ -265,7 +308,7 @@ class FuseAV(nn.Module):
         Args:
             x (list): contains slow, fast and audio features
             get_misaligned_audio (bool): whether misaligned audio is carried in x
-            mode:
+            mode (str):
                 AFS  -- fuse audio, fast and slow
                 AS   -- fuse audio and slow 
                 FS   -- fuse fast and slow 
@@ -376,12 +419,11 @@ class AVSlowFast(nn.Module):
     Model builder for AVSlowFast network.
     Fanyi Xiao, Yong Jae Lee, Kristen Grauman, Jitendra Malik, Christoph Feichtenhofer.
     "Audiovisual Slowfast Networks for Video Recognition."
+    https://arxiv.org/abs/2001.08740
     """
 
     def __init__(self, cfg):
         """
-        The `__init__` method of any subclass should also contain these
-            arguments.
         Args:
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
@@ -397,8 +439,9 @@ class AVSlowFast(nn.Module):
 
     def _construct_network(self, cfg):
         """
-        Builds a SlowFast model. The first pathway is the Slow pathway and the
-            second pathway is the Fast pathway.
+        Builds an AVSlowFast model. The first pathway is the Slow pathway and the
+            second pathway is the Fast pathway, and the third one is the Audio 
+            pathway.
 
         Args:
             cfg (CfgNode): model building configs, details are in the
