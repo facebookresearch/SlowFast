@@ -16,6 +16,11 @@ def get_trans_func(name):
     trans_funcs = {
         "bottleneck_transform": BottleneckTransform,
         "basic_transform": BasicTransform,
+        # the following two are transform that decouples 
+        # time and frequency in log-mel-spectrogram as described 
+        # in AVSlowFast paper. Specifically, tf_bottleneck_transform_v1
+        # is used in the paper, but tf_bottleneck_transform_v2 is 
+        # more memory efficient.
         "tf_bottleneck_transform_v2": TimeFreqBottleneckTransform_v2,
         "tf_bottleneck_transform_v1": TimeFreqBottleneckTransform_v1,
     }
@@ -112,8 +117,10 @@ class BasicTransform(nn.Module):
 
 class TimeFreqBottleneckTransform_v1(nn.Module):
     """
-    Bottleneck transformation: Tx1x1, 1x1x3, 1x3x1, 1x1x1, 
-        where T is the size of temporal kernel.
+    The transformation function that decouples time 
+    and frequency axis in log-mel-spectrogram inputs, 
+    as described in the AVSlowFast paper.  
+    1x1x3, 1x3x1, 1x1x1
     """
 
     def __init__(
@@ -149,6 +156,9 @@ class TimeFreqBottleneckTransform_v1(nn.Module):
             eps (float): epsilon for batch norm.
             bn_mmt (float): momentum for batch norm. Noted that BN momentum in
                 PyTorch = 1 - BN momentum in Caffe2.
+            dilation (int): size of dilation.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(TimeFreqBottleneckTransform_v1, self).__init__()
         self.temp_kernel_size = temp_kernel_size
@@ -165,6 +175,7 @@ class TimeFreqBottleneckTransform_v1(nn.Module):
             dilation,
             norm_module,
         )
+
 
     def _construct(self, dim_in, dim_out, stride, dim_inner, num_groups, 
                    dilation, norm_module):
@@ -213,6 +224,7 @@ class TimeFreqBottleneckTransform_v1(nn.Module):
         )
         self.out_bn.transform_final_bn = True
 
+
     def forward(self, x):
         # Explicitly forward every layer.
         # Branch2a_t.
@@ -236,8 +248,11 @@ class TimeFreqBottleneckTransform_v1(nn.Module):
     
 class TimeFreqBottleneckTransform_v2(nn.Module):
     """
-    Bottleneck transformation: Tx1x1, 1x1x3, 1x3x1, 1x1x1, 
-        where T is the size of temporal kernel.
+    A more memory efficient version of the transformation 
+    function that decouples time and frequency axis in 
+    log-mel-spectrogram inputs, as described in the 
+    AVSlowFast paper.  
+    Tx1x1, 1x1x3, 1x3x1, 1x1x1
     """
 
     def __init__(
@@ -273,6 +288,9 @@ class TimeFreqBottleneckTransform_v2(nn.Module):
             eps (float): epsilon for batch norm.
             bn_mmt (float): momentum for batch norm. Noted that BN momentum in
                 PyTorch = 1 - BN momentum in Caffe2.
+            dilation (int): size of dilation.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
         """
         super(TimeFreqBottleneckTransform_v2, self).__init__()
         self.temp_kernel_size = temp_kernel_size
@@ -351,6 +369,7 @@ class TimeFreqBottleneckTransform_v2(nn.Module):
             dim_out, eps=self._eps, momentum=self._bn_mmt
         )
         self.c_bn.transform_final_bn = True
+
 
     def forward(self, x):
         # Explicitly forward every layer.

@@ -228,6 +228,8 @@ class Kinetics(torch.utils.data.Dataset):
                 index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
             
+            # If audio sampling is turned on but no audio is available,
+            # we discard this sample and continue.
             if self.cfg.DATA.USE_AUDIO and audio_frames is None:
                 index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
@@ -249,9 +251,12 @@ class Kinetics(torch.utils.data.Dataset):
                 inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
             
+            # The default order is RGB, this is to convert it 
+            # to BGR if needed.
             if self.cfg.DATA.USE_BGR_ORDER:
                 frames = frames[[2, 1, 0], ...]
             
+            # Optionally normalize audio inputs (log-mel-spectrogram)
             if self.cfg.DATA.USE_AUDIO:
                 audio_frames = utils.tensor_normalize(
                     audio_frames, 
