@@ -3,6 +3,7 @@
 
 import logging as log
 import os
+import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import slowfast.utils.logging as logging
@@ -25,16 +26,20 @@ class TensorboardWriter(object):
                 slowfast/config/defaults.py
         """
         # class_names: list of class names.
-        # matrix_subset_classes: a list of class ids -- a user-specified subset.
+        # cm_subset_classes: a list of class ids -- a user-specified subset.
         # parent_map: dictionary where key is the parent class name and
         #   value is a list of ids of its children classes.
-        self.class_names, self.matrix_subset_classes, self.parent_map = (
-            None,
-            None,
-            None,
-        )
+        # hist_subset_classes: a list of class ids -- user-specified to plot histograms.
+        (
+            self.class_names,
+            self.cm_subset_classes,
+            self.parent_map,
+            self.hist_subset_classes,
+        ) = (None, None, None, None)
         self.cfg = cfg
-        self.cm_figsize = cfg.TENSORBOARD.FIGSIZE
+        self.cm_figsize = cfg.TENSORBOARD.CONFUSION_MATRIX.FIGSIZE
+        self.hist_figsize = cfg.TENSORBOARD.HISTOGRAM.FIGSIZE
+
         if cfg.TENSORBOARD.LOG_DIR == "":
             log_dir = os.path.join(
                 cfg.OUTPUT_DIR, "runs-{}".format(cfg.TRAIN.DATASET)
@@ -50,7 +55,7 @@ class TensorboardWriter(object):
             )
         )
 
-        if cfg.TENSORBOARD.CLASS_NAMES != "":
+        if cfg.TENSORBOARD.CLASS_NAMES_PATH != "":
             if cfg.DETECTION.ENABLE:
                 logger.info(
                     "Plotting confusion matrix is currently \
@@ -59,12 +64,25 @@ class TensorboardWriter(object):
             (
                 self.class_names,
                 self.parent_map,
-                self.matrix_subset_classes,
+                self.cm_subset_classes,
             ) = get_class_names(
-                cfg.TENSORBOARD.CLASS_NAMES,
-                cfg.TENSORBOARD.CATEGORIES,
-                cfg.TENSORBOARD.CM_SUBSET_CATEGORIES_PATH,
+                cfg.TENSORBOARD.CLASS_NAMES_PATH,
+                cfg.TENSORBOARD.CATEGORIES_PATH,
+                cfg.TENSORBOARD.CONFUSION_MATRIX.SUBSET_PATH,
             )
+
+            if cfg.TENSORBOARD.HISTOGRAM.ENABLE:
+                if cfg.DETECTION.ENABLE:
+                    logger.info(
+                        "Plotting histogram is not currently \
+                    supported for detection tasks."
+                    )
+                if cfg.TENSORBOARD.HISTOGRAM.SUBSET_PATH != "":
+                    _, _, self.hist_subset_classes = get_class_names(
+                        cfg.TENSORBOARD.CLASS_NAMES_PATH,
+                        None,
+                        cfg.TENSORBOARD.HISTOGRAM.SUBSET_PATH,
+                    )
 
     def add_scalars(self, data_dict, global_step=None):
         """
@@ -87,10 +105,11 @@ class TensorboardWriter(object):
         """
         if not self.cfg.DETECTION.ENABLE:
             cmtx = None
-            if self.cfg.TENSORBOARD.CONFUSION_MATRIX:
+            if self.cfg.TENSORBOARD.CONFUSION_MATRIX.ENABLE:
                 cmtx = vis_utils.get_confusion_matrix(
                     preds, labels, self.cfg.MODEL.NUM_CLASSES
                 )
+                # Add full confusion matrix.
                 add_confusion_matrix(
                     self.writer,
                     cmtx,
@@ -99,17 +118,20 @@ class TensorboardWriter(object):
                     class_names=self.class_names,
                     figsize=self.cm_figsize,
                 )
-                if self.matrix_subset_classes is not None:
+                # If a list of subset is provided, plot confusion matrix subset.
+                if self.cm_subset_classes is not None:
                     add_confusion_matrix(
                         self.writer,
                         cmtx,
                         self.cfg.MODEL.NUM_CLASSES,
                         global_step=global_step,
-                        subset=self.matrix_subset_classes,
+                        subset_ids=self.cm_subset_classes,
                         class_names=self.class_names,
                         tag="Confusion Matrix Subset",
                         figsize=self.cm_figsize,
                     )
+                # If a parent-child classes mapping is provided, plot confusion
+                # matrices grouped by parent classes.
                 if self.parent_map is not None:
                     # Get list of tags (parent categories names) and their children.
                     for parent_class, children_ls in self.parent_map.items():
@@ -122,11 +144,26 @@ class TensorboardWriter(object):
                             cmtx,
                             self.cfg.MODEL.NUM_CLASSES,
                             global_step=global_step,
-                            subset=children_ls,
+                            subset_ids=children_ls,
                             class_names=self.class_names,
                             tag=tag,
                             figsize=self.cm_figsize,
                         )
+            if self.cfg.TENSORBOARD.HISTOGRAM.ENABLE:
+                if cmtx is None:
+                    cmtx = vis_utils.get_confusion_matrix(
+                        preds, labels, self.cfg.MODEL.NUM_CLASSES
+                    )
+                plot_hist(
+                    self.writer,
+                    cmtx,
+                    self.cfg.MODEL.NUM_CLASSES,
+                    self.cfg.TENSORBOARD.HISTOGRAM.TOPK,
+                    global_step=global_step,
+                    subset_ids=self.hist_subset_classes,
+                    class_names=self.class_names,
+                    figsize=self.hist_figsize,
+                )
 
     def close(self):
         self.writer.flush()
@@ -173,3 +210,51 @@ def add_confusion_matrix(
         )
         # Add the confusion matrix image to writer.
         writer.add_figure(tag=tag, figure=sub_cmtx, global_step=global_step)
+
+
+def plot_hist(
+    writer,
+    cmtx,
+    num_classes,
+    k=10,
+    global_step=None,
+    subset_ids=None,
+    class_names=None,
+    figsize=None,
+):
+    """
+    Given all predictions and all true labels, plot histograms of top-k most
+    frequently predicted classes for each true class.
+
+    Args:
+        writer (SummaryWriter object): a tensorboard SummaryWriter object.
+        cmtx (ndarray): confusion matrix.
+        num_classes (int): total number of classes.
+        k (int): top k to plot histograms.
+        global_step (int): current step.
+        subset_ids (list of ints, optional): class indices to plot histogram.
+        mapping (list of strings): names of all classes.
+        figsize (Optional[float, float]): the figure size of the confusion matrix.
+            If None, default to [6.4, 4.8].
+    """
+    if subset_ids is None or len(subset_ids) != 0:
+        if subset_ids is None:
+            subset_ids = set(range(num_classes))
+        else:
+            subset_ids = set(subset_ids)
+        # If class names are not provided, use their indices as names.
+        if class_names is None:
+            class_names = list(range(num_classes))
+
+        for i in subset_ids:
+            pred = cmtx[i]
+            hist = vis_utils.plot_topk_histogram(
+                class_names[i], torch.Tensor(pred), k, class_names, figsize=figsize
+            )
+            writer.add_figure(
+                tag="Top {} predictions by classes/{}".format(
+                    k, class_names[i]
+                ),
+                figure=hist,
+                global_step=global_step,
+            )

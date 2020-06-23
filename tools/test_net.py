@@ -102,7 +102,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
-
     # Log epoch stats and print the final testing results.
     if writer is not None:
         all_preds_cpu = [pred.clone().detach().cpu() for pred in test_meter.video_preds]
