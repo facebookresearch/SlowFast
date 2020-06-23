@@ -328,6 +328,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
             ]
             class_parent[parent] = indices
 
+    subset_ids = None
     if subset_path is not None and subset_path != "":
         try:
             with PathManager.open(subset_path, "r") as f:
