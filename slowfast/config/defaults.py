@@ -545,10 +545,24 @@ _C.TENSORBOARD = CfgNode()
 # log loss, lr and metrics during train/eval.
 _C.TENSORBOARD.ENABLE = False
 
-# Path to directory for tensorboard logs
+# Path to directory for tensorboard logs.
 # Default to to cfg.OUTPUT_DIR/runs-{cfg.TRAIN.DATASET}.
 _C.TENSORBOARD.LOG_DIR = ""
-
+# Figure size of the confusion matrices plotted.
+_C.TENSORBOARD.FIGSIZE = [8, 8]
+# Visualize confusion matrix.
+_C.TENSORBOARD.CONFUSION_MATRIX = False
+# Path to a subset of categories to visualize.
+# File contains class names separated by newline characters.
+_C.TENSORBOARD.CM_SUBSET_CATEGORIES_PATH = ""
+# Path to a json file for categories -> classes mapping
+# in the format {"parent_class": ["child_class1", "child_class2",...], ...}.
+_C.TENSORBOARD.CATEGORIES = ""
+# Path to a json file providing class_name - id mapping
+# in the format {"class_name1": id1, "class_name2": id2, ...}.
+# This file must be provided to enable plotting confusion matrix
+# by a subset or parent categories.
+_C.TENSORBOARD.CLASS_NAMES = ""
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)

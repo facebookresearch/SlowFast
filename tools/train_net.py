@@ -244,9 +244,17 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
     # write to tensorboard format if available.
-    if writer is not None and cfg.DETECTION.ENABLE:
-        writer.add_scalars(
-            {"Val/mAP": val_meter.full_map}, global_step=cur_epoch
+    if writer is not None:
+        if cfg.DETECTION.ENABLE:
+            writer.add_scalars(
+                {"Val/mAP": val_meter.full_map}, global_step=cur_epoch
+            )
+        all_preds_cpu = [pred.clone().detach().cpu() for pred in val_meter.all_preds]
+        all_labels_cpu = [label.clone().detach().cpu() for label in val_meter.all_labels]
+        writer.plot_eval(
+            preds=all_preds_cpu,
+            labels=all_labels_cpu,
+            global_step=cur_epoch,
         )
 
     val_meter.reset()
