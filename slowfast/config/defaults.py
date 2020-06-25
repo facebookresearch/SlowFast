@@ -17,12 +17,6 @@ _C = CfgNode()
 # ---------------------------------------------------------------------------- #
 _C.BN = CfgNode()
 
-# BN epsilon.
-_C.BN.EPSILON = 1e-5
-
-# BN momentum.
-_C.BN.MOMENTUM = 0.1
-
 # Precise BN stats.
 _C.BN.USE_PRECISE_STATS = False
 
