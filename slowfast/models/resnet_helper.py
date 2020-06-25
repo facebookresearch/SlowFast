@@ -45,8 +45,8 @@ class BasicTransform(nn.Module):
         Args:
             dim_in (int): the channel dimensions of the input.
             dim_out (int): the channel dimension of the output.
-            temp_kernel_size (int): the temporal kernel sizes of the middle
-                convolution in the bottleneck.
+            temp_kernel_size (int): the temporal kernel sizes of the first
+                convolution in the basic block.
             stride (int): the stride of the bottleneck.
             dim_inner (None): the inner dimension would not be used in
                 BasicTransform.
@@ -132,7 +132,7 @@ class BottleneckTransform(nn.Module):
         Args:
             dim_in (int): the channel dimensions of the input.
             dim_out (int): the channel dimension of the output.
-            temp_kernel_size (int): the temporal kernel sizes of the middle
+            temp_kernel_size (int): the temporal kernel sizes of the first
                 convolution in the bottleneck.
             stride (int): the stride of the bottleneck.
             dim_inner (int): the inner dimension of the block.
