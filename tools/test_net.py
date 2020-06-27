@@ -137,7 +137,7 @@ def test(cfg):
     # Build the video model and print model statistics.
     model = build_model(cfg)
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, is_train=False)
+        misc.log_model_info(model, cfg, use_train_input=False)
 
     # Load a checkpoint to test if applicable.
     if cfg.TEST.CHECKPOINT_FILE_PATH != "":

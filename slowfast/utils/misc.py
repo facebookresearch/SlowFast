@@ -64,21 +64,21 @@ def cpu_mem_usage():
     return usage, total
 
 
-def _get_model_analysis_input(cfg, is_train):
+def _get_model_analysis_input(cfg, use_train_input):
     """
     Return a dummy input for model analysis with batch size 1. The input is
         used for analyzing the model (counting flops and activations etc.).
     Args:
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        is_train (bool): if True, return the input for training. Otherwise,
+        use_train_input (bool): if True, return the input for training. Otherwise,
             return the input for testing.
 
     Returns:
         inputs: the input for model analysis.
     """
     rgb_dimension = 3
-    if is_train:
+    if use_train_input:
         input_tensors = torch.rand(
             rgb_dimension,
             cfg.DATA.NUM_FRAMES,
@@ -106,60 +106,64 @@ def _get_model_analysis_input(cfg, is_train):
     return inputs
 
 
-def get_flop_stats(model, cfg, is_train):
+def get_model_stats(model, cfg, mode, use_train_input):
     """
-    Compute the gflops for the current model given the config.
+    Compute statistics for the current model given the config.
     Args:
-        model (model): model to compute the flop counts.
+        model (model): model to perform analysis.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        is_train (bool): if True, compute flops for training. Otherwise,
-            compute flops for testing.
+        mode (str): Options include `flop` or `activation`. Compute either flop
+            (gflops) or activation count (mega).
+        use_train_input (bool): if True, compute statistics for training. Otherwise,
+            compute statistics for testing.
 
     Returns:
-        float: the total number of gflops of the given model.
+        float: the total number of count of the given model.
     """
-    inputs = _get_model_analysis_input(cfg, is_train)
-    gflop_dict, _ = flop_count(model, inputs)
-    gflops = sum(gflop_dict.values())
-    return gflops
+    assert mode in [
+        "flop",
+        "activation",
+    ], "'{}' not supported for model analysis".format(mode)
+    if mode == "flop":
+        model_stats_fun = flop_count
+    elif mode == "activation":
+        model_stats_fun = activation_count
+
+    # Set model to evaluation mode for analysis.
+    # Evaluation mode can avoid getting stuck with sync batchnorm.
+    model_mode = model.training
+    model.eval()
+    inputs = _get_model_analysis_input(cfg, use_train_input)
+    count_dict, _ = model_stats_fun(model, inputs)
+    count = sum(count_dict.values())
+    model.train(model_mode)
+    return count
 
 
-def get_activation_stats(model, cfg, is_train):
+def log_model_info(model, cfg, use_train_input=True):
     """
-    Compute the activation count (mega) for the current model given the config.
-    Args:
-        model (model): model to compute the activation counts.
-        cfg (CfgNode): configs. Details can be found in
-            slowfast/config/defaults.py
-        is_train (bool): if True, compute activation for training. Otherwise,
-            compute activation for testing.
-
-    Returns:
-        float: the total number of activation (mega) of the given model.
-    """
-    inputs = _get_model_analysis_input(cfg, is_train)
-    activation_dict, _ = activation_count(model, inputs)
-    activation = sum(activation_dict.values())
-    return activation
-
-
-def log_model_info(model, cfg, is_train=True):
-    """
-    Log info, includes number of parameters, gpu usage and gflops.
+    Log info, includes number of parameters, gpu usage, gflops and activation count.
+        The model info is computed when the model is in validation mode.
     Args:
         model (model): model to log the info.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        is_train (bool): if True, log info for training. Otherwise,
+        use_train_input (bool): if True, log info for training. Otherwise,
             log info for testing.
     """
     logger.info("Model:\n{}".format(model))
     logger.info("Params: {:,}".format(params_count(model)))
     logger.info("Mem: {:,} MB".format(gpu_mem_usage()))
-    logger.info("Flops: {:,} G".format(get_flop_stats(model, cfg, is_train)))
     logger.info(
-        "Activations: {:,} M".format(get_activation_stats(model, cfg, is_train))
+        "Flops: {:,} G".format(
+            get_model_stats(model, cfg, "flop", use_train_input)
+        )
+    )
+    logger.info(
+        "Activations: {:,} M".format(
+            get_model_stats(model, cfg, "activation", use_train_input)
+        )
     )
     logger.info("nvidia-smi")
     os.system("nvidia-smi")
