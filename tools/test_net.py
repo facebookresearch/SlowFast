@@ -104,11 +104,13 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         test_meter.iter_tic()
     # Log epoch stats and print the final testing results.
     if writer is not None:
-        all_preds_cpu = [pred.clone().detach().cpu() for pred in test_meter.video_preds]
-        all_labels_cpu = [label.clone().detach().cpu() for label in test_meter.video_labels]
-        writer.plot_eval(
-            preds=all_preds_cpu, labels=all_labels_cpu
-        )
+        all_preds_cpu = [
+            pred.clone().detach().cpu() for pred in test_meter.video_preds
+        ]
+        all_labels_cpu = [
+            label.clone().detach().cpu() for label in test_meter.video_labels
+        ]
+        writer.plot_eval(preds=all_preds_cpu, labels=all_labels_cpu)
 
     test_meter.finalize_metrics()
     test_meter.reset()

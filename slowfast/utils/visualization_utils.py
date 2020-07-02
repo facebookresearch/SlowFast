@@ -35,10 +35,7 @@ def get_confusion_matrix(preds, labels, num_classes, normalize="true"):
     preds = torch.flatten(torch.argmax(preds, dim=-1))
     labels = torch.flatten(labels)
     cmtx = confusion_matrix(
-        labels,
-        preds,
-        labels=list(range(num_classes)),
-        normalize=normalize,
+        labels, preds, labels=list(range(num_classes)), normalize=normalize
     )
     return cmtx
 

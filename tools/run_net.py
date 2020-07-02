@@ -5,6 +5,7 @@
 from slowfast.utils.misc import launch_job
 from slowfast.utils.parser import load_config, parse_args
 
+from demo_net import demo
 from test_net import test
 from train_net import train
 
@@ -23,6 +24,9 @@ def main():
     # Perform multi-clip testing.
     if cfg.TEST.ENABLE:
         launch_job(cfg=cfg, init_method=args.init_method, func=test)
+
+    if cfg.DEMO.ENABLE:
+        launch_job(cfg=cfg, init_method=args.init_method, func=demo)
 
 
 if __name__ == "__main__":

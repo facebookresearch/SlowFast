@@ -206,7 +206,10 @@ def add_confusion_matrix(
         sub_names = [class_names[j] for j in subset_ids]
 
         sub_cmtx = vis_utils.plot_confusion_matrix(
-            sub_cmtx, num_classes=len(subset_ids), class_names=sub_names, figsize=figsize,
+            sub_cmtx,
+            num_classes=len(subset_ids),
+            class_names=sub_names,
+            figsize=figsize,
         )
         # Add the confusion matrix image to writer.
         writer.add_figure(tag=tag, figure=sub_cmtx, global_step=global_step)
@@ -249,7 +252,11 @@ def plot_hist(
         for i in subset_ids:
             pred = cmtx[i]
             hist = vis_utils.plot_topk_histogram(
-                class_names[i], torch.Tensor(pred), k, class_names, figsize=figsize
+                class_names[i],
+                torch.Tensor(pred),
+                k,
+                class_names,
+                figsize=figsize,
             )
             writer.add_figure(
                 tag="Top {} predictions by classes/{}".format(
