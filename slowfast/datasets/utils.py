@@ -282,3 +282,20 @@ def get_random_sampling_rate(long_cycle_sampling_rate, sampling_rate):
         return random.randint(sampling_rate, long_cycle_sampling_rate)
     else:
         return sampling_rate
+
+
+def revert_tensor_normalize(tensor, mean, std):
+    """
+    Revert normalization for a given tensor by multiplying by the std and adding the mean.
+    Args:
+        tensor (tensor): tensor to revert normalization.
+        mean (tensor or list): mean value to add.
+        std (tensor or list): std to multiply.
+    """
+    if type(mean) == list:
+        mean = torch.tensor(mean)
+    if type(std) == list:
+        std = torch.tensor(std)
+    tensor = tensor * std
+    tensor = tensor + mean
+    return tensor

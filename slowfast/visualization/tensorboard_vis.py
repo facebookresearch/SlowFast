@@ -7,7 +7,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import slowfast.utils.logging as logging
-import slowfast.utils.visualization_utils as vis_utils
+import slowfast.visualization.utils as vis_utils
 from slowfast.utils.misc import get_class_names
 
 logger = logging.get_logger(__name__)
@@ -164,6 +164,18 @@ class TensorboardWriter(object):
                     class_names=self.class_names,
                     figsize=self.hist_figsize,
                 )
+
+    def add_video(self, vid_tensor, tag="Video Input", global_step=None, fps=4):
+        """
+        Add input to tensorboard SummaryWriter as a video.
+        Args:
+            vid_tensor (tensor): shape of (B, T, C, H, W). Values should lie
+                [0, 255] for type uint8 or [0, 1] for type float.
+            tag (Optional[str]): name of the video.
+            global_step(Optional[int]): current step.
+            fps (int): frames per second.
+        """
+        self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps)
 
     def close(self):
         self.writer.flush()

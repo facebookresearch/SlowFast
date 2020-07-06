@@ -26,5 +26,6 @@ setup(
         "sklearn",
         "tensorboard",
     ],
+    extras_require={"tensorboard_video_visualization": ["moviepy"]},
     packages=find_packages(exclude=("configs", "tests")),
 )

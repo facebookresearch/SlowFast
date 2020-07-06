@@ -10,7 +10,7 @@ import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
-import slowfast.utils.tensorboard_vis as tb
+import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TestMeter
@@ -64,7 +64,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
             preds = model(inputs, meta["boxes"])
-
             preds = preds.cpu()
             ori_boxes = meta["ori_boxes"].cpu()
             metadata = meta["metadata"].cpu()
@@ -141,34 +140,7 @@ def test(cfg):
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
         misc.log_model_info(model, cfg, use_train_input=False)
 
-    # Load a checkpoint to test if applicable.
-    if cfg.TEST.CHECKPOINT_FILE_PATH != "":
-        cu.load_checkpoint(
-            cfg.TEST.CHECKPOINT_FILE_PATH,
-            model,
-            cfg.NUM_GPUS > 1,
-            None,
-            inflation=False,
-            convert_from_caffe2=cfg.TEST.CHECKPOINT_TYPE == "caffe2",
-        )
-    elif cu.has_checkpoint(cfg.OUTPUT_DIR):
-        last_checkpoint = cu.get_last_checkpoint(cfg.OUTPUT_DIR)
-        cu.load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1)
-    elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
-        # If no checkpoint found in TEST.CHECKPOINT_FILE_PATH or in the current
-        # checkpoint folder, try to load checkpint from
-        # TRAIN.CHECKPOINT_FILE_PATH and test it.
-        cu.load_checkpoint(
-            cfg.TRAIN.CHECKPOINT_FILE_PATH,
-            model,
-            cfg.NUM_GPUS > 1,
-            None,
-            inflation=False,
-            convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
-        )
-    else:
-        # raise NotImplementedError("Unknown way to load checkpoint.")
-        logger.info("Testing with random initialization. Only for debugging.")
+    cu.load_test_checkpoint(cfg, model)
 
     # Create video testing loaders.
     test_loader = loader.construct_loader(cfg, "test")

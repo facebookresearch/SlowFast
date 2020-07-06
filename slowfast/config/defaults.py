@@ -575,6 +575,18 @@ _C.TENSORBOARD.HISTOGRAM.TOPK = 10
 # Figure size of the histograms plotted.
 _C.TENSORBOARD.HISTOGRAM.FIGSIZE = [8, 8]
 
+# ---------------------------------------------------------------------------- #
+# Model Visualization options
+# ---------------------------------------------------------------------------- #
+
+# Config for layers' weights and activations visualization.
+# _C.TENSORBOARD.ENABLE must be True.
+_C.TENSORBOARD.MODEL_VIS = CfgNode()
+
+# If False, skip model visualization.
+_C.TENSORBOARD.MODEL_VIS.ENABLE = False
+
+
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
 

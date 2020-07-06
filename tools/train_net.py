@@ -14,7 +14,7 @@ import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
-import slowfast.utils.tensorboard_vis as tb
+import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
@@ -366,26 +366,7 @@ def train(cfg):
     optimizer = optim.construct_optimizer(model, cfg)
 
     # Load a checkpoint to resume training if applicable.
-    if cfg.TRAIN.AUTO_RESUME and cu.has_checkpoint(cfg.OUTPUT_DIR):
-        last_checkpoint = cu.get_last_checkpoint(cfg.OUTPUT_DIR)
-        logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
-        checkpoint_epoch = cu.load_checkpoint(
-            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
-        )
-        start_epoch = checkpoint_epoch + 1
-    elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
-        logger.info("Load from given checkpoint file.")
-        checkpoint_epoch = cu.load_checkpoint(
-            cfg.TRAIN.CHECKPOINT_FILE_PATH,
-            model,
-            cfg.NUM_GPUS > 1,
-            optimizer,
-            inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
-            convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
-        )
-        start_epoch = checkpoint_epoch + 1
-    else:
-        start_epoch = 0
+    start_epoch = cu.load_train_checkpoint(cfg, model, optimizer)
 
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")

@@ -308,7 +308,8 @@ def get_class_names(path, parent_path=None, subset_path=None):
         print("Fail to load file from {} with error {}".format(path, err))
         return
 
-    class_names = [None] * len(class2idx)
+    max_key = max(class2idx.values())
+    class_names = [None] * (max_key + 1)
 
     for k, i in class2idx.items():
         class_names[i] = k

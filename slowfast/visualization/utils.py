@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import torch
 from sklearn.metrics import confusion_matrix
 
+import slowfast.utils.logging as logging
+
+logger = logging.get_logger(__name__)
+
 
 def get_confusion_matrix(preds, labels, num_classes, normalize="true"):
     """

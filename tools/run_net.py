@@ -8,6 +8,7 @@ from slowfast.utils.parser import load_config, parse_args
 from demo_net import demo
 from test_net import test
 from train_net import train
+from visualization import visualize
 
 
 def main():
@@ -27,6 +28,9 @@ def main():
 
     if cfg.DEMO.ENABLE:
         launch_job(cfg=cfg, init_method=args.init_method, func=demo)
+
+    if cfg.TENSORBOARD.ENABLE and cfg.TENSORBOARD.MODEL_VIS.ENABLE:
+        launch_job(cfg=cfg, init_method=args.init_method, func=visualize)
 
 
 if __name__ == "__main__":
