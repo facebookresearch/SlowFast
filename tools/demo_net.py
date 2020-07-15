@@ -3,8 +3,10 @@
 
 import numpy as np
 from time import time
+import cv2
 import pandas as pd
 import torch
+import tqdm
 from detectron2 import model_zoo
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
@@ -16,8 +18,6 @@ from slowfast.datasets.cv2_transform import scale
 from slowfast.datasets.utils import tensor_normalize
 from slowfast.models import build
 from slowfast.utils import logging, misc
-
-import cv2
 
 logger = logging.get_logger(__name__)
 np.random.seed(20)
@@ -130,7 +130,7 @@ def demo(cfg):
         dtron2_cfg_file = cfg.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_CFG
         dtron2_cfg = get_cfg()
         dtron2_cfg.merge_from_file(model_zoo.get_config_file(dtron2_cfg_file))
-        dtron2_cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
+        dtron2_cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.9
         dtron2_cfg.MODEL.WEIGHTS = (
             cfg.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_WEIGHTS
         )
@@ -153,7 +153,7 @@ def demo(cfg):
     frames = []
     pred_labels = []
     s = 0.0
-    for able_to_read, frame in frame_provider:
+    for able_to_read, frame in tqdm.tqdm(frame_provider):
         if not able_to_read:
             # when reaches the end frame, clear the buffer and continue to the next one.
             frames = []
@@ -186,9 +186,8 @@ def demo(cfg):
                     [torch.full((boxes.shape[0], 1), float(0)).cuda(), boxes],
                     axis=1,
                 )
-            inputs = tensor_normalize(
-                torch.as_tensor(frames), cfg.DATA.MEAN, cfg.DATA.STD
-            )
+            inputs = torch.from_numpy(np.array(frames)).float() / 255.0
+            inputs = tensor_normalize(inputs, cfg.DATA.MEAN, cfg.DATA.STD)
 
             # T H W C -> C T H W.
             inputs = inputs.permute(3, 0, 1, 2)

@@ -6,10 +6,9 @@ import os
 import random
 import time
 from collections import defaultdict
+import cv2
 import torch
 from fvcore.common.file_io import PathManager
-
-import cv2
 
 from . import transform as transform
 
