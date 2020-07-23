@@ -16,6 +16,7 @@ from slowfast.visualization.utils import (
     GetWeightAndActivation,
     process_layer_index_data,
 )
+from slowfast.visualization.video_visualizer import VideoVisualizer
 
 logger = logging.get_logger(__name__)
 
@@ -48,6 +49,12 @@ def run_visualization(vis_loader, model, cfg, writer=None):
             layer_weights, tag="Layer Weights/", heat_map=False
         )
 
+    video_vis = VideoVisualizer(
+        cfg.MODEL.NUM_CLASSES,
+        cfg.TENSORBOARD.CLASS_NAMES_PATH,
+        cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
+        cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
+    )
     logger.info("Finish drawing weights.")
     global_idx = -1
     for inputs, _, _, meta in vis_loader:
@@ -65,12 +72,18 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                 meta[key] = val.cuda(non_blocking=True)
 
         if cfg.DETECTION.ENABLE:
-            activations = model_vis.get_activations(inputs, meta["boxes"])
+            activations, preds = model_vis.get_activations(
+                inputs, meta["boxes"]
+            )
         else:
-            activations = model_vis.get_activations(inputs)
+            activations, preds = model_vis.get_activations(inputs)
 
         inputs = du.all_gather_unaligned(inputs)
         activations = du.all_gather_unaligned(activations)
+        preds = du.all_gather_unaligned(preds)
+        boxes = [None] * n_devices
+        if cfg.DETECTION.ENABLE:
+            boxes = du.all_gather_unaligned(meta["boxes"])
 
         if writer is not None:
             total_vids = 0
@@ -78,7 +91,8 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                 cur_input = inputs[i]
                 cur_activations = activations[i]
                 cur_batch_size = cur_input[0].shape[0]
-
+                cur_preds = preds[i].cpu()
+                cur_boxes = boxes[i]
                 for cur_batch_idx in range(cur_batch_size):
                     global_idx += 1
                     total_vids += 1
@@ -95,7 +109,19 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                             video = data_utils.revert_tensor_normalize(
                                 video.cpu(), cfg.DATA.MEAN, cfg.DATA.STD
                             )
-                            video = video.permute(0, 3, 1, 2).unsqueeze(0)
+                            bboxes = (
+                                None
+                                if cur_boxes is None
+                                else cur_boxes[:, 1:].cpu()
+                            )
+                            video = video_vis.draw_clip(
+                                video, cur_preds, bboxes=bboxes
+                            )
+                            video = (
+                                torch.Tensor(video)
+                                .permute(0, 3, 1, 2)
+                                .unsqueeze(0)
+                            )
                             writer.add_video(
                                 video,
                                 tag="Input {}/Input from pathway {}".format(

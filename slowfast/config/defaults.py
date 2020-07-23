@@ -599,6 +599,12 @@ _C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
 # e.g.: [layer1 1,2;1,2, layer2, layer3 150,151;3,4]; this means for each array `arr`
 # along the batch dimension in `layer1`, we take arr[[1, 2], [1, 2]]
 _C.TENSORBOARD.MODEL_VIS.LAYER_LIST = []
+# Top-k predictions to plot on videos
+_C.TENSORBOARD.MODEL_VIS.TOPK_PREDS = 1
+
+# Colormap to for text boxes and bounding boxes colors
+_C.TENSORBOARD.MODEL_VIS.COLORMAP = "Pastel2"
+
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
