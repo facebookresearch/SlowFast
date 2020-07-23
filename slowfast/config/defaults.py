@@ -575,10 +575,6 @@ _C.TENSORBOARD.HISTOGRAM.TOPK = 10
 # Figure size of the histograms plotted.
 _C.TENSORBOARD.HISTOGRAM.FIGSIZE = [8, 8]
 
-# ---------------------------------------------------------------------------- #
-# Model Visualization options
-# ---------------------------------------------------------------------------- #
-
 # Config for layers' weights and activations visualization.
 # _C.TENSORBOARD.ENABLE must be True.
 _C.TENSORBOARD.MODEL_VIS = CfgNode()
@@ -586,6 +582,23 @@ _C.TENSORBOARD.MODEL_VIS = CfgNode()
 # If False, skip model visualization.
 _C.TENSORBOARD.MODEL_VIS.ENABLE = False
 
+# If False, skip visualizing model weights.
+_C.TENSORBOARD.MODEL_VIS.MODEL_WEIGHTS = False
+
+# If False, skip visualizing model activations.
+_C.TENSORBOARD.MODEL_VIS.ACTIVATIONS = False
+
+# If False, skip visualizing input videos.
+_C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
+
+# List of strings containing data about layer names and their indexing to
+# visualize weights and activations for. The indexing is meant for
+# choosing a subset of activations outputed by a layer for visualization.
+# If indexing is not specified, visualize all activations outputed by the layer.
+# For each string, layer name and indexing is separated by whitespaces.
+# e.g.: [layer1 1,2;1,2, layer2, layer3 150,151;3,4]; this means for each array `arr`
+# along the batch dimension in `layer1`, we take arr[[1, 2], [1, 2]]
+_C.TENSORBOARD.MODEL_VIS.LAYER_LIST = []
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
