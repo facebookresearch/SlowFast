@@ -168,7 +168,7 @@ class TensorboardWriter(object):
                     figsize=self.hist_figsize,
                 )
 
-    def add_video(self, vid_tensor, tag="Video Input", global_step=None):
+    def add_video(self, vid_tensor, tag="Video Input", global_step=None, fps=4):
         """
         Add input to tensorboard SummaryWriter as a video.
         Args:
@@ -176,8 +176,9 @@ class TensorboardWriter(object):
                 [0, 255] for type uint8 or [0, 1] for type float.
             tag (Optional[str]): name of the video.
             global_step(Optional[int]): current step.
+            fps (int): frames per second.
         """
-        self.writer.add_video(tag, vid_tensor, global_step=global_step)
+        self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps)
 
     def plot_weights_and_activations(
         self,
