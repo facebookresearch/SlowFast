@@ -58,18 +58,19 @@ def run_visualization(vis_loader, model, cfg, writer=None):
     logger.info("Finish drawing weights.")
     global_idx = -1
     for inputs, _, _, meta in vis_loader:
-        # Transfer the data to the current GPU device.
-        if isinstance(inputs, (list,)):
-            for i in range(len(inputs)):
-                inputs[i] = inputs[i].cuda(non_blocking=True)
-        else:
-            inputs = inputs.cuda(non_blocking=True)
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
+        if cfg.NUM_GPUS:
+            # Transfer the data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                meta[key] = val.cuda(non_blocking=True)
+                inputs = inputs.cuda(non_blocking=True)
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
 
         if cfg.DETECTION.ENABLE:
             activations, preds = model_vis.get_activations(
@@ -77,21 +78,32 @@ def run_visualization(vis_loader, model, cfg, writer=None):
             )
         else:
             activations, preds = model_vis.get_activations(inputs)
+        if cfg.NUM_GPUS:
+            inputs = du.all_gather_unaligned(inputs)
+            activations = du.all_gather_unaligned(activations)
+            preds = du.all_gather_unaligned(preds)
+            if isinstance(inputs[0], list):
+                for i in range(len(inputs)):
+                    for j in range(len(inputs[0])):
+                        inputs[i][j] = inputs[i][j].cpu()
+            else:
+                inputs = [inp.cpu() for inp in inputs]
+            preds = [pred.cpu() for pred in preds]
+        else:
+            inputs, activations, preds = [inputs], [activations], [preds]
 
-        inputs = du.all_gather_unaligned(inputs)
-        activations = du.all_gather_unaligned(activations)
-        preds = du.all_gather_unaligned(preds)
-        boxes = [None] * n_devices
-        if cfg.DETECTION.ENABLE:
+        boxes = [None] * max(n_devices, 1)
+        if cfg.DETECTION.ENABLE and cfg.NUM_GPUS:
             boxes = du.all_gather_unaligned(meta["boxes"])
+            boxes = [box.cpu() for box in boxes]
 
         if writer is not None:
             total_vids = 0
-            for i in range(n_devices):
+            for i in range(max(n_devices, 1)):
                 cur_input = inputs[i]
                 cur_activations = activations[i]
                 cur_batch_size = cur_input[0].shape[0]
-                cur_preds = preds[i].cpu()
+                cur_preds = preds[i]
                 cur_boxes = boxes[i]
                 for cur_batch_idx in range(cur_batch_size):
                     global_idx += 1
@@ -107,12 +119,10 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                             # Permute to (T, H, W, C) from (C, T, H, W).
                             video = video.permute(1, 2, 3, 0)
                             video = data_utils.revert_tensor_normalize(
-                                video.cpu(), cfg.DATA.MEAN, cfg.DATA.STD
+                                video, cfg.DATA.MEAN, cfg.DATA.STD
                             )
                             bboxes = (
-                                None
-                                if cur_boxes is None
-                                else cur_boxes[:, 1:].cpu()
+                                None if cur_boxes is None else cur_boxes[:, 1:]
                             )
                             video = video_vis.draw_clip(
                                 video, cur_preds, bboxes=bboxes
@@ -174,7 +184,7 @@ def visualize(cfg):
         )
 
         if cfg.DETECTION.ENABLE:
-            assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE
+            assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
 
         # Set up writer for logging to Tensorboard format.
         if du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):

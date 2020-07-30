@@ -82,7 +82,7 @@ class ActionPredictor:
                     inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
-        if self.cfg.DETECTION.ENABLE and not len(bboxes):
+        if self.cfg.DETECTION.ENABLE and not bboxes.shape[0]:
             preds = torch.tensor([])
         else:
             preds = self.model(inputs, bboxes)
@@ -121,6 +121,7 @@ class Detectron2Predictor:
         self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = cfg.DEMO.DETECTRON2_THRESH
         self.cfg.MODEL.WEIGHTS = cfg.DEMO.DETECTRON2_WEIGHTS
         self.cfg.INPUT.FORMAT = cfg.DEMO.INPUT_FORMAT
+        self.cfg.MODEL.DEVICE = "cuda:0" if cfg.NUM_GPUS > 0 else "cpu"
 
         logger.info("Initialized Detectron2 Object Detection Model.")
 
@@ -164,7 +165,6 @@ def draw_predictions(task, video_vis):
     if boxes is not None:
         img_width = task.img_width
         img_height = task.img_height
-        boxes = boxes.numpy()
         boxes = cv2_transform.revert_scaled_boxes(
             task.crop_size, boxes, img_height, img_width
         )

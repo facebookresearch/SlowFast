@@ -46,7 +46,10 @@ def gpu_mem_usage():
     """
     Compute the GPU memory usage for the current device (GB).
     """
-    mem_usage_bytes = torch.cuda.max_memory_allocated()
+    if torch.cuda.is_available():
+        mem_usage_bytes = torch.cuda.max_memory_allocated()
+    else:
+        mem_usage_bytes = 0
     return mem_usage_bytes / 1024 ** 3
 
 
@@ -94,12 +97,15 @@ def _get_model_analysis_input(cfg, use_train_input):
         )
     model_inputs = pack_pathway_output(cfg, input_tensors)
     for i in range(len(model_inputs)):
-        model_inputs[i] = model_inputs[i].unsqueeze(0).cuda(non_blocking=True)
+        model_inputs[i] = model_inputs[i].unsqueeze(0)
+        if cfg.NUM_GPUS:
+            model_inputs[i] = model_inputs[i].cuda(non_blocking=True)
 
     # If detection is enabled, count flops for one proposal.
     if cfg.DETECTION.ENABLE:
         bbox = torch.tensor([[0, 0, 1.0, 0, 1.0]])
-        bbox = bbox.cuda()
+        if cfg.NUM_GPUS:
+            bbox = bbox.cuda()
         inputs = (model_inputs, bbox)
     else:
         inputs = (model_inputs,)

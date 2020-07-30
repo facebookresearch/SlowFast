@@ -259,7 +259,7 @@ def init_distributed_training(cfg):
     """
     Initialize variables needed for distributed training.
     """
-    if cfg.NUM_GPUS == 1:
+    if cfg.NUM_GPUS <= 1:
         return
     num_gpus_per_machine = cfg.NUM_GPUS
     num_machines = dist.get_world_size() // num_gpus_per_machine

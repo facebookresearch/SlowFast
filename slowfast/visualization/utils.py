@@ -220,11 +220,11 @@ class GetWeightAndActivation:
                 {layer_name: list of activations}, where activations are outputs returned
                 by the layer.
         """
+        input_clone = [inp.clone() for inp in input]
         if bboxes is not None:
-            input_clone = [inp.clone() for inp in input]
             preds = self.model(input_clone, bboxes)
         else:
-            preds = self.model(input)
+            preds = self.model(input_clone)
 
         activation_dict = {}
         for layer_name, hook in self.hooks.items():

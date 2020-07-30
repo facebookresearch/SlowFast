@@ -44,27 +44,27 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     test_meter.iter_tic()
 
     for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
-        # Transfer the data to the current GPU device.
-        if isinstance(inputs, (list,)):
-            for i in range(len(inputs)):
-                inputs[i] = inputs[i].cuda(non_blocking=True)
-        else:
-            inputs = inputs.cuda(non_blocking=True)
-
-        # Transfer the data to the current GPU device.
-        labels = labels.cuda()
-        video_idx = video_idx.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
+        if cfg.NUM_GPUS:
+            # Transfer the data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                meta[key] = val.cuda(non_blocking=True)
+                inputs = inputs.cuda(non_blocking=True)
+
+            # Transfer the data to the current GPU device.
+            labels = labels.cuda()
+            video_idx = video_idx.cuda()
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
             preds = model(inputs, meta["boxes"])
-            preds = preds.cpu()
             ori_boxes = meta["ori_boxes"].cpu()
             metadata = meta["metadata"].cpu()
 
@@ -73,13 +73,17 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 ori_boxes = torch.cat(du.all_gather_unaligned(ori_boxes), dim=0)
                 metadata = torch.cat(du.all_gather_unaligned(metadata), dim=0)
 
+            preds = preds.detach().cpu() if cfg.NUM_GPUS else preds.detach()
+            ori_boxes = (
+                ori_boxes.detach().cpu() if cfg.NUM_GPUS else ori_boxes.detach()
+            )
+            metadata = (
+                metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
+            )
+
             test_meter.iter_toc()
             # Update and log stats.
-            test_meter.update_stats(
-                preds.detach().cpu(),
-                ori_boxes.detach().cpu(),
-                metadata.detach().cpu(),
-            )
+            test_meter.update_stats(preds, ori_boxes, metadata)
             test_meter.log_iter_stats(None, cur_iter)
         else:
             # Perform the forward pass.
@@ -90,26 +94,28 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 preds, labels, video_idx = du.all_gather(
                     [preds, labels, video_idx]
                 )
-
+            if cfg.NUM_GPUS:
+                preds = preds.cpu()
+                labels = labels.cpu()
+                video_idx = video_idx.cpu()
             test_meter.iter_toc()
             # Update and log stats.
             test_meter.update_stats(
-                preds.detach().cpu(),
-                labels.detach().cpu(),
-                video_idx.detach().cpu(),
+                preds.detach(), labels.detach(), video_idx.detach()
             )
             test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
     # Log epoch stats and print the final testing results.
     if writer is not None and not cfg.DETECTION.ENABLE:
-        all_preds_cpu = [
-            pred.clone().detach().cpu() for pred in test_meter.video_preds
+        all_preds = [pred.clone().detach() for pred in test_meter.video_preds]
+        all_labels = [
+            label.clone().detach() for label in test_meter.video_labels
         ]
-        all_labels_cpu = [
-            label.clone().detach().cpu() for label in test_meter.video_labels
-        ]
-        writer.plot_eval(preds=all_preds_cpu, labels=all_labels_cpu)
+        if cfg.NUM_GPUS:
+            all_preds = [pred.cpu() for pred in all_preds]
+            all_labels = [label.cpu() for label in all_labels]
+        writer.plot_eval(preds=all_preds, labels=all_labels)
 
     test_meter.finalize_metrics()
     test_meter.reset()
@@ -147,7 +153,7 @@ def test(cfg):
     logger.info("Testing model for {} iterations".format(len(test_loader)))
 
     if cfg.DETECTION.ENABLE:
-        assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE
+        assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
         test_meter = AVAMeter(len(test_loader), cfg, mode="test")
     else:
         assert (

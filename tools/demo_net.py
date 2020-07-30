@@ -37,7 +37,7 @@ def run_demo(cfg, frame_provider):
     # Print config.
     logger.info("Run demo with config:")
     logger.info(cfg)
-    assert cfg.NUM_GPUS == 1, "Cannot run demo on multiple GPUs."
+    assert cfg.NUM_GPUS <= 1, "Cannot run demo on multiple GPUs."
     # Print config.
     logger.info("Run demo with config:")
     logger.info(cfg)
