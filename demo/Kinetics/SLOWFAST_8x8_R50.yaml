@@ -36,8 +36,6 @@ NONLOCAL:
 BN:
   USE_PRECISE_STATS: True
   NUM_BATCHES_PRECISE: 200
-  MOMENTUM: 0.1
-  WEIGHT_DECAY: 0.0
 SOLVER:
   BASE_LR: 0.1
   LR_POLICY: cosine
@@ -61,10 +59,8 @@ DATA_LOADER:
   PIN_MEMORY: True
 DEMO:
   ENABLE: True
-  LABEL_FILE_PATH: "./demo/Kinetics/kinetics_400_labels.csv"
-  DATA_SOURCE: 2
-  # DISPLAY_WIDTH: 640
-  # DISPLAY_HEIGHT: 480
+  LABEL_FILE_PATH:  # Add local label file path here.
+  WEBCAM: 0
 NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0

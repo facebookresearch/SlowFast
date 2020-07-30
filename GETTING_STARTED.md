@@ -13,7 +13,7 @@ python tools/run_net.py \
   NUM_GPUS 2 \
   TRAIN.BATCH_SIZE 16 \
 ```
-You may need to pass location of your dataset in the command line by adding `DATA.PATH_TO_DATA_DIR path_to_your_dataset`, or you can simply add 
+You may need to pass location of your dataset in the command line by adding `DATA.PATH_TO_DATA_DIR path_to_your_dataset`, or you can simply add
 
 ```
 DATA:
@@ -58,37 +58,33 @@ python tools/run_net.py \
   TRAIN.ENABLE False \
 ```
 ## Run the Demo on Videos/Camera
+
+Currently, demo on multiple GPUs is not supported. Set the following in your config file:
+* `NUM_GPUS: 1`
+* `NUM_SHARDS: 1`
+* `DEMO.WEBCAM`: Set this to an index of a camera for demo using webcam. Otherwise, set `DEMO.INPUT_VIDEO` to path of an input video.
+* `DEMO.ENABLE: True`
+* `DEMO.LABEL_FILE_PATH`: path to a json label file that map {label: label_id}.
+* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
+
+Optional:
+* `DEMO.DISPLAY_WIDTH`: custom display window width.
+* `DEMO.DISPLAY_HEIGHT`: custom display window height.
+* `DEMO.OUTPUT_FILE`: set this as a path if you want to write outputs to a video file instead of displaying it in a window.
+* `DEMO.BUFFER_SIZE`: overlapping number of frames between 2 consecutive input clips. Set this to a positive number to make more frequent predictions
+(at the expense of slower speed).
+
+If you want to only run the demo process, set `TRAIN.ENABLE` and `TEST.ENABLE` to False.
+
 ### Classification
-modify a `<pretrained_model_config_file>.yaml` in `configs/Kinetics/c2/` corresponding to the pretrained model you want to use and set the following settings (you can look at `demo/Kinetics/SLOWFAST_8x8_R50.yaml` for reference):
-* `TRAIN.ENABLE: False`
-* `TEST.ENABLE: False`
-* `CHECKPOINT_TYPE: caffe2`
-* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
-* `DEMO.ENABLE: True`
-* `DEMO.LABEL_FILE_PATH`: path to a CSV label file (already in `demo/Kinetics/kinetics_400_labels.csv`)..
-* `DEMO.DATA_SOURCE`: Index to the camera source (if you want to run on a video, put the video path here and set values of `DEMO.DATA_SOURCE` in `slowfast/config/default.py` to `""`)
-* `NUM_GPUS: 1` (only if running on a single CPU)
-* `NUM_SHARDS: 1` (only if running on a single machine)
-  
-Optional:
-* `DISPLAY_WIDTH`: custom display window width
-* `DISPLAY_HEIGHT`: custom display window height
+Modify a `<pretrained_model_config_file>.yaml` in `configs/Kinetics/` corresponding to the pretrained model you want to use (you can look at `demo/Kinetics/SLOWFAST_8x8_R50.yaml` for reference).
+
 ### Detection
-modify a `<pretrained_model_config_file>.yaml` in `configs/AVA/c2/` corresponding to the pretrained model you want to use and set the following settings (you can look at `demo/AVA/SLOWFAST_32x2_R101_50_50.yaml` for reference):
-* `TRAIN.ENABLE: False`
-* `TEST.ENABLE: False`
-* `DETECTION.ENABLE: True`
-* `CHECKPOINT_TYPE: caffe2`
-* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
-* `DEMO.ENABLE: True`
-* `DEMO.LABEL_FILE_PATH`: path to a text label file (already in `demo/AVA/ava.names`).
-* `DEMO.DATA_SOURCE`: Index to the camera source (if you want to run on a video, put the video path here and set values of `DEMO.DATA_SOURCE` in `slowfast/config/default.py` to `""`)
-* `NUM_GPUS: 1` (only if running on a single CPU)
-* `NUM_SHARDS: 1` (only if running on a single machine)
-  
+Modify a `<pretrained_model_config_file>.yaml` in `configs/AVA/` corresponding to the pretrained model you want to use (you can look at `demo/AVA/SLOWFAST_32x2_R101_50_50.yaml` for reference)
+
 Optional:
-* `DEMO.DISPLAY_WIDTH`: custom display window width
-* `DEMO.DISPLAY_HEIGHT`: custom display window height
+* `DEMO.DETECTRON2_THRESH`: Set a threshold for choosing bouding boxes outputed by Detectron2. (Default to 0.9)
+* Pick a different [Detectron2](https://github.com/facebookresearch/detectron2/blob/master/MODEL_ZOO.md) Object Detection model config and weights. Set the parameters: `DEMO.DETECTRON2_CFG` and `DEMO.DETECTRON2_WEIGHTS`. (Default to `faster_rcnn_R_50_FPN_3x.yaml` config and the corresponding weights)
 
 ### Run command
 ```

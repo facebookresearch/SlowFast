@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+import itertools
+import logging as log
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from detectron2.utils.visualizer import Visualizer
 
+import slowfast.utils.logging as logging
 from slowfast.utils.misc import get_class_names
+
+logger = logging.get_logger(__name__)
+log.getLogger("matplotlib").setLevel(log.ERROR)
 
 
 def _create_text_labels(classes, scores, class_names, ground_truth=False):
@@ -20,12 +26,16 @@ def _create_text_labels(classes, scores, class_names, ground_truth=False):
     Returns:
         labels (list[str]): formatted text labels.
     """
+    try:
+        labels = [class_names[i] for i in classes]
+    except IndexError:
+        logger.error("Class indices get out of range: {}".format(classes))
+        return None
 
-    assert len(classes) == len(scores)
-    labels = [class_names[i] for i in classes]
     if ground_truth:
         labels = ["[{}] {}".format("GT", label) for label in labels]
     elif scores is not None:
+        assert len(classes) == len(scores)
         labels = [
             "[{:.0f}] {}".format(s * 100, label)
             for s, label in zip(scores, labels)
@@ -35,7 +45,7 @@ def _create_text_labels(classes, scores, class_names, ground_truth=False):
 
 
 class ImgVisualizer(Visualizer):
-    def __init__(self, img_rgb, **kwargs):
+    def __init__(self, img_rgb, meta, **kwargs):
         """
         See https://github.com/facebookresearch/detectron2/blob/master/detectron2/utils/visualizer.py
         for more details.
@@ -45,8 +55,10 @@ class ImgVisualizer(Visualizer):
                 color channels. The image is required to be in RGB format since that
                 is a requirement of the Matplotlib library. The image is also expected
                 to be in the range [0, 255].
+            meta (MetadataCatalog): image metadata.
+                See https://github.com/facebookresearch/detectron2/blob/81d5a87763bfc71a492b5be89b74179bd7492f6b/detectron2/data/catalog.py#L90
         """
-        super(ImgVisualizer, self).__init__(img_rgb, **kwargs)
+        super(ImgVisualizer, self).__init__(img_rgb, meta, **kwargs)
 
     def draw_text(
         self,
@@ -77,7 +89,6 @@ class ImgVisualizer(Visualizer):
         """
         if not font_size:
             font_size = self._default_font_size
-
         x, y = position
         self.output.ax.text(
             x,
@@ -129,10 +140,9 @@ class ImgVisualizer(Visualizer):
         assert len(box_facecolors) == len(
             text_ls
         ), "Number of colors provided is not equal to the number of text labels."
-
         if not font_size:
             font_size = self._default_font_size
-        text_box_width = font_size + font_size // 2.5
+        text_box_width = font_size + font_size // 2
         # If the texts does not fit in the assigned location,
         # we split the text and draw it in another place.
         if top_corner:
@@ -217,7 +227,7 @@ class ImgVisualizer(Visualizer):
                 box_facecolor=box_facecolors[i],
                 alpha=alpha,
             )
-            y -= font_size + font_size // 2.5
+            y -= font_size + font_size // 2
 
     def draw_multiple_text_downward(
         self,
@@ -270,7 +280,7 @@ class ImgVisualizer(Visualizer):
                 box_facecolor=box_facecolors[i],
                 alpha=alpha,
             )
-            y += font_size + font_size // 2.5
+            y += font_size + font_size // 2
 
     def _align_x_coordinate(self, box_coordinate):
         """
@@ -376,34 +386,47 @@ class VideoVisualizer:
                     color channels. The image is required to be in RGB format since that
                     is a requirement of the Matplotlib library. The image is also expected
                     to be in the range [0, 255].
-                preds (tensor): a float tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
-                    of the model. For recognition task, input shape can be (num_classes,). To plot true label,
-                    preds is a tensor contains int32 of the shape (num_boxes, true_class_ids) or (true_class_ids,)
+                preds (tensor or list): If ground_truth is False, provide a float tensor of shape (num_boxes, num_classes)
+                    that contains all of the confidence scores of the model.
+                    For recognition task, input shape can be (num_classes,). To plot true label (ground_truth is True),
+                    preds is a list contains int32 of the shape (num_boxes, true_class_ids) or (true_class_ids,).
                 bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
                 alpha (Optional[float]): transparency level of the bounding boxes.
                 text_alpha (Optional[float]): transparency level of the box wrapped around text labels.
                 ground_truth (bool): whether the prodived bounding boxes are ground-truth.
         """
-        if preds.ndim == 1:
-            preds = preds.unsqueeze(0)
-        n_instances = preds.shape[0]
+        if isinstance(preds, torch.Tensor):
+            if preds.ndim == 1:
+                preds = preds.unsqueeze(0)
+            n_instances = preds.shape[0]
+        elif isinstance(preds, list):
+            n_instances = len(preds)
+        else:
+            logger.error("Unsupported type of prediction input.")
+            return
 
-        if preds.dtype == torch.int32:
+        if ground_truth:
             top_scores, top_classes = [None] * n_instances, preds
 
         else:
             top_scores, top_classes = torch.topk(preds, k=self.top_k)
+            top_scores, top_classes = top_scores.tolist(), top_classes.tolist()
 
         # Create labels top k predicted classes with their scores.
         text_labels = []
         for i in range(n_instances):
             text_labels.append(
                 _create_text_labels(
-                    top_classes[i], top_scores[i], self.class_names
+                    top_classes[i],
+                    top_scores[i],
+                    self.class_names,
+                    ground_truth=ground_truth,
                 )
             )
-        frame_visualizer = ImgVisualizer(frame)
-        font_size = max(np.sqrt(frame.shape[0] * frame.shape[1]) // 35, 5)
+        frame_visualizer = ImgVisualizer(frame, meta=None)
+        font_size = min(
+            max(np.sqrt(frame.shape[0] * frame.shape[1]) // 35, 5), 9
+        )
         top_corner = not ground_truth
         if bboxes is not None:
             assert len(preds) == len(
@@ -413,7 +436,7 @@ class VideoVisualizer:
             )
             for i, box in enumerate(bboxes):
                 text = text_labels[i]
-                pred_class = top_classes[i].numpy()
+                pred_class = top_classes[i]
                 colors = [self._get_color(pred) for pred in pred_class]
 
                 box_color = "r" if ground_truth else "g"
@@ -434,11 +457,11 @@ class VideoVisualizer:
                 )
         else:
             text = text_labels[0]
-            pred_class = top_classes[0].numpy()
+            pred_class = top_classes[0]
             colors = [self._get_color(pred) for pred in pred_class]
             frame_visualizer.draw_multiple_text(
                 text,
-                torch.Tensor([0, 0, frame.shape[1], frame.shape[0]]),
+                torch.Tensor([0, 5, frame.shape[1], frame.shape[0] - 5]),
                 top_corner=top_corner,
                 font_size=font_size,
                 box_facecolors=colors,
@@ -447,8 +470,69 @@ class VideoVisualizer:
 
         return frame_visualizer.output.get_image()
 
+    def draw_clip_range(
+        self,
+        frames,
+        preds,
+        bboxes=None,
+        text_alpha=0.5,
+        ground_truth=False,
+        keyframe_idx=None,
+        draw_range=None,
+        repeat_frame=1,
+    ):
+        """
+            Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
+            if bboxes is provided. Boxes will gradually fade in and out the clip, centered around
+            the clip's central frame, within the provided `draw_range`.
+            Args:
+                frames (array-like): video data in the shape (T, H, W, C).
+                preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
+                    of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
+                bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
+                text_alpha (float): transparency label of the box wrapped around text labels.
+                ground_truth (bool): whether the prodived bounding boxes are ground-truth.
+                keyframe_idx (int): the index of keyframe in the clip.
+                draw_range (Optional[list[ints]): only draw frames in range [start_idx, end_idx] inclusively in the clip.
+                    If None, draw on the entire clip.
+                repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
+        """
+        if draw_range is None:
+            draw_range = [0, len(frames) - 1]
+        if draw_range is not None:
+            draw_range[0] = max(0, draw_range[0])
+            left_frames = frames[: draw_range[0]]
+            right_frames = frames[draw_range[1] + 1 :]
+
+        draw_frames = frames[draw_range[0] : draw_range[1] + 1]
+        if keyframe_idx is None:
+            keyframe_idx = len(frames) // 2
+
+        img_ls = (
+            list(left_frames)
+            + self.draw_clip(
+                draw_frames,
+                preds,
+                bboxes=bboxes,
+                text_alpha=text_alpha,
+                ground_truth=ground_truth,
+                keyframe_idx=keyframe_idx - draw_range[0],
+                repeat_frame=repeat_frame,
+            )
+            + list(right_frames)
+        )
+
+        return img_ls
+
     def draw_clip(
-        self, frames, preds, bboxes=None, text_alpha=0.5, ground_truth=False
+        self,
+        frames,
+        preds,
+        bboxes=None,
+        text_alpha=0.5,
+        ground_truth=False,
+        keyframe_idx=None,
+        repeat_frame=1,
     ):
         """
             Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
@@ -461,19 +545,36 @@ class VideoVisualizer:
                 bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
                 text_alpha (float): transparency label of the box wrapped around text labels.
                 ground_truth (bool): whether the prodived bounding boxes are ground-truth.
+                keyframe_idx (int): the index of keyframe in the clip.
+                repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
         """
+        assert repeat_frame >= 1, "`repeat_frame` must be a positive integer."
+
+        repeated_seq = range(0, len(frames))
+        repeated_seq = list(
+            itertools.chain.from_iterable(
+                itertools.repeat(x, repeat_frame) for x in repeated_seq
+            )
+        )
+
         frames, adjusted = self._adjust_frames_type(frames)
-        half_left = len(frames) // 2
-        half_right = len(frames) - half_left
+        if keyframe_idx is None:
+            half_left = len(repeated_seq) // 2
+            half_right = (len(repeated_seq) + 1) // 2
+        else:
+            mid = int((keyframe_idx / len(frames)) * len(repeated_seq))
+            half_left = mid
+            half_right = len(repeated_seq) - mid
+
         alpha_ls = np.concatenate(
             [
                 np.linspace(0, 1, num=half_left),
                 np.linspace(1, 0, num=half_right),
             ]
-        ).tolist()
+        )
         text_alpha = text_alpha
+        frames = frames[repeated_seq]
         img_ls = []
-
         for alpha, frame in zip(alpha_ls, frames):
             draw_img = self.draw_one_frame(
                 frame,
@@ -510,4 +611,4 @@ class VideoVisualizer:
             frames = frames.astype(np.uint8)
             adjusted = True
 
-        return list(frames), adjusted
+        return frames, adjusted

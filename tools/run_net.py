@@ -26,11 +26,13 @@ def main():
     if cfg.TEST.ENABLE:
         launch_job(cfg=cfg, init_method=args.init_method, func=test)
 
-    if cfg.DEMO.ENABLE:
-        launch_job(cfg=cfg, init_method=args.init_method, func=demo)
-
+    # Perform model visualization.
     if cfg.TENSORBOARD.ENABLE and cfg.TENSORBOARD.MODEL_VIS.ENABLE:
         launch_job(cfg=cfg, init_method=args.init_method, func=visualize)
+
+    # Run demo.
+    if cfg.DEMO.ENABLE:
+        demo(cfg)
 
 
 if __name__ == "__main__":

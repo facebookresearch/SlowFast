@@ -606,30 +606,55 @@ _C.TENSORBOARD.MODEL_VIS.TOPK_PREDS = 1
 _C.TENSORBOARD.MODEL_VIS.COLORMAP = "Pastel2"
 
 
-# Add custom config with default values.
-custom_config.add_custom_config(_C)
-
-
 # ---------------------------------------------------------------------------- #
 # Demo options
 # ---------------------------------------------------------------------------- #
 _C.DEMO = CfgNode()
 
+# Run model in DEMO mode.
 _C.DEMO.ENABLE = False
 
+# Path to a json file providing class_name - id mapping
+# in the format {"class_name1": id1, "class_name2": id2, ...}.
 _C.DEMO.LABEL_FILE_PATH = ""
 
-_C.DEMO.DATA_SOURCE = 0
+# Specify a camera device as input. This will be prioritized
+# over input video if set.
+# If -1, use input video instead.
+_C.DEMO.WEBCAM = -1
 
+# Path to input video for demo.
+_C.DEMO.INPUT_VIDEO = ""
+# Custom width for reading input video data.
 _C.DEMO.DISPLAY_WIDTH = 0
-
+# Custom height for reading input video data.
 _C.DEMO.DISPLAY_HEIGHT = 0
-
-_C.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_CFG = ""
-
-_C.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_WEIGHTS = ""
-
+# Path to Detectron2 object detection model configuration,
+# only used for detection tasks.
+_C.DEMO.DETECTRON2_CFG = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+# Path to Detectron2 object detection model pre-trained weights.
+_C.DEMO.DETECTRON2_WEIGHTS = "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+# Threshold for choosing predicted bounding boxes by Detectron2.
+_C.DEMO.DETECTRON2_THRESH = 0.9
+# Number of overlapping frames between 2 consecutive clips.
+# Increase this number for more frequent action predictions.
+# The number of overlapping frames cannot be larger than
+# half of the sequence length `cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE`
+_C.DEMO.BUFFER_SIZE = 0
+# If specified, the visualized outputs will be written this a video file of
+# this path. Otherwise, the visualized outputs will be displayed in a window.
 _C.DEMO.OUTPUT_FILE = ""
+# Frames per second rate for writing to output video file.
+# If not set (-1), use fps rate from input file.
+_C.DEMO.OUTPUT_FPS = -1
+# Input format from demo video reader ("RGB" or "BGR").
+_C.DEMO.INPUT_FORMAT = "BGR"
+# Draw visualization frames in [keyframe_idx - CLIP_VIS_SIZE, keyframe_idx + CLIP_VIS_SIZE] inclusively.
+_C.DEMO.CLIP_VIS_SIZE = 10
+
+
+# Add custom config with default values.
+custom_config.add_custom_config(_C)
 
 
 def _assert_and_infer_cfg(cfg):

@@ -135,6 +135,7 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                             batch_idx=cur_batch_idx,
                             indexing_dict=indexing_dict,
                         )
+
             logger.info("Visualized {} videos...".format(total_vids))
 
 
