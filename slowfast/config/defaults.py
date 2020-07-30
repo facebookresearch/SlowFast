@@ -652,6 +652,14 @@ _C.DEMO.INPUT_FORMAT = "BGR"
 # Draw visualization frames in [keyframe_idx - CLIP_VIS_SIZE, keyframe_idx + CLIP_VIS_SIZE] inclusively.
 _C.DEMO.CLIP_VIS_SIZE = 10
 
+_C.DEMO.PREDS_BOXES = ""
+# Path to ground-truth boxes and labels (optional)
+_C.DEMO.GT_BOXES = ""
+# The starting second of the video w.r.t bounding boxes file.
+_C.DEMO.STARTING_SECOND = 900
+# Frames per second of the input video/folder of images.
+_C.DEMO.FPS = 30
+
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)

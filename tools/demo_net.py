@@ -8,6 +8,7 @@ import tqdm
 
 from slowfast.utils import logging
 from slowfast.visualization.demo_loader import VideoReader
+from slowfast.visualization.ava_demo_precomputed_boxes import AVAVisualizerWithPrecomputedBox
 from slowfast.visualization.predictor import (
     ActionPredictor,
     Detectron2Predictor,
@@ -86,11 +87,15 @@ def demo(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    # AVA format-specific visualization with precomputed boxes.
+    if cfg.DETECTION.ENABLE and cfg.DEMO.PREDS_BOXES != "":
+        precomputed_box_vis = AVAVisualizerWithPrecomputedBox(cfg)
+        precomputed_box_vis()
+    else:
+        frame_provider = VideoReader(cfg)
 
-    frame_provider = VideoReader(cfg)
+        for frames in tqdm.tqdm(run_demo(cfg, frame_provider)):
+            for frame in frames:
+                frame_provider.display(frame)
 
-    for frames in tqdm.tqdm(run_demo(cfg, frame_provider)):
-        for frame in frames:
-            frame_provider.display(frame)
-
-    frame_provider.clean()
+        frame_provider.clean()
