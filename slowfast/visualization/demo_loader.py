@@ -74,7 +74,7 @@ class VideoReader:
         while was_read and len(frames) < self.seq_length:
             was_read, frame = self.cap.read()
             frames.append(frame)
-        if was_read:
+        if was_read and self.buffer_size != 0:
             self.buffer = frames[-self.buffer_size :]
 
         task.add_frames(self.id, frames)
