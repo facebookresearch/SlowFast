@@ -98,7 +98,7 @@ class Kinetics(torch.utils.data.Dataset):
                 )
                 for idx in range(self._num_clips):
                     self._path_to_videos.append(
-                        os.path.join(self.cfg.DATA.PATH_PREFIX, path)
+                        os.path.join(self.cfg.DATA.PATH_PREFIX, self.mode, path)
                     )
                     self._labels.append(int(label))
                     self._spatial_temporal_idx.append(idx)
