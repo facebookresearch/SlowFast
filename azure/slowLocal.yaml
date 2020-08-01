@@ -1,0 +1,28 @@
+_include: !include SLOWFAST_4x16_R50.yaml
+
+log_file: ''
+debug: True
+log_upload_files: False
+logger_type: passthrough
+config_file_delete_on_exit: False
+root_dir: /home/mrevow
+output_dir: /home/mrevow/out
+input_file_storage: ''
+init_method: tcp://localhost:9990
+log_title: ''
+NUM_SHARDS: 2
+
+DATA_LOADER:
+  NUM_WORKERS: 4
+NUM_GPUS: 1
+
+SOLVER:
+  MAX_EPOCH: 2
+
+DATA:
+  PATH_TO_DATA_DIR: 'data/kinetics700'
+  PATH_LABEL_SEPARATOR: ','
+  PATH_PREFIX: data/kinetics700/dataset
+
+TRAIN:
+  BATCH_SIZE: 4

@@ -1,0 +1,24 @@
+_include: !include SLOWFAST_4x16_R50.yaml
+
+log_file: ''
+debug: False
+log_upload_files: True
+logger_type: pipeline
+config_file_delete_on_exit: True
+init_method: tcp://localhost:9999
+
+DATA:
+  PATH_TO_DATA_DIR: 'kinetics700'
+  PATH_LABEL_SEPARATOR: ','
+  PATH_PREFIX: kinetics700/dataset
+
+DATA_LOADER:
+  NUM_WORKERS: 8
+NUM_GPUS: 4
+
+SOLVER:
+  MAX_EPOCH: 100
+
+TRAIN:
+  BATCH_SIZE: 32  
+

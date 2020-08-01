@@ -1,0 +1,25 @@
+# Configuration for submitting runTrainSpeechModel runs to azure
+# 
+
+allow_reuse: False
+aml_compute_target: cpu-12Node-D11
+azure_config_path: Configs/
+azure_package_path: wheels_canary
+config_overwrite: True
+azure_script: run.py
+conda_environment: vqm_environment_cpu.yaml
+datastore: videoclass
+datastore_fileStorage: videoclass
+dist_dir: dist
+docker_image: mcr.microsoft.com/azureml/base:intelmpi2018.3-ubuntu16.04
+do_canary: False
+exp: tmp
+step_name: tmp
+output_pipe_name: output
+repo_rel_path: ../
+run_framework: python
+template_prefix: tmp
+setup_template: setup.py
+submitter_wait_delay_sec: 5
+workspace_config: video_class_config.json
+conda_pckg_expr: 'azureml-private-packages/slowfast'
