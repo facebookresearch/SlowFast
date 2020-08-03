@@ -65,13 +65,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
             preds = model(inputs, meta["boxes"])
-            ori_boxes = meta["ori_boxes"].cpu()
-            metadata = meta["metadata"].cpu()
-
-            if cfg.NUM_GPUS > 1:
-                preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
-                ori_boxes = torch.cat(du.all_gather_unaligned(ori_boxes), dim=0)
-                metadata = torch.cat(du.all_gather_unaligned(metadata), dim=0)
+            ori_boxes = meta["ori_boxes"]
+            metadata = meta["metadata"]
 
             preds = preds.detach().cpu() if cfg.NUM_GPUS else preds.detach()
             ori_boxes = (
@@ -80,6 +75,11 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             metadata = (
                 metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
             )
+
+            if cfg.NUM_GPUS > 1:
+                preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
+                ori_boxes = torch.cat(du.all_gather_unaligned(ori_boxes), dim=0)
+                metadata = torch.cat(du.all_gather_unaligned(metadata), dim=0)
 
             test_meter.iter_toc()
             # Update and log stats.
