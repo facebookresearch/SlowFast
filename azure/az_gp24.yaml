@@ -2,8 +2,8 @@ _include: !include azureSubmit_cpu.yaml
 # Configuration for submitting runTrainSpeechModel runs to azure
 # 
 
-aml_compute_target: gpu-NC6
-# aml_compute_target: gpu-NC24
+# aml_compute_target: gpu-NC6
+aml_compute_target: gpu-NC24
 docker_image: mcr.microsoft.com/azureml/base-gpu:openmpi3.1.2-cuda10.1-cudnn7-ubuntu18.04
 workspace_config: video_class_config.json
 conda_environment: vqm_environment_gpu.yaml

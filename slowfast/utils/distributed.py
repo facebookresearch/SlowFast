@@ -34,7 +34,7 @@ def all_gather(tensors):
     return output_tensor
 
 
-def all_reduce(tensors, average=True):
+def all_reduce(tensors, op=dist.ReduceOp.SUM, average=True):
     """
     All reduce the provided tensors from all processes across machines.
     Args:
@@ -45,7 +45,7 @@ def all_reduce(tensors, average=True):
     """
 
     for tensor in tensors:
-        dist.all_reduce(tensor, async_op=False)
+        dist.all_reduce(tensor, op=op, async_op=False)
     if average:
         world_size = dist.get_world_size()
         for tensor in tensors:
@@ -79,6 +79,9 @@ def init_process_group(
             https://pytorch.org/docs/stable/distributed.html
     """
     # Sets the GPU to use.
+    print("init_process_group local_rank {} local_world_size {} shard_id {} num_shars {} init_method {} dist_backed {}".format(
+        local_rank, local_world_size, shard_id, num_shards, init_method, dist_backend
+    ))
     torch.cuda.set_device(local_rank)
     # Initialize the process group.
     proc_rank = local_rank + shard_id * local_world_size
@@ -259,8 +262,8 @@ def init_distributed_training(cfg):
     """
     Initialize variables needed for distributed training.
     """
-    if cfg.NUM_GPUS == 1:
-        return
+    # if cfg.NUM_GPUS == 1:
+    #     return
     num_gpus_per_machine = cfg.NUM_GPUS
     num_machines = dist.get_world_size() // num_gpus_per_machine
     for i in range(num_machines):

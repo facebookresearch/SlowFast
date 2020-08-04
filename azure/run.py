@@ -3,6 +3,7 @@ import sys
 import os
 import copy
 import datetime
+import socket
 
 from common.utils.yamlConfig import YamlConfig
 from common.utils.logger import CreateLogger
@@ -40,13 +41,13 @@ def ParseArgs():
   parser.add_argument(
       "--shard_id",
       help="The shard id of current node, Starts from 0 to num_shards - 1",
-      default=0,
+      default=None,
       type=int,
   )
   parser.add_argument(
       "--num_shards",
       help="Number of shards using by the job",
-      default=1,
+      default=None,
       type=int,
   )
   parser.add_argument(
@@ -67,6 +68,9 @@ def updatePaths(args):
 
 def main():
   argsOrig = ParseArgs()
+  host_name = socket.gethostname() 
+  host_ip = socket.gethostbyname(host_name)        
+  print("Starting on host {} host_ip {}".format(host_name, host_ip))
   for config_file in argsOrig.config_files:
     args = copy.deepcopy(argsOrig)
     args.config_file = config_file  
@@ -82,13 +86,20 @@ def main():
 
       with CreateLogger(args, logger_type=args.logger_type) as logger:
         logger.log_value('title', args.log_title, 'Run Title entered when job started')
+        logger.info("Starting on host {} host_ip {}".format(host_name, host_ip))
+
         # logger.info(config.ReportConfig())
+        args.master_addr = args.master_addr if cfg.NUM_SHARDS > 1 else host_ip
+        os.environ["MASTER_ADDR"] = args.master_addr
+        os.environ["MASTER_PORT"] = str(args.master_port)
+        os.environ["WORLD_SIZE"] = str(cfg.NUM_SHARDS * cfg.NUM_GPUS)
+        logger.info("MASTER_ADDR {} MASTER_PORT {} WORLD_SIZE {}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"], os.environ["WORLD_SIZE"]))
         logger.info("CFG")
         logger.info(cfg)
         ite = 0
         loss = 1.1
         trainer = Trainer(cfg)
-        launch_job(cfg=cfg, init_method=args.init_method, func=trainer.train)
+        launch_job(cfg=cfg, init_method=None, func=trainer.train)
 
 if __name__ == "__main__":
   main()  

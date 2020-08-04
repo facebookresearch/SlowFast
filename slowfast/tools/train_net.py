@@ -2,12 +2,14 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Train a video classification model."""
+import os
 import numpy as np
 import pprint
 import torch
 import time
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 import matplotlib.pyplot as plt
+import torch.distributed as dist
 
 import slowfast.models.losses as losses
 import slowfast.models.optimizer as optim
@@ -50,19 +52,29 @@ class Trainer(object):
         train_meter.iter_tic()
         data_size = len(train_loader)
         start = time.time()
-        self.logger.info("Start Epoch {} dSize {} localRank {} rank {} world {}".format(
-            cur_epoch, data_size, du.get_local_rank(), du.get_rank(), du.get_world_size()))
+        btch = cfg.TRAIN.BATCH_SIZE
+        rankE = os.environ.get("RANK", None)
+        worldE = os.environ.get("WORLD_SIZE", None)
+        self.logger.info("Start Epoch {} dLen {} Batch {} dSize {} localRank {} rank {} {} world {} {}".format(
+            cur_epoch, data_size, btch, data_size * btch, du.get_local_rank(), du.get_rank(), rankE, du.get_world_size(), worldE))
         tot = 0
+        first = True
 
         for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
+            tot += len(labels)
             if isinstance(inputs, (list,)):
-                tot += len(labels)
-                # self.logger.info("LEN {}  {} shape {} {} tot {}".format(len(labels), len(inputs), inputs[0].shape, labels[0].shape, tot))
+                if first:
+                    self.logger.info("rank {} LEN {}  {} shape Slow {} Fast {} {} tot {}".format(du.get_rank(), len(labels), len(inputs), 
+                        inputs[0].shape, inputs[1].shape, labels[0].shape, tot))
+                    first = False
                 for i in range(len(inputs)):
                     inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                tot += 1
+                if first:
+                    self.logger.info("rank {} LEN {} shape {} {} tot {}".format(du.get_rank(), len(labels),  
+                        inputs.shape, labels[0].shape, tot))
+                    first = False
                 inputs = inputs.cuda(non_blocking=True)
             labels = labels.cuda()
             
@@ -76,7 +88,6 @@ class Trainer(object):
             # Update the learning rate.
             lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
             optim.set_lr(optimizer, lr)
-
             if cfg.DETECTION.ENABLE:
                 # Compute the predictions.
                 preds = model(inputs, meta["boxes"])
@@ -147,6 +158,7 @@ class Trainer(object):
 
                 train_meter.iter_toc()
                 # Update and log stats.
+                # self.logger.info("UPDATING stat {} {} {}".format(inputs[0].size(0), cfg.NUM_GPUS, inputs[0].size(0) * cfg.NUM_GPUS))
                 train_meter.update_stats(
                     top1_err, top5_err, loss, lr, inputs[0].size(0) * cfg.NUM_GPUS
                 )
@@ -175,18 +187,16 @@ class Trainer(object):
         # Log epoch stats.
         train_meter.log_epoch_stats(cur_epoch)
         train_meter.reset()
-        tot = torch.tensor(tot).cuda()
-        
-        if du.is_master_proc():
-            end = time.time()
-            el = end - start
-            # totAll = du.all_reduce([tot], average=False)
-            tsum = tot.item()
-            # self.logger.info("Tot {} All {} ".format(tot, totAll))
-            # tsum = 0
-            # for t in totAll:
-            #     tsum += t.item()
-            self.logger.info("{} samp time {} Rate {:.1f}".format(tsum, el, tsum/el))
+        end = time.time()
+        el = end - start
+        totAll = du.all_reduce([torch.tensor(tot).cuda()], average=False)
+        tSum = totAll[0].item()
+        elT = torch.tensor(el).cuda()
+        elMax = du.all_reduce([elT], op=dist.ReduceOp.MAX, average=False)[0].item()
+        jobRate = tSum/elMax
+        self.logger.info("totSampCnt {} workerSampCnt {}  eTimeMax {} eTimeWorker {}  SampPerSecJob {:.1f} SampPerSecWorker {:.1f}".format(
+            tSum, tot, elMax, el, jobRate, tot/el))
+        return jobRate
 
     @torch.no_grad()
     def eval_epoch(self, val_loader, model, val_meter, cur_epoch, cfg, writer=None):
@@ -430,8 +440,8 @@ class Trainer(object):
             train_meter = AVAMeter(len(train_loader), cfg, mode="train")
             val_meter = AVAMeter(len(val_loader), cfg, mode="val")
         else:
-            train_meter = TrainMeter(len(train_loader), cfg)
-            val_meter = ValMeter(len(val_loader), cfg)
+            train_meter = TrainMeter(len(train_loader), cfg, self.logger)
+            val_meter = ValMeter(len(val_loader), cfg, self.logger)
 
         # set up writer for logging to Tensorboard format.
         if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
@@ -441,6 +451,9 @@ class Trainer(object):
         else:
             writer = None
 
+        avgRate = 0
+        epCnt = 0
+        self.logger.info("Train startEpoch {}  maxEpoch {}".format(start_epoch, cfg.SOLVER.MAX_EPOCH))
         for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
             if cfg.MULTIGRID.LONG_CYCLE:
                 cfg, changed = multigrid.update_long_cycle(cfg, cur_epoch)
@@ -469,9 +482,10 @@ class Trainer(object):
             # Shuffle the dataset.
             loader.shuffle_dataset(train_loader, cur_epoch)
             # Train for one epoch.
-            self.train_epoch(
+            avgRate += self.train_epoch(
                 train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
             )
+            epCnt += 1
 
             # Compute precise BN stats.
             if cfg.BN.USE_PRECISE_STATS and len(get_bn_modules(model)) > 0:
@@ -496,7 +510,24 @@ class Trainer(object):
         if writer is not None:
             writer.close()
 
+        avgRate = avgRate / epCnt if epCnt > 0 else -1
+        self.logger.info("Exiting overall jobrate {:.1f}".format(avgRate))
+        self.logger.log_value('jobRate', avgRate, 'Average number lips /sec')
+
+    def reportInfo(self, cfg):
+        totGpu = cfg.NUM_GPUS * cfg.NUM_SHARDS
+        rank = cfg.SHARD_ID * cfg.NUM_GPUS +  cfg.SHARD_ID
+        self.logger.info("Start Train gpu_per_shard {} num_shards {} totGpu {} rank {} shardId {}".format(
+            cfg.NUM_GPUS, cfg.NUM_SHARDS, totGpu, rank, cfg.SHARD_ID,
+        ))
+        self.logger.log_value('gpu_per_shard', cfg.NUM_GPUS, 'Number gpu per shard')
+        self.logger.log_value('num_shards', cfg.NUM_SHARDS, 'Number of shards')
+        self.logger.log_value('tot_gpu', totGpu, 'Total gpu count')
+        self.logger.log_value('rank', rank, 'Global Id ')
+        self.logger.log_value('shard_id', cfg.SHARD_ID, 'Id of the compute shard')
+
     def train(self, cfg):
         with CreateLogger(cfg, logger_type=cfg.logger_type) as logger:
             self.logger = logger
+            self.reportInfo(cfg)
             self.trainImpl(cfg)

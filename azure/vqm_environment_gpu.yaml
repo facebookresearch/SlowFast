@@ -27,7 +27,7 @@ dependencies:
   - tensorboard
   - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/ic3_ai-0.13-py3-none-any.whl
   - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/detectron2-0.2-cp38-cp38-linux_x86_64.whl
-  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/slowfast-1596257237.9708366-py3-none-any.whl
+  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/slowfast-1596465006.340789-py3-none-any.whl
 - pytorch=1.6.0
 - cudatoolkit=10.2
 - opencv

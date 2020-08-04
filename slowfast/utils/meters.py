@@ -428,13 +428,14 @@ class TrainMeter(object):
     Measure training stats.
     """
 
-    def __init__(self, epoch_iters, cfg):
+    def __init__(self, epoch_iters, cfg, logger):
         """
         Args:
             epoch_iters (int): the overall number of iterations of one epoch.
             cfg (CfgNode): configs.
         """
         self._cfg = cfg
+        self.logger = logger
         self.epoch_iters = epoch_iters
         self.MAX_EPOCH = cfg.SOLVER.MAX_EPOCH * epoch_iters
         self.iter_timer = Timer()
@@ -523,7 +524,7 @@ class TrainMeter(object):
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
             stats["top5_err"] = self.mb_top5_err.get_win_median()
-        logging.log_json_stats(stats)
+        self.logger.info(stats)
 
     def log_epoch_stats(self, cur_epoch):
         """
@@ -531,6 +532,10 @@ class TrainMeter(object):
         Args:
             cur_epoch (int): the number of current epoch.
         """
+        if self.num_samples <= 0:
+            self.logger.warning("TrainMeter log_epoch_stats numSample {}".format(self.num_samples))
+            return 
+           
         eta_sec = self.iter_timer.seconds() * (
             self.MAX_EPOCH - (cur_epoch + 1) * self.epoch_iters
         )
@@ -551,7 +556,7 @@ class TrainMeter(object):
             stats["top1_err"] = top1_err
             stats["top5_err"] = top5_err
             stats["loss"] = avg_loss
-        logging.log_json_stats(stats)
+        self.logger.info(stats)
 
 
 class ValMeter(object):
@@ -559,13 +564,14 @@ class ValMeter(object):
     Measures validation stats.
     """
 
-    def __init__(self, max_iter, cfg):
+    def __init__(self, max_iter, cfg, logger):
         """
         Args:
             max_iter (int): the max number of iteration of the current epoch.
             cfg (CfgNode): configs.
         """
         self._cfg = cfg
+        self.logger = logger
         self.max_iter = max_iter
         self.iter_timer = Timer()
         # Current minibatch errors (smoothed over a window).
@@ -653,7 +659,7 @@ class ValMeter(object):
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
             stats["top5_err"] = self.mb_top5_err.get_win_median()
-        logging.log_json_stats(stats)
+        self.logger.info(stats)
 
     def log_epoch_stats(self, cur_epoch):
         """
@@ -661,6 +667,10 @@ class ValMeter(object):
         Args:
             cur_epoch (int): the number of current epoch.
         """
+        if self.num_samples <= 0:
+            self.logger.warning("ValMeter log_epoch_stats numSample {}".format(self.num_samples))
+            return
+
         stats = {
             "_type": "val_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
@@ -684,7 +694,7 @@ class ValMeter(object):
             stats["min_top1_err"] = self.min_top1_err
             stats["min_top5_err"] = self.min_top5_err
 
-        logging.log_json_stats(stats)
+        self.logger.info(stats)
 
 
 def get_map(preds, labels):

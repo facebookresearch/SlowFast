@@ -8,16 +8,19 @@ config_file_delete_on_exit: False
 root_dir: /home/mrevow
 output_dir: /home/mrevow/out
 input_file_storage: ''
-init_method: tcp://localhost:9990
+# init_method: tcp://localhost:9990
 log_title: ''
-NUM_SHARDS: 2
+master_addr: '10.0.41.4'
+master_port: '9755'
+num_shards: 2
+shard_id: 0
 
 DATA_LOADER:
   NUM_WORKERS: 4
 NUM_GPUS: 1
 
 SOLVER:
-  MAX_EPOCH: 2
+  MAX_EPOCH: 1
 
 DATA:
   PATH_TO_DATA_DIR: 'data/kinetics700'

@@ -5,9 +5,9 @@ debug: False
 log_upload_files: True
 logger_type: pipeline
 config_file_delete_on_exit: True
-master_addr: '10.0.41.6'
+master_addr: '10.3.0.4'
 master_port: '9755'
-num_shards: 4
+num_shards: 3
 shard_id: 0
 
 DATA:
@@ -17,11 +17,11 @@ DATA:
 
 DATA_LOADER:
   NUM_WORKERS: 8
-NUM_GPUS: 1
+NUM_GPUS: 4
 
 SOLVER:
   MAX_EPOCH: 2
 
 TRAIN:
-  BATCH_SIZE: 8  
+  BATCH_SIZE: 32 
 

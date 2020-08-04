@@ -85,7 +85,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
         # Create a sampler for multi-process training
         sampler = (
             DistributedSampler(dataset)
-            if cfg.NUM_GPUS > 1
+            if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1)
             else RandomSampler(dataset)
         )
         batch_sampler = ShortCycleBatchSampler(
@@ -100,7 +100,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
         )
     else:
         # Create a sampler for multi-process training
-        sampler = DistributedSampler(dataset) if cfg.NUM_GPUS > 1 else None
+        sampler = DistributedSampler(dataset) if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1) else None
         # Create a loader
         loader = torch.utils.data.DataLoader(
             dataset,

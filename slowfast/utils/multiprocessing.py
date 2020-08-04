@@ -4,7 +4,7 @@
 """Multiprocessing helpers."""
 
 import torch
-
+import os
 
 def run(
     local_rank, num_proc, func, init_method, shard_id, num_shards, backend, cfg
@@ -35,8 +35,15 @@ def run(
     # Initialize the process group.
     world_size = num_proc * num_shards
     rank = shard_id * num_proc + local_rank
+    print("RUN local_rank {} rank {} world_size {} shard_id {} num_shards {} init_method {} dist_backed {}".format(
+        local_rank, rank, world_size, shard_id, num_shards, init_method, backend
+    ))
 
     try:
+        master_addr = os.environ.get("MASTER_ADDR", None)
+        master_port = os.environ.get("MASTER_PORT", None)
+        print("In run() MASTER {} PORT {}".format(master_addr, master_port))
+
         torch.distributed.init_process_group(
             backend=backend,
             init_method=init_method,
@@ -47,4 +54,5 @@ def run(
         raise e
 
     torch.cuda.set_device(local_rank)
+    print("Call func - shard {} ".format(shard_id))
     func(cfg)

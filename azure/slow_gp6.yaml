@@ -7,7 +7,7 @@ logger_type: pipeline
 config_file_delete_on_exit: True
 master_addr: '10.0.41.6'
 master_port: '9755'
-num_shards: 4
+num_shards: 12
 shard_id: 0
 
 DATA:
