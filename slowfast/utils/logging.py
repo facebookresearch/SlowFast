@@ -42,9 +42,6 @@ def setup_logging(output_dir=None):
     if du.is_master_proc():
         # Enable logging for the master process.
         logging.root.handlers = []
-        logging.basicConfig(
-            level=logging.INFO, format=_FORMAT, stream=sys.stdout
-        )
     else:
         # Suppress logging for non-master processes.
         _suppress_print()
