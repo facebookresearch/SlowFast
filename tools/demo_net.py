@@ -12,8 +12,10 @@ from slowfast.visualization.async_predictor import (
     AsycnActionPredictor,
     AsyncVis,
 )
+from slowfast.visualization.ava_demo_precomputed_boxes import (
+    AVAVisualizerWithPrecomputedBox,
+)
 from slowfast.visualization.demo_loader import VideoReader
-from slowfast.visualization.ava_demo_precomputed_boxes import AVAVisualizerWithPrecomputedBox
 from slowfast.visualization.predictor import ActionPredictor
 from slowfast.visualization.video_visualizer import VideoVisualizer
 
@@ -39,12 +41,23 @@ def run_demo(cfg, frame_provider):
     logger.info("Run demo with config:")
     logger.info(cfg)
 
-    video_vis = VideoVisualizer(
-        cfg.MODEL.NUM_CLASSES,
-        cfg.DEMO.LABEL_FILE_PATH,
-        cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
-        cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
+    common_classes = (
+        cfg.DEMO.COMMON_CLASS_NAMES
+        if len(cfg.DEMO.LABEL_FILE_PATH) != 0
+        else None
     )
+
+    video_vis = VideoVisualizer(
+        num_classes=cfg.MODEL.NUM_CLASSES,
+        class_names_path=cfg.DEMO.LABEL_FILE_PATH,
+        top_k=cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
+        thres=cfg.DEMO.COMMON_CLASS_THRES,
+        lower_thres=cfg.DEMO.UNCOMMON_CLASS_THRES,
+        common_class_names=common_classes,
+        colormap=cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
+        mode=cfg.DEMO.VIS_MODE,
+    )
+
     async_vis = AsyncVis(video_vis, n_workers=cfg.DEMO.NUM_VIS_INSTANCES)
 
     if cfg.NUM_GPUS <= 1:

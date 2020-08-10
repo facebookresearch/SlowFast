@@ -148,7 +148,9 @@ class AVAVisualizerWithPrecomputedBox:
         cu.load_test_checkpoint(self.cfg, model)
         logger.info("Finish loading model weights")
         logger.info("Start making predictions for precomputed boxes.")
-        for keyframe_idx, boxes_and_labels in tqdm.tqdm(self.pred_boxes.items()):
+        for keyframe_idx, boxes_and_labels in tqdm.tqdm(
+            self.pred_boxes.items()
+        ):
             inputs = self.get_input_clip(keyframe_idx)
             boxes = boxes_and_labels[0]
             boxes = torch.from_numpy(np.array(boxes)).float()
@@ -193,13 +195,22 @@ class AVAVisualizerWithPrecomputedBox:
         Write the visualized result to a video output file.
         """
         all_boxes = merge_pred_gt_boxes(self.pred_boxes, self.gt_boxes)
-
-        video_vis = VideoVisualizer(
-            self.cfg.MODEL.NUM_CLASSES,
-            self.cfg.DEMO.LABEL_FILE_PATH,
-            self.cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
-            self.cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
+        common_classes = (
+            self.cfg.DEMO.COMMON_CLASS_NAMES
+            if len(self.cfg.DEMO.LABEL_FILE_PATH) != 0
+            else None
         )
+        video_vis = VideoVisualizer(
+            num_classes=self.cfg.MODEL.NUM_CLASSES,
+            class_names_path=self.cfg.DEMO.LABEL_FILE_PATH,
+            top_k=self.cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
+            thres=self.cfg.DEMO.COMMON_CLASS_THRES,
+            lower_thres=self.cfg.DEMO.UNCOMMON_CLASS_THRES,
+            common_class_names=common_classes,
+            colormap=self.cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
+            mode=self.cfg.DEMO.VIS_MODE,
+        )
+
         all_keys = sorted(all_boxes.keys())
         no_frames_repeat = 3
         # Draw around the keyframe for 2/8 of the sequence length.

@@ -342,7 +342,15 @@ class ImgVisualizer(Visualizer):
 
 class VideoVisualizer:
     def __init__(
-        self, num_classes, class_names_path, top_k=1, colormap="rainbow"
+        self,
+        num_classes,
+        class_names_path,
+        top_k=1,
+        colormap="rainbow",
+        thres=0.7,
+        lower_thres=0.3,
+        common_class_names=None,
+        mode="top-k",
     ):
         """
         Args:
@@ -352,10 +360,31 @@ class VideoVisualizer:
             top_k (int): number of top predicted classes to plot.
             colormap (str): the colormap to choose color for class labels from.
                 See https://matplotlib.org/tutorials/colors/colormaps.html
+            thres (float): threshold for picking predicted classes to visualize.
+            lower_thres (Optional[float]): If `common_class_names` if given,
+                this `lower_thres` will be applied to uncommon classes and
+                `thres` will be applied to classes in `common_class_names`.
+            common_class_names (Optional[list of str(s)]): list of common class names
+                to apply `thres`. Class names not included in `common_class_names` will
+                have `lower_thres` as a threshold. If None, all classes will have `thres` as a threshold.
+                This is helpful for model trained on highly imbalanced dataset.
+            mode (str): Supported modes are {"top-k", "thres"}.
+                This is used for choosing predictions for visualization.
+
         """
+        assert mode in ["top-k", "thres"], "Mode {} is not supported.".format(
+            mode
+        )
+        self.mode = mode
         self.num_classes = num_classes
         self.class_names, _, _ = get_class_names(class_names_path, None, None)
         self.top_k = top_k
+        self.thres = thres
+        self.lower_thres = lower_thres
+
+        if mode == "thres":
+            self._get_thres_array(common_class_names=common_class_names)
+
         self.color_map = plt.get_cmap(colormap)
 
     def _get_color(self, class_id):
@@ -407,9 +436,16 @@ class VideoVisualizer:
         if ground_truth:
             top_scores, top_classes = [None] * n_instances, preds
 
-        else:
+        elif self.mode == "top-k":
             top_scores, top_classes = torch.topk(preds, k=self.top_k)
             top_scores, top_classes = top_scores.tolist(), top_classes.tolist()
+        elif self.mode == "thres":
+            top_scores, top_classes = [], []
+            for pred in preds:
+                mask = pred >= self.thres
+                top_scores.append(pred[mask].tolist())
+                top_class = torch.squeeze(torch.nonzero(mask), dim=-1).tolist()
+                top_classes.append(top_class)
 
         # Create labels top k predicted classes with their scores.
         text_labels = []
@@ -611,3 +647,25 @@ class VideoVisualizer:
             adjusted = True
 
         return frames, adjusted
+
+    def _get_thres_array(self, common_class_names=None):
+        """
+        Compute a thresholds array for all classes based on `self.thes` and `self.lower_thres`.
+        Args:
+            common_class_names (Optional[list of strs]): a list of common class names.
+        """
+        common_class_ids = []
+        if common_class_names is not None:
+            common_classes = set(common_class_names)
+
+            for i, name in enumerate(self.class_names):
+                if name in common_classes:
+                    common_class_ids.append(i)
+        else:
+            common_class_ids = list(range(self.num_classes))
+
+        thres_array = np.full(
+            shape=(self.num_classes,), fill_value=self.lower_thres
+        )
+        thres_array[common_class_ids] = self.thres
+        self.thres = torch.from_numpy(thres_array)
