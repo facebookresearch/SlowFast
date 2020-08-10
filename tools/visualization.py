@@ -12,6 +12,7 @@ import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
+from slowfast.visualization.gradcam_utils import GradCAM
 from slowfast.visualization.utils import (
     GetWeightAndActivation,
     process_layer_index_data,
@@ -55,9 +56,25 @@ def run_visualization(vis_loader, model, cfg, writer=None):
         cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
         cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
     )
+    if n_devices > 1:
+        grad_cam_layer_ls = [
+            "module/" + layer
+            for layer in cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST
+        ]
+    else:
+        grad_cam_layer_ls = cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST
+
+    if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
+        gradcam = GradCAM(
+            model,
+            target_layers=grad_cam_layer_ls,
+            data_mean=cfg.DATA.MEAN,
+            data_std=cfg.DATA.STD,
+            colormap=cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.COLORMAP,
+        )
     logger.info("Finish drawing weights.")
     global_idx = -1
-    for inputs, _, _, meta in vis_loader:
+    for inputs, labels, _, meta in vis_loader:
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -65,6 +82,7 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                     inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
+            labels = labels.cuda()
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
@@ -78,6 +96,11 @@ def run_visualization(vis_loader, model, cfg, writer=None):
             )
         else:
             activations, preds = model_vis.get_activations(inputs)
+        if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
+            if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.USE_TRUE_LABEL:
+                inputs, preds = gradcam(inputs, labels=labels)
+            else:
+                inputs, preds = gradcam(inputs)
         if cfg.NUM_GPUS:
             inputs = du.all_gather_unaligned(inputs)
             activations = du.all_gather_unaligned(activations)
@@ -108,7 +131,10 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                 for cur_batch_idx in range(cur_batch_size):
                     global_idx += 1
                     total_vids += 1
-                    if cfg.TENSORBOARD.MODEL_VIS.INPUT_VIDEO:
+                    if (
+                        cfg.TENSORBOARD.MODEL_VIS.INPUT_VIDEO
+                        or cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE
+                    ):
                         for path_idx, input_pathway in enumerate(cur_input):
                             if cfg.TEST.DATASET == "ava" and cfg.AVA.BGR:
                                 video = input_pathway[
@@ -116,25 +142,35 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                                 ]
                             else:
                                 video = input_pathway[cur_batch_idx]
-                            # Permute to (T, H, W, C) from (C, T, H, W).
-                            video = video.permute(1, 2, 3, 0)
-                            video = data_utils.revert_tensor_normalize(
-                                video, cfg.DATA.MEAN, cfg.DATA.STD
-                            )
+
+                            if not cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
+                                # Permute to (T, H, W, C) from (C, T, H, W).
+                                video = video.permute(1, 2, 3, 0)
+                                video = data_utils.revert_tensor_normalize(
+                                    video, cfg.DATA.MEAN, cfg.DATA.STD
+                                )
+                            else:
+                                # Permute from (T, C, H, W) to (T, H, W, C)
+                                video = video.permute(0, 2, 3, 1)
                             bboxes = (
                                 None if cur_boxes is None else cur_boxes[:, 1:]
                             )
+                            cur_prediction = (
+                                cur_preds
+                                if cfg.DETECTION.ENABLE
+                                else cur_preds[cur_batch_idx]
+                            )
                             video = video_vis.draw_clip(
-                                video, cur_preds, bboxes=bboxes
+                                video, cur_prediction, bboxes=bboxes
                             )
                             video = (
-                                torch.Tensor(video)
+                                torch.from_numpy(np.array(video))
                                 .permute(0, 3, 1, 2)
                                 .unsqueeze(0)
                             )
                             writer.add_video(
                                 video,
-                                tag="Input {}/Input from pathway {}".format(
+                                tag="Input {}/Pathway {}".format(
                                     global_idx, path_idx + 1
                                 ),
                             )
@@ -157,6 +193,30 @@ def visualize(cfg):
             slowfast/config/defaults.py
     """
     if cfg.TENSORBOARD.ENABLE and cfg.TENSORBOARD.MODEL_VIS.ENABLE:
+        if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
+            assert (
+                not cfg.DETECTION.ENABLE
+            ), "Detection task is currently not supported for Grad-CAM visualization."
+            if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
+                assert (
+                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1
+                ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                )
+            elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
+                assert (
+                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 2
+                ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                )
+            else:
+                raise NotImplementedError(
+                    "Model arch {} is not in {}".format(
+                        cfg.MODEL.ARCH,
+                        cfg.MODEL.SINGLE_PATHWAY_ARCH
+                        + cfg.MODEL.MULTI_PATHWAY_ARCH,
+                    )
+                )
         # Set up environment.
         du.init_distributed_training(cfg)
         # Set random seed from configs.

@@ -601,9 +601,20 @@ _C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
 _C.TENSORBOARD.MODEL_VIS.LAYER_LIST = []
 # Top-k predictions to plot on videos
 _C.TENSORBOARD.MODEL_VIS.TOPK_PREDS = 1
-
 # Colormap to for text boxes and bounding boxes colors
 _C.TENSORBOARD.MODEL_VIS.COLORMAP = "Pastel2"
+
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM = CfgNode()
+# Whether to run visualization using Grad-CAM technique.
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE = True
+# CNN layers to use for Grad-CAM. The number of layers must be equal to
+# number of pathway(s).
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST = []
+# If True, visualize Grad-CAM using true labels for each instances.
+# If False, use the highest predicted class.
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.USE_TRUE_LABEL = False
+# Colormap to for text boxes and bounding boxes colors
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.COLORMAP = "viridis"
 
 
 # ---------------------------------------------------------------------------- #

@@ -268,7 +268,9 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
             )
         else:
             all_preds = [pred.clone().detach() for pred in val_meter.all_preds]
-            all_labels = [label.clone().detach() for label in val_meter.all_labels]
+            all_labels = [
+                label.clone().detach() for label in val_meter.all_labels
+            ]
             if cfg.NUM_GPUS:
                 all_preds = [pred.cpu() for pred in all_preds]
                 all_labels = [label.cpu() for label in all_labels]

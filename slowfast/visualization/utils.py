@@ -198,7 +198,7 @@ class GetWeightAndActivation:
         def hook_fn(module, input, output):
             self.hooks[layer_name] = output.clone().detach()
 
-        layer = self._get_layer(layer_name)
+        layer = get_layer(self.model, layer_name)
         layer.register_forward_hook(hook_fn)
 
     def _register_hooks(self):
@@ -242,7 +242,7 @@ class GetWeightAndActivation:
         """
         weights = {}
         for layer in self.layers_names:
-            cur_layer = self._get_layer(layer)
+            cur_layer = get_layer(self.model, layer)
             if hasattr(cur_layer, "weight"):
                 weights[layer] = cur_layer.weight.clone().detach()
             else:
@@ -322,6 +322,24 @@ def process_cv2_inputs(frames, cfg):
     return inputs
 
 
+def get_layer(model, layer_name):
+    """
+    Return the targeted layer (nn.Module Object) given a hierarchical layer name,
+    separated by /.
+    Args:
+        model (model): model to get layers from.
+        layer_name (str): name of the layer.
+    Returns:
+        prev_module (nn.Module): the layer from the model with `layer_name` name.
+    """
+    layer_ls = layer_name.split("/")
+    prev_module = model
+    for layer in layer_ls:
+        prev_module = prev_module._modules[layer]
+
+    return prev_module
+
+
 class TaskInfo:
     def __init__(self):
         self.frames = None
@@ -355,18 +373,3 @@ class TaskInfo:
         Add the corresponding action predictions.
         """
         self.action_preds = preds
-
-
-def init_task_info(img_height, img_width, crop_size, clip_vis_size):
-    """
-    Initialze global attributes for TaskInfo object.
-    Args:
-        img_height (int): image/video height.
-        img_width (int): image/video width.
-        crop_size (int): crop size for input to the model.
-        clip_vis_size (int): size for scaling the video for visualization.
-    """
-    TaskInfo.img_height = img_height
-    TaskInfo.img_width = img_width
-    TaskInfo.crop_size = crop_size
-    TaskInfo.clip_vis_size = clip_vis_size
