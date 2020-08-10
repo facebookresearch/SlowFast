@@ -651,6 +651,8 @@ _C.DEMO.OUTPUT_FPS = -1
 _C.DEMO.INPUT_FORMAT = "BGR"
 # Draw visualization frames in [keyframe_idx - CLIP_VIS_SIZE, keyframe_idx + CLIP_VIS_SIZE] inclusively.
 _C.DEMO.CLIP_VIS_SIZE = 10
+# Number of processes to run video visualizer.
+_C.DEMO.NUM_VIS_INSTANCES = 2
 
 _C.DEMO.PREDS_BOXES = ""
 # Path to ground-truth boxes and labels (optional)

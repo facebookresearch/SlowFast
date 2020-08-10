@@ -40,7 +40,6 @@ def _create_text_labels(classes, scores, class_names, ground_truth=False):
             "[{:.0f}] {}".format(s * 100, label)
             for s, label in zip(scores, labels)
         ]
-
     return labels
 
 

@@ -10,30 +10,36 @@ from detectron2.engine import DefaultPredictor
 import slowfast.utils.checkpoint as cu
 from slowfast.datasets import cv2_transform
 from slowfast.models import build_model
-from slowfast.utils import logging, misc
+from slowfast.utils import logging
 from slowfast.visualization.utils import process_cv2_inputs
 
 logger = logging.get_logger(__name__)
 
 
-class ActionPredictor:
+class Predictor:
     """
     Action Predictor for action recognition.
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, gpu_id=None):
         """
         Args:
             cfg (CfgNode): configs. Details can be found in
                 slowfast/config/defaults.py
+            gpu_id (Optional[int]): GPU id.
         """
+        if cfg.NUM_GPUS:
+            self.gpu_id = torch.cuda.current_device() if gpu_id is None else gpu_id
+
         # Build the video model and print model statistics.
-        self.model = build_model(cfg)
+        self.model = build_model(cfg, gpu_id=gpu_id)
         self.model.eval()
         self.cfg = cfg
-        logger.info("Start loading model info")
-        misc.log_model_info(self.model, cfg, use_train_input=False)
-        logger.info("Start loading model weights")
+
+        if cfg.DETECTION.ENABLE:
+            self.object_detector = Detectron2Predictor(cfg, gpu_id=self.gpu_id)
+
+        logger.info("Start loading model weights.")
         cu.load_test_checkpoint(cfg, self.model)
         logger.info("Finish loading model weights")
 
@@ -48,6 +54,9 @@ class ActionPredictor:
                 prediction values (a tensor) and the corresponding boxes for
                 action detection task.
         """
+        if self.cfg.DETECTION.ENABLE:
+            task = self.object_detector(task)
+
         frames, bboxes = task.frames, task.bboxes
         if bboxes is not None:
             bboxes = cv2_transform.scale_boxes(
@@ -79,9 +88,13 @@ class ActionPredictor:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
+                    inputs[i] = inputs[i].cuda(
+                        device=torch.device(self.gpu_id), non_blocking=True
+                    )
             else:
-                inputs = inputs.cuda(non_blocking=True)
+                inputs = inputs.cuda(
+                    device=torch.device(self.gpu_id), non_blocking=True
+                )
         if self.cfg.DETECTION.ENABLE and not bboxes.shape[0]:
             preds = torch.tensor([])
         else:
@@ -90,15 +103,40 @@ class ActionPredictor:
         if self.cfg.NUM_GPUS:
             preds = preds.cpu()
             if bboxes is not None:
-                bboxes = bboxes.cpu()
+                bboxes = bboxes.detach().cpu()
 
         preds = preds.detach()
-
         task.add_action_preds(preds)
         if bboxes is not None:
             task.add_bboxes(bboxes[:, 1:])
 
         return task
+
+
+class ActionPredictor:
+    """
+    Synchronous Action Prediction and Visualization pipeline with AsyncVis.
+    """
+    def __init__(self, cfg, async_vis=None, gpu_id=None):
+        """
+        Args:
+            cfg (CfgNode): configs. Details can be found in
+                slowfast/config/defaults.py
+            async_vis (AsyncVis object): asynchronous visualizer.
+            gpu_id (Optional[int]): GPU id.
+        """
+        self.predictor = Predictor(cfg=cfg, gpu_id=gpu_id)
+        self.async_vis = async_vis
+
+    def put(self, task):
+        """
+        Make prediction and put the results in `async_vis` task queue.
+        Args:
+            task (TaskInfo object): task object that contain
+                the necessary information for action prediction. (e.g. frames, boxes)
+        """
+        task = self.predictor(task)
+        self.async_vis.put(task)
 
 
 class Detectron2Predictor:
@@ -107,11 +145,12 @@ class Detectron2Predictor:
     as a ndarray.
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, gpu_id=None):
         """
         Args:
             cfg (CfgNode): configs. Details can be found in
                 slowfast/config/defaults.py
+            gpu_id (Optional[int]): GPU id.
         """
 
         self.cfg = get_cfg()
@@ -121,7 +160,11 @@ class Detectron2Predictor:
         self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = cfg.DEMO.DETECTRON2_THRESH
         self.cfg.MODEL.WEIGHTS = cfg.DEMO.DETECTRON2_WEIGHTS
         self.cfg.INPUT.FORMAT = cfg.DEMO.INPUT_FORMAT
-        self.cfg.MODEL.DEVICE = "cuda:0" if cfg.NUM_GPUS > 0 else "cpu"
+        if cfg.NUM_GPUS and gpu_id is None:
+            gpu_id = torch.cuda.current_device()
+        self.cfg.MODEL.DEVICE = (
+            "cuda:{}".format(gpu_id) if cfg.NUM_GPUS > 0 else "cpu"
+        )
 
         logger.info("Initialized Detectron2 Object Detection Model.")
 
@@ -146,48 +189,3 @@ class Detectron2Predictor:
         task.add_bboxes(pred_boxes)
 
         return task
-
-
-def draw_predictions(task, video_vis):
-    """
-    Draw prediction for the given task.
-    Args:
-        task (TaskInfo object): task object that contain
-            the necessary information for visualization. (e.g. frames, preds)
-            All attributes must lie on CPU devices.
-        video_vis (VideoVisualizer object): the video visualizer object.
-    Returns:
-        frames (list of ndarray): visualized frames in the clip.
-    """
-    boxes = task.bboxes
-    frames = task.frames
-    preds = task.action_preds
-    if boxes is not None:
-        img_width = task.img_width
-        img_height = task.img_height
-        boxes = cv2_transform.revert_scaled_boxes(
-            task.crop_size, boxes, img_height, img_width
-        )
-
-    keyframe_idx = len(frames) // 2 - task.num_buffer_frames
-    draw_range = [
-        keyframe_idx - task.clip_vis_size,
-        keyframe_idx + task.clip_vis_size,
-    ]
-    frames = frames[task.num_buffer_frames :]
-    if boxes is not None:
-        if len(boxes) != 0:
-            frames = video_vis.draw_clip_range(
-                frames,
-                preds,
-                boxes,
-                keyframe_idx=keyframe_idx,
-                draw_range=draw_range,
-            )
-    else:
-        frames = video_vis.draw_clip_range(
-            frames, preds, keyframe_idx=keyframe_idx, draw_range=draw_range
-        )
-    del task
-
-    return frames
