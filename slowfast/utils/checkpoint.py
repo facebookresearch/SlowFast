@@ -387,3 +387,69 @@ def normal_to_sub_bn(checkpoint_sd, model_sd):
                     )
                 )
     return checkpoint_sd
+
+
+def load_test_checkpoint(cfg, model):
+    """
+    Loading checkpoint logic for testing.
+    """
+    # Load a checkpoint to test if applicable.
+    if cfg.TEST.CHECKPOINT_FILE_PATH != "":
+        # If no checkpoint found in MODEL_VIS.CHECKPOINT_FILE_PATH or in the current
+        # checkpoint folder, try to load checkpoint from
+        # TEST.CHECKPOINT_FILE_PATH and test it.
+        load_checkpoint(
+            cfg.TEST.CHECKPOINT_FILE_PATH,
+            model,
+            cfg.NUM_GPUS > 1,
+            None,
+            inflation=False,
+            convert_from_caffe2=cfg.TEST.CHECKPOINT_TYPE == "caffe2",
+        )
+    elif has_checkpoint(cfg.OUTPUT_DIR):
+        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
+        load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1)
+    elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
+        # If no checkpoint found in TEST.CHECKPOINT_FILE_PATH or in the current
+        # checkpoint folder, try to load checkpoint from
+        # TRAIN.CHECKPOINT_FILE_PATH and test it.
+        load_checkpoint(
+            cfg.TRAIN.CHECKPOINT_FILE_PATH,
+            model,
+            cfg.NUM_GPUS > 1,
+            None,
+            inflation=False,
+            convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
+        )
+    else:
+        logger.info(
+            "Unknown way of loading checkpoint. Using with random initialization, only for debugging."
+        )
+
+
+def load_train_checkpoint(cfg, model, optimizer):
+    """
+    Loading checkpoint logic for training.
+    """
+    if cfg.TRAIN.AUTO_RESUME and has_checkpoint(cfg.OUTPUT_DIR):
+        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
+        logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
+        checkpoint_epoch = load_checkpoint(
+            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
+        )
+        start_epoch = checkpoint_epoch + 1
+    elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
+        logger.info("Load from given checkpoint file.")
+        checkpoint_epoch = load_checkpoint(
+            cfg.TRAIN.CHECKPOINT_FILE_PATH,
+            model,
+            cfg.NUM_GPUS > 1,
+            optimizer,
+            inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
+            convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
+        )
+        start_epoch = checkpoint_epoch + 1
+    else:
+        start_epoch = 0
+
+    return start_epoch

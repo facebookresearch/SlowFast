@@ -3,7 +3,6 @@
 
 import math
 import numpy as np
-
 import cv2
 
 
@@ -779,3 +778,20 @@ def color_jitter(image, img_brightness=0, img_contrast=0, img_saturation=0):
             elif jitter[order[idx]] == "saturation":
                 image = saturation(img_saturation, image)
     return image
+
+
+def revert_scaled_boxes(size, boxes, img_height, img_width):
+    """
+    Revert scaled input boxes to match the original image size.
+    Args:
+        size (int): size of the cropped image.
+        boxes (array): shape (num_boxes, 4).
+        img_height (int): height of original image.
+        img_width (int): width of original image.
+    Returns:
+        reverted_boxes (array): boxes scaled back to the original image size.
+    """
+    scaled_aspect = np.min([img_height, img_width])
+    scale_ratio = scaled_aspect / size
+    reverted_boxes = boxes * scale_ratio
+    return reverted_boxes

@@ -92,56 +92,17 @@ def load_boxes_and_labels(cfg, mode):
     ann_is_gt_box = [True] * len(gt_lists) + [False] * len(pred_lists)
 
     detect_thresh = cfg.AVA.DETECTION_SCORE_THRESH
-    all_boxes = {}
-    count = 0
-    unique_box_count = 0
-    for filename, is_gt_box in zip(ann_filenames, ann_is_gt_box):
-        with PathManager.open(filename, "r") as f:
-            for line in f:
-                row = line.strip().split(",")
-                # When we use predicted boxes to train/eval, we need to
-                # ignore the boxes whose scores are below the threshold.
-                if not is_gt_box:
-                    score = float(row[7])
-                    if score < detect_thresh:
-                        continue
-
-                video_name, frame_sec = row[0], int(row[1])
-
-                # Only select frame_sec % 4 = 0 samples for validation if not
-                # set FULL_TEST_ON_VAL.
-                if (
-                    mode == "val"
-                    and not cfg.AVA.FULL_TEST_ON_VAL
-                    and frame_sec % 4 != 0
-                ):
-                    continue
-
-                # Box with format [x1, y1, x2, y2] with a range of [0, 1] as float.
-                box_key = ",".join(row[2:6])
-                box = list(map(float, row[2:6]))
-                label = -1 if row[6] == "" else int(row[6])
-
-                if video_name not in all_boxes:
-                    all_boxes[video_name] = {}
-                    for sec in AVA_VALID_FRAMES:
-                        all_boxes[video_name][sec] = {}
-
-                if box_key not in all_boxes[video_name][frame_sec]:
-                    all_boxes[video_name][frame_sec][box_key] = [box, []]
-                    unique_box_count += 1
-
-                all_boxes[video_name][frame_sec][box_key][1].append(label)
-                if label != -1:
-                    count += 1
-
-    for video_name in all_boxes.keys():
-        for frame_sec in all_boxes[video_name].keys():
-            # Save in format of a list of [box_i, box_i_labels].
-            all_boxes[video_name][frame_sec] = list(
-                all_boxes[video_name][frame_sec].values()
-            )
-
+    # Only select frame_sec % 4 = 0 samples for validation if not
+    # set FULL_TEST_ON_VAL.
+    boxes_sample_rate = (
+        4 if mode == "val" and not cfg.AVA.FULL_TEST_ON_VAL else 1
+    )
+    all_boxes, count, unique_box_count = parse_bboxes_file(
+        ann_filenames=ann_filenames,
+        ann_is_gt_box=ann_is_gt_box,
+        detect_thresh=detect_thresh,
+        boxes_sample_rate=boxes_sample_rate,
+    )
     logger.info(
         "Finished loading annotations from: %s" % ", ".join(ann_filenames)
     )
@@ -215,3 +176,61 @@ def get_num_boxes_used(keyframe_indices, keyframe_boxes_and_labels):
     for video_idx, sec_idx, _, _ in keyframe_indices:
         count += len(keyframe_boxes_and_labels[video_idx][sec_idx])
     return count
+
+
+def parse_bboxes_file(
+    ann_filenames, ann_is_gt_box, detect_thresh, boxes_sample_rate=1
+):
+    """
+    Parse AVA bounding boxes files.
+    Args:
+        ann_filenames (list of str(s)): a list of AVA bounding boxes annotation files.
+        ann_is_gt_box (list of bools): a list of boolean to indicate whether the corresponding
+            ann_file is ground-truth. `ann_is_gt_box[i]` correspond to `ann_filenames[i]`.
+        detect_thresh (float): threshold for accepting predicted boxes, range [0, 1].
+        boxes_sample_rate (int): sample rate for test bounding boxes. Get 1 every `boxes_sample_rate`.
+    """
+    all_boxes = {}
+    count = 0
+    unique_box_count = 0
+    for filename, is_gt_box in zip(ann_filenames, ann_is_gt_box):
+        with PathManager.open(filename, "r") as f:
+            for line in f:
+                row = line.strip().split(",")
+                # When we use predicted boxes to train/eval, we need to
+                # ignore the boxes whose scores are below the threshold.
+                if not is_gt_box:
+                    score = float(row[7])
+                    if score < detect_thresh:
+                        continue
+
+                video_name, frame_sec = row[0], int(row[1])
+                if frame_sec % boxes_sample_rate != 0:
+                    continue
+
+                # Box with format [x1, y1, x2, y2] with a range of [0, 1] as float.
+                box_key = ",".join(row[2:6])
+                box = list(map(float, row[2:6]))
+                label = -1 if row[6] == "" else int(row[6])
+
+                if video_name not in all_boxes:
+                    all_boxes[video_name] = {}
+                    for sec in AVA_VALID_FRAMES:
+                        all_boxes[video_name][sec] = {}
+
+                if box_key not in all_boxes[video_name][frame_sec]:
+                    all_boxes[video_name][frame_sec][box_key] = [box, []]
+                    unique_box_count += 1
+
+                all_boxes[video_name][frame_sec][box_key][1].append(label)
+                if label != -1:
+                    count += 1
+
+    for video_name in all_boxes.keys():
+        for frame_sec in all_boxes[video_name].keys():
+            # Save in format of a list of [box_i, box_i_labels].
+            all_boxes[video_name][frame_sec] = list(
+                all_boxes[video_name][frame_sec].values()
+            )
+
+    return all_boxes, count, unique_box_count

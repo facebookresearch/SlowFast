@@ -15,6 +15,7 @@ import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
+import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
@@ -43,19 +44,20 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
 
     for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
-        if isinstance(inputs, (list,)):
-            for i in range(len(inputs)):
-                inputs[i] = inputs[i].cuda(non_blocking=True)
-        else:
-            inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
+        if cfg.NUM_GPUS:
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                meta[key] = val.cuda(non_blocking=True)
-        
+                inputs = inputs.cuda(non_blocking=True)
+            labels = labels.cuda()
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
+                    
         # Optionally shuffle misaligned audio data
         inputs = loader.shuffle_misaligned_audio(cur_epoch, inputs, cfg)
 
@@ -136,7 +138,14 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
             train_meter.iter_toc()
             # Update and log stats.
             train_meter.update_stats(
-                top1_err, top5_err, loss, lr, inputs[0].size(0) * cfg.NUM_GPUS
+                top1_err,
+                top5_err,
+                loss,
+                lr,
+                inputs[0].size(0)
+                * max(
+                    cfg.NUM_GPUS, 1
+                ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
             )
 
         train_meter.log_iter_stats(cur_epoch, cur_iter)
@@ -165,27 +174,31 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
     val_meter.iter_tic()
 
     for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
-        # Transferthe data to the current GPU device.
-        if isinstance(inputs, (list,)):
-            for i in range(len(inputs)):
-                inputs[i] = inputs[i].cuda(non_blocking=True)
-        else:
-            inputs = inputs.cuda(non_blocking=True)
-        labels = labels.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
+        if cfg.NUM_GPUS:
+            # Transferthe data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                meta[key] = val.cuda(non_blocking=True)
+                inputs = inputs.cuda(non_blocking=True)
+            labels = labels.cuda()
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
             preds = model(inputs, meta["boxes"])
+            ori_boxes = meta["ori_boxes"]
+            metadata = meta["metadata"]
 
-            preds = preds.cpu()
-            ori_boxes = meta["ori_boxes"].cpu()
-            metadata = meta["metadata"].cpu()
+            if cfg.NUM_GPUS:
+                preds = preds.cpu()
+                ori_boxes = ori_boxes.cpu()
+                metadata = metadata.cpu()
 
             if cfg.NUM_GPUS > 1:
                 preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
@@ -194,7 +207,8 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
             val_meter.iter_toc()
             # Update and log stats.
-            val_meter.update_stats(preds.cpu(), ori_boxes.cpu(), metadata.cpu())
+            val_meter.update_stats(preds, ori_boxes, metadata)
+
         else:
             preds = model(inputs)
 
@@ -219,7 +233,12 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
                 val_meter.iter_toc()
                 # Update and log stats.
                 val_meter.update_stats(
-                    top1_err, top5_err, inputs[0].size(0) * cfg.NUM_GPUS
+                    top1_err,
+                    top5_err,
+                    inputs[0].size(0)
+                    * max(
+                        cfg.NUM_GPUS, 1
+                    ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
                 )
 
         val_meter.log_iter_stats(cur_epoch, cur_iter)
@@ -227,25 +246,46 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
+
+    # write to tensorboard format if available.
+    if writer is not None:
+        if cfg.DETECTION.ENABLE:
+            writer.add_scalars(
+                {"Val/mAP": val_meter.full_map}, global_step=cur_epoch
+            )
+        else:
+            all_preds = [pred.clone().detach() for pred in val_meter.all_preds]
+            all_labels = [
+                label.clone().detach() for label in val_meter.all_labels
+            ]
+            if cfg.NUM_GPUS:
+                all_preds = [pred.cpu() for pred in all_preds]
+                all_labels = [label.cpu() for label in all_labels]
+            writer.plot_eval(
+                preds=all_preds, labels=all_labels, global_step=cur_epoch
+            )
+
     val_meter.reset()
 
 
-def calculate_and_update_precise_bn(loader, model, num_iters=200):
+def calculate_and_update_precise_bn(loader, model, num_iters=200, use_gpu=True):
     """
     Update the stats in bn layers by calculate the precise stats.
     Args:
         loader (loader): data loader to provide training data.
         model (model): model to update the bn stats.
         num_iters (int): number of iterations to compute and update the bn stats.
+        use_gpu (bool): whether to use GPU or not.
     """
 
     def _gen_loader():
         for inputs, _, _, _ in loader:
-            if isinstance(inputs, (list,)):
-                for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
-            else:
-                inputs = inputs.cuda(non_blocking=True)
+            if use_gpu:
+                if isinstance(inputs, (list,)):
+                    for i in range(len(inputs)):
+                        inputs[i] = inputs[i].cuda(non_blocking=True)
+                else:
+                    inputs = inputs.cuda(non_blocking=True)
             yield inputs
 
     # Update the bn stats.
@@ -272,7 +312,7 @@ def build_trainer(cfg):
     # Build the video model and print model statistics.
     model = build_model(cfg)
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, is_train=True)
+        misc.log_model_info(model, cfg, use_train_input=True)
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
@@ -328,32 +368,13 @@ def train(cfg):
     # Build the video model and print model statistics.
     model = build_model(cfg)
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, is_train=True)
+        misc.log_model_info(model, cfg, use_train_input=True)
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
 
     # Load a checkpoint to resume training if applicable.
-    if cfg.TRAIN.AUTO_RESUME and cu.has_checkpoint(cfg.OUTPUT_DIR):
-        last_checkpoint = cu.get_last_checkpoint(cfg.OUTPUT_DIR)
-        logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
-        checkpoint_epoch = cu.load_checkpoint(
-            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
-        )
-        start_epoch = checkpoint_epoch + 1
-    elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
-        logger.info("Load from given checkpoint file.")
-        checkpoint_epoch = cu.load_checkpoint(
-            cfg.TRAIN.CHECKPOINT_FILE_PATH,
-            model,
-            cfg.NUM_GPUS > 1,
-            optimizer,
-            inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
-            convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
-        )
-        start_epoch = checkpoint_epoch + 1
-    else:
-        start_epoch = 0
+    start_epoch = cu.load_train_checkpoint(cfg, model, optimizer)
 
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
@@ -409,6 +430,7 @@ def train(cfg):
                 precise_bn_loader,
                 model,
                 min(cfg.BN.NUM_BATCHES_PRECISE, len(precise_bn_loader)),
+                cfg.NUM_GPUS > 0,
             )
         _ = misc.aggregate_sub_bn_stats(model)
 

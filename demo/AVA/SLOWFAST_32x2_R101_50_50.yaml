@@ -5,10 +5,10 @@ TRAIN:
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  # CHECKPOINT_FILE_PATH: path to pretrain model
-  CHECKPOINT_TYPE: caffe2
+  CHECKPOINT_FILE_PATH: ./SLOWFAST_32x2_R101_50_50.pkl  #path to pretrain model
+  CHECKPOINT_TYPE: pytorch
 DATA:
-  NUM_FRAMES: 64
+  NUM_FRAMES: 32
   SAMPLING_RATE: 2
   TRAIN_JITTER_SCALES: [256, 320]
   TRAIN_CROP_SIZE: 224
@@ -56,13 +56,23 @@ MODEL:
   DROPOUT_RATE: 0.5
   HEAD_ACT: sigmoid
 TEST:
-  ENABLE: True
+  ENABLE: False
   DATASET: ava
   BATCH_SIZE: 8
 DATA_LOADER:
-  NUM_WORKERS: 0
+  NUM_WORKERS: 2
   PIN_MEMORY: True
-NUM_GPUS: 8
+
+NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
+TENSORBOARD:
+  MODEL_VIS:
+    TOPK: 2
+DEMO:
+  ENABLE: True
+  LABEL_FILE_PATH:  # Add local label file path here.
+  WEBCAM: 0
+  DETECTRON2_CFG: "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+  DETECTRON2_WEIGHTS: detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl
