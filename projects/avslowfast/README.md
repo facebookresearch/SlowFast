@@ -25,3 +25,13 @@ python tools/run_net.py \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
 ```
+
+## Citing AVSlowFast
+Please cite AVSlowFast if you use it in your research, you can use the following BibTeX entry.
+```BibTeX
+@article{xiao-avslowfast2020,
+  author    = {Xiao, Fanyi and Lee, Yong Jae and Grauman, Kristen and Malik, Jitendra and Feichtenhofer, Christoph},
+  title     = {{Audiovisual SlowFast Networks for Video Recognition}},
+  journal   = {arXiv preprint arXiv:2001.08740},
+  Year      = {2020}}
+```
