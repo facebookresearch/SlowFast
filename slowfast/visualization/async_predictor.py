@@ -4,6 +4,7 @@
 import atexit
 import numpy as np
 import torch
+import queue
 import torch.multiprocessing as mp
 
 import slowfast.utils.logging as logging
@@ -77,6 +78,9 @@ class AsycnActionPredictor:
     def put(self, task):
         """
         Add the new task to task queue.
+        Args:
+            task (TaskInfo object): task object that contain
+                the necessary information for action prediction. (e.g. frames)
         """
         self.put_idx += 1
         self.task_queue.put(task)
@@ -144,8 +148,8 @@ class AsyncVis:
                     break
 
                 frames = draw_predictions(task, self.video_vis)
-                frames = np.array(frames)
-                self.result_queue.put((task.id, frames))
+                task.frames = np.array(frames)
+                self.result_queue.put(task)
 
     def __init__(self, video_vis, n_workers=None):
         """
@@ -160,8 +164,7 @@ class AsyncVis:
 
         self.task_queue = mp.Queue()
         self.result_queue = mp.Queue()
-
-        self.get_idx = -1
+        self.get_indices_ls = []
         self.procs = []
         self.result_data = {}
         self.put_id = -1
@@ -180,6 +183,9 @@ class AsyncVis:
     def put(self, task):
         """
         Add the new task to task queue.
+        Args:
+            task (TaskInfo object): task object that contain
+                the necessary information for action prediction. (e.g. frames, boxes, predictions)
         """
         self.put_id += 1
         self.task_queue.put(task)
@@ -189,16 +195,18 @@ class AsyncVis:
         Return visualized frames/clips in the correct order based on task id if
         result(s) is available. Otherwise, raise queue.Empty exception.
         """
-        if self.result_data.get(self.get_idx + 1) is not None:
-            self.get_idx += 1
-            res = self.result_data[self.get_idx]
-            del self.result_data[self.get_idx]
+        get_idx = self.get_indices_ls[0]
+        if self.result_data.get(get_idx) is not None:
+            res = self.result_data[get_idx]
+            del self.result_data[get_idx]
+            del self.get_indices_ls[0]
             return res
 
         while True:
-            idx, res = self.result_queue.get(block=False)
-            if idx == self.get_idx + 1:
-                self.get_idx += 1
+            res = self.result_queue.get(block=False)
+            idx = res.id
+            if idx == get_idx:
+                del self.get_indices_ls[0]
                 return res
             self.result_data[idx] = res
 
@@ -224,6 +232,42 @@ class AsyncVis:
 
 class _StopToken:
     pass
+
+
+class AsyncDemo:
+    """
+    Asynchronous Action Prediction and Visualization pipeline with AsyncVis.
+    """
+    def __init__(self, cfg, async_vis):
+        """
+        Args:
+            cfg (CfgNode): configs. Details can be found in
+                slowfast/config/defaults.py
+            async_vis (AsyncVis object): asynchronous visualizer.
+        """
+        self.model = AsycnActionPredictor(cfg=cfg, result_queue=async_vis.task_queue)
+        self.async_vis = async_vis
+
+    def put(self, task):
+        """
+        Put task into task queue for prediction and visualization.
+        Args:
+            task (TaskInfo object): task object that contain
+                the necessary information for action prediction. (e.g. frames)
+        """
+        self.async_vis.get_indices_ls.append(task.id)
+        self.model.put(task)
+
+    def get(self):
+        """
+        Get the visualized clips if any.
+        """
+        try:
+            task = self.async_vis.get()
+        except (queue.Empty, IndexError):
+            raise IndexError("Results are not available yet.")
+
+        return task
 
 
 def draw_predictions(task, video_vis):
@@ -252,6 +296,7 @@ def draw_predictions(task, video_vis):
         keyframe_idx - task.clip_vis_size,
         keyframe_idx + task.clip_vis_size,
     ]
+    buffer = frames[: task.num_buffer_frames]
     frames = frames[task.num_buffer_frames :]
     if boxes is not None:
         if len(boxes) != 0:
@@ -268,4 +313,4 @@ def draw_predictions(task, video_vis):
         )
     del task
 
-    return frames
+    return buffer + frames

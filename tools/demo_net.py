@@ -2,22 +2,19 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import numpy as np
-import queue
-import cv2
+import time
 import torch
 import tqdm
 
 from slowfast.utils import logging
 from slowfast.visualization.async_predictor import (
-    AsycnActionPredictor,
+    AsyncDemo,
     AsyncVis,
 )
-from slowfast.visualization.ava_demo_precomputed_boxes import (
-    AVAVisualizerWithPrecomputedBox,
-)
-from slowfast.visualization.demo_loader import VideoReader
+from slowfast.visualization.ava_demo_precomputed_boxes import AVAVisualizerWithPrecomputedBox
 from slowfast.visualization.predictor import ActionPredictor
 from slowfast.visualization.video_visualizer import VideoVisualizer
+from slowfast.visualization.demo_loader import ThreadVideoReader, VideoReader
 
 logger = logging.get_logger(__name__)
 
@@ -40,7 +37,6 @@ def run_demo(cfg, frame_provider):
     # Print config.
     logger.info("Run demo with config:")
     logger.info(cfg)
-
     common_classes = (
         cfg.DEMO.COMMON_CLASS_NAMES
         if len(cfg.DEMO.LABEL_FILE_PATH) != 0
@@ -63,7 +59,7 @@ def run_demo(cfg, frame_provider):
     if cfg.NUM_GPUS <= 1:
         model = ActionPredictor(cfg=cfg, async_vis=async_vis)
     else:
-        model = AsycnActionPredictor(cfg, async_vis.task_queue)
+        model = AsyncDemo(cfg=cfg, async_vis=async_vis)
 
     seq_len = cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE
 
@@ -71,35 +67,31 @@ def run_demo(cfg, frame_provider):
         cfg.DEMO.BUFFER_SIZE <= seq_len // 2
     ), "Buffer size cannot be greater than half of sequence length."
     num_task = 0
+    # Start reading frames.
+    frame_provider.start()
     for able_to_read, task in frame_provider:
         if not able_to_read:
             break
+        if task is None:
+            time.sleep(0.02)
+            continue
         num_task += 1
 
         model.put(task)
-
         try:
-            frames = async_vis.get()
+            task = model.get()
             num_task -= 1
-            yield frames
-        except queue.Empty:
+            yield task
+        except IndexError:
             continue
-        # hit Esc to quit the demo.
-        key = cv2.waitKey(1)
-        if key == 27:
-            break
 
     while num_task != 0:
         try:
-            frames = async_vis.get()
+            task = model.get()
             num_task -= 1
-            yield frames
-        except queue.Empty:
+            yield task
+        except IndexError:
             continue
-        # hit Esc to quit the demo.
-        key = cv2.waitKey(1)
-        if key == 27:
-            break
 
 
 def demo(cfg):
@@ -115,8 +107,15 @@ def demo(cfg):
         precomputed_box_vis()
     else:
         frame_provider = VideoReader(cfg)
+        start = time.time()
+        if cfg.DEMO.THREAD_ENABLE:
+            frame_provider = ThreadVideoReader(cfg)
+        else:
+            frame_provider = VideoReader(cfg)
 
-        for frames in tqdm.tqdm(run_demo(cfg, frame_provider)):
-            for frame in frames:
-                frame_provider.display(frame)
+        for task in tqdm.tqdm(run_demo(cfg, frame_provider)):
+            frame_provider.display(task)
+
+        frame_provider.join()
         frame_provider.clean()
+        logger.info("Finish demo in: {}".format(time.time() - start))

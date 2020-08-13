@@ -665,7 +665,10 @@ _C.DEMO.CLIP_VIS_SIZE = 10
 # Number of processes to run video visualizer.
 _C.DEMO.NUM_VIS_INSTANCES = 2
 
+# Path to pre-computed predicted boxes
 _C.DEMO.PREDS_BOXES = ""
+# Whether to run in realtime mode. This will drop some clips in exchange for performance.
+_C.DEMO.THREAD_ENABLE = False
 # Path to ground-truth boxes and labels (optional)
 _C.DEMO.GT_BOXES = ""
 # The starting second of the video w.r.t bounding boxes file.
