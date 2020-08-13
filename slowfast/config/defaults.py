@@ -667,8 +667,13 @@ _C.DEMO.NUM_VIS_INSTANCES = 2
 
 # Path to pre-computed predicted boxes
 _C.DEMO.PREDS_BOXES = ""
-# Whether to run in realtime mode. This will drop some clips in exchange for performance.
+# Whether to run in with multi-threaded video reader.
 _C.DEMO.THREAD_ENABLE = False
+# Take one clip for every `DEMO.NUM_CLIPS_SKIP` + 1 for prediction and visualization.
+# This is used for fast demo speed by reducing the prediction/visualiztion frequency.
+# If -1, take the most recent read clip for visualization. This mode is only supported
+# if `DEMO.THREAD_ENABLE` is set to True.
+_C.DEMO.NUM_CLIPS_SKIP = 0
 # Path to ground-truth boxes and labels (optional)
 _C.DEMO.GT_BOXES = ""
 # The starting second of the video w.r.t bounding boxes file.

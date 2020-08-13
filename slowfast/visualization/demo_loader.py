@@ -3,6 +3,7 @@
 
 import atexit
 import copy
+import queue
 import threading
 import time
 import cv2
@@ -13,9 +14,9 @@ from slowfast.visualization.utils import TaskInfo
 logger = logging.get_logger(__name__)
 
 
-class VideoReader:
+class VideoManager:
     """
-    VideoReader object for getting frames from video source for inference.
+    VideoManager object for getting frames from video source for inference.
     """
 
     def __init__(self, cfg):
@@ -142,9 +143,9 @@ class VideoReader:
         pass
 
 
-class ThreadVideoReader:
+class ThreadVideoManager:
     """
-    VideoReader object for getting frames from video source for inference
+    VideoManager object for getting frames from video source for inference
     using multithreading for read and write frames.
     """
 
@@ -186,6 +187,7 @@ class ThreadVideoReader:
             self.output_file = self.get_output_file(
                 cfg.DEMO.OUTPUT_FILE, fps=output_fps
             )
+        self.num_skip = cfg.DEMO.NUM_CLIPS_SKIP + 1
         self.get_id = -1
         self.put_id = -1
         self.buffer = []
@@ -194,9 +196,11 @@ class ThreadVideoReader:
         self.test_crop_size = cfg.DATA.TEST_CROP_SIZE
         self.clip_vis_size = cfg.DEMO.CLIP_VIS_SIZE
 
-        self.task_queue = {}
+        self.read_queue = queue.Queue()
+        self.write_queue = {}
         self.not_end = True
-        self.taskqueue_lock = threading.Lock()
+        self.write_lock = threading.Lock()
+        self.put_id_lock = threading.Lock()
         self.input_lock = threading.Lock()
         self.output_lock = threading.Lock()
         self.stopped = False
@@ -248,63 +252,72 @@ class ThreadVideoReader:
             task.num_buffer_frames = (
                 0 if self.put_id == -1 else self.buffer_size
             )
-            self.taskqueue_lock.acquire()
-            self.put_id += 1
-            self.not_end = was_read
-            self.task_queue[self.put_id] = (was_read, task)
-            self.taskqueue_lock.release()
+            with self.put_id_lock:
+                self.put_id += 1
+                self.not_end = was_read
+            # If mode is to read the most recent clip or we reach task
+            # index that is not supposed to be skipped.
+            if self.num_skip == 0 or self.put_id % self.num_skip == 0:
+                self.read_queue.put((was_read, copy.deepcopy(task)))
+            else:
+                with self.write_lock:
+                    self.write_queue[task.id] = (was_read, copy.deepcopy(task))
 
     def __next__(self):
-        self.taskqueue_lock.acquire()
         # If there is nothing in the task queue.
-        if len(self.task_queue) == 0:
-            self.taskqueue_lock.release()
+        if self.read_queue.qsize() == 0:
             return self.not_end, None
         else:
-            # If we have already consume the latest task.
-            if self.task_queue.get(self.put_id) is None:
-                self.taskqueue_lock.release()
-                time.sleep(0.02)
-                return self.not_end, None
-            was_read, task = self.task_queue[self.put_id]
+            with self.put_id_lock:
+                put_id = self.put_id
+            was_read, task = None, None
+            # If mode is to predict most recent read clip.
+            if self.num_skip == 0:
+                # Write all previous clips to write queue.
+                with self.write_lock:
+                    while True:
+                        was_read, task = self.read_queue.get()
+                        if task.id == put_id:
+                            break
+                        self.write_queue[task.id] = (was_read, task)
+            else:
+                was_read, task = self.read_queue.get()
             # If we reach the end of the video.
             if not was_read:
-                self.taskqueue_lock.release()
-                return was_read, None
-
-            task = copy.deepcopy(task)
-            del self.task_queue[self.put_id]
-            self.taskqueue_lock.release()
+                # Put to write queue.
+                with self.write_lock:
+                    self.write_queue[put_id] = was_read, copy.deepcopy(task)
+                task = None
             return was_read, task
 
     def get_fn(self):
         while not self.stopped:
-            self.taskqueue_lock.acquire()
-            # If video ended and we have display all frames.
-            if not self.not_end and self.get_id == self.put_id:
-                self.taskqueue_lock.release()
-                break
-            # If the next frames are not available, wait.
-            if (
-                len(self.task_queue) == 0
-                or self.task_queue.get(self.get_id + 1) is None
-            ):
-                self.taskqueue_lock.release()
-                time.sleep(0.02)
-                continue
-            else:
-                self.get_id += 1
-                was_read, task = self.task_queue[self.get_id]
-                task = copy.deepcopy(task)
-                del self.task_queue[self.get_id]
-                self.taskqueue_lock.release()
-                self.output_lock.acquire()
+            with self.put_id_lock:
+                put_id = self.put_id
+                not_end = self.not_end
+
+            with self.write_lock:
+                # If video ended and we have display all frames.
+                if not not_end and self.get_id == put_id:
+                    break
+                # If the next frames are not available, wait.
+                if (
+                    len(self.write_queue) == 0
+                    or self.write_queue.get(self.get_id + 1) is None
+                ):
+                    time.sleep(0.02)
+                    continue
+                else:
+                    self.get_id += 1
+                    was_read, task = self.write_queue[self.get_id]
+                    del self.write_queue[self.get_id]
+
+            with self.output_lock:
                 for frame in task.frames[task.num_buffer_frames :]:
                     if self.output_file is None:
                         cv2.imshow("SlowFast", frame)
                     else:
                         self.output_file.write(frame)
-                self.output_lock.release()
 
     def display(self, task):
         """
@@ -313,7 +326,8 @@ class ThreadVideoReader:
             task (TaskInfo object): task object that contain
                 the necessary information for prediction visualization. (e.g. visualized frames.)
         """
-        self.task_queue[task.id] = (True, task)
+        with self.write_lock:
+            self.write_queue[task.id] = (True, task)
 
     def start(self):
         """

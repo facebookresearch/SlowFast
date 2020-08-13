@@ -3,8 +3,8 @@
 
 import atexit
 import numpy as np
-import torch
 import queue
+import torch
 import torch.multiprocessing as mp
 
 import slowfast.utils.logging as logging
@@ -238,6 +238,7 @@ class AsyncDemo:
     """
     Asynchronous Action Prediction and Visualization pipeline with AsyncVis.
     """
+
     def __init__(self, cfg, async_vis):
         """
         Args:
@@ -245,7 +246,9 @@ class AsyncDemo:
                 slowfast/config/defaults.py
             async_vis (AsyncVis object): asynchronous visualizer.
         """
-        self.model = AsycnActionPredictor(cfg=cfg, result_queue=async_vis.task_queue)
+        self.model = AsycnActionPredictor(
+            cfg=cfg, result_queue=async_vis.task_queue
+        )
         self.async_vis = async_vis
 
     def put(self, task):

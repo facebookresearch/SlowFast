@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+import queue
 import cv2
 import torch
-import queue
 from detectron2 import model_zoo
 from detectron2.config import get_cfg
 from detectron2.engine import DefaultPredictor
@@ -30,7 +30,9 @@ class Predictor:
             gpu_id (Optional[int]): GPU id.
         """
         if cfg.NUM_GPUS:
-            self.gpu_id = torch.cuda.current_device() if gpu_id is None else gpu_id
+            self.gpu_id = (
+                torch.cuda.current_device() if gpu_id is None else gpu_id
+            )
 
         # Build the video model and print model statistics.
         self.model = build_model(cfg, gpu_id=gpu_id)
@@ -118,6 +120,7 @@ class ActionPredictor:
     """
     Synchronous Action Prediction and Visualization pipeline with AsyncVis.
     """
+
     def __init__(self, cfg, async_vis=None, gpu_id=None):
         """
         Args:

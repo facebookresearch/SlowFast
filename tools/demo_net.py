@@ -7,14 +7,13 @@ import torch
 import tqdm
 
 from slowfast.utils import logging
-from slowfast.visualization.async_predictor import (
-    AsyncDemo,
-    AsyncVis,
+from slowfast.visualization.async_predictor import AsyncDemo, AsyncVis
+from slowfast.visualization.ava_demo_precomputed_boxes import (
+    AVAVisualizerWithPrecomputedBox,
 )
-from slowfast.visualization.ava_demo_precomputed_boxes import AVAVisualizerWithPrecomputedBox
+from slowfast.visualization.demo_loader import ThreadVideoManager, VideoManager
 from slowfast.visualization.predictor import ActionPredictor
 from slowfast.visualization.video_visualizer import VideoVisualizer
-from slowfast.visualization.demo_loader import ThreadVideoReader, VideoReader
 
 logger = logging.get_logger(__name__)
 
@@ -106,12 +105,11 @@ def demo(cfg):
         precomputed_box_vis = AVAVisualizerWithPrecomputedBox(cfg)
         precomputed_box_vis()
     else:
-        frame_provider = VideoReader(cfg)
         start = time.time()
         if cfg.DEMO.THREAD_ENABLE:
-            frame_provider = ThreadVideoReader(cfg)
+            frame_provider = ThreadVideoManager(cfg)
         else:
-            frame_provider = VideoReader(cfg)
+            frame_provider = VideoManager(cfg)
 
         for task in tqdm.tqdm(run_demo(cfg, frame_provider)):
             frame_provider.display(task)
