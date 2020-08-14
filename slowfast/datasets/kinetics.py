@@ -72,6 +72,7 @@ class Kinetics(torch.utils.data.Dataset):
 
         logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
+        
 
     def _construct_loader(self):
         """
@@ -204,7 +205,7 @@ class Kinetics(torch.utils.data.Dataset):
                 continue
 
             # Decode video. Meta info is used to perform selective decoding.
-            frames = decoder.decode(
+            frames, audio_frames, misaligned_audio_frames = decoder.decode(
                 video_container,
                 sampling_rate,
                 self.cfg.DATA.NUM_FRAMES,
@@ -214,11 +215,27 @@ class Kinetics(torch.utils.data.Dataset):
                 target_fps=self.cfg.DATA.TARGET_FPS,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 max_spatial_scale=max_scale,
+                # audio-related configs
+                decode_audio=self.cfg.DATA.USE_AUDIO,
+                get_misaligned_audio=self.cfg.DATA.GET_MISALIGNED_AUDIO,
+                extract_logmel=self.cfg.DATA.USE_AUDIO, 
+                au_sr=self.cfg.DATA.AUDIO_SAMPLE_RATE,
+                au_win_sz=self.cfg.DATA.AUDIO_WIN_SZ,
+                au_step_sz=self.cfg.DATA.AUDIO_STEP_SZ, 
+                num_audio_frames=self.cfg.DATA.AUDIO_FRAME_NUM,
+                au_n_mels=self.cfg.DATA.AUDIO_MEL_NUM,
+                au_misaligned_gap=self.cfg.DATA.AUDIO_MISALIGNED_GAP,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
             # select another video.
             if frames is None:
+                index = random.randint(0, len(self._path_to_videos) - 1)
+                continue
+            
+            # If audio sampling is turned on but no audio is available,
+            # we discard this sample and continue.
+            if self.cfg.DATA.USE_AUDIO and audio_frames is None:
                 index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
 
@@ -238,9 +255,30 @@ class Kinetics(torch.utils.data.Dataset):
                 random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
                 inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
             )
+            
+            # The default order is RGB, this is to convert it 
+            # to BGR if needed.
+            if self.cfg.DATA.USE_BGR_ORDER:
+                frames = frames[[2, 1, 0], ...]
+            
+            # Optionally normalize audio inputs (log-mel-spectrogram)
+            if self.cfg.DATA.USE_AUDIO:
+                audio_frames = utils.tensor_normalize(
+                    audio_frames, 
+                    self.cfg.DATA.LOGMEL_MEAN, 
+                    self.cfg.DATA.LOGMEL_STD
+                )
+                if self.cfg.DATA.GET_MISALIGNED_AUDIO:
+                    misaligned_audio_frames = utils.tensor_normalize(
+                        misaligned_audio_frames, 
+                        self.cfg.DATA.LOGMEL_MEAN, 
+                        self.cfg.DATA.LOGMEL_STD
+                    )
+                    audio_frames = torch.cat([audio_frames, \
+                                    misaligned_audio_frames], dim=0)
 
             label = self._labels[index]
-            frames = utils.pack_pathway_output(self.cfg, frames)
+            frames = utils.pack_pathway_output(self.cfg, frames, audio_frames)
             return frames, label, index, {}
         else:
             raise RuntimeError(

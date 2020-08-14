@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Train a video classification model."""
+
 import numpy as np
 import pprint
 import torch
@@ -23,9 +24,7 @@ from slowfast.utils.multigrid import MultigridSchedule
 logger = logging.get_logger(__name__)
 
 
-def train_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None
-):
+def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg):
     """
     Perform the video training for one epoch.
     Args:
@@ -37,8 +36,6 @@ def train_epoch(
         cur_epoch (int): current epoch of training.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        writer (TensorboardWriter, optional): TensorboardWriter object
-            to writer Tensorboard log.
     """
     # Enable train mode.
     model.train()
@@ -60,10 +57,16 @@ def train_epoch(
                         val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
+                    
+        # Optionally shuffle misaligned audio data
+        inputs = loader.shuffle_misaligned_audio(cur_epoch, inputs, cfg)
 
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
         optim.set_lr(optimizer, lr)
+        
+        # Auxilliary losses.
+        aux_loss = {}
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
@@ -72,11 +75,21 @@ def train_epoch(
         else:
             # Perform the forward pass.
             preds = model(inputs)
+        
+        # Fetch actual preds.
+        if type(preds) == type(()):
+            preds, avs_loss = preds
+            aux_loss.update(avs_loss)
+        
         # Explicitly declare reduction to mean.
         loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
 
         # Compute the loss.
         loss = loss_fun(preds, labels)
+        
+        # Accumulate auxilliary losses.
+        if len(aux_loss) > 0:
+            loss = loss + sum(aux_loss.values())
 
         # check Nan Loss.
         misc.check_nan_losses(loss)
@@ -95,13 +108,6 @@ def train_epoch(
             train_meter.iter_toc()
             # Update and log stats.
             train_meter.update_stats(None, None, None, loss, lr)
-            # write to tensorboard format if available.
-            if writer is not None:
-                writer.add_scalars(
-                    {"Train/loss": loss, "Train/lr": lr},
-                    global_step=data_size * cur_epoch + cur_iter,
-                )
-
         else:
             top1_err, top5_err = None, None
             if cfg.DATA.MULTI_LABEL:
@@ -141,17 +147,6 @@ def train_epoch(
                     cfg.NUM_GPUS, 1
                 ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
             )
-            # write to tensorboard format if available.
-            if writer is not None:
-                writer.add_scalars(
-                    {
-                        "Train/loss": loss,
-                        "Train/lr": lr,
-                        "Train/Top1_err": top1_err,
-                        "Train/Top5_err": top5_err,
-                    },
-                    global_step=data_size * cur_epoch + cur_iter,
-                )
 
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         train_meter.iter_tic()
@@ -162,7 +157,7 @@ def train_epoch(
 
 
 @torch.no_grad()
-def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
+def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
     """
     Evaluate the model on the val set.
     Args:
@@ -172,8 +167,6 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
         cur_epoch (int): number of the current epoch of training.
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
-        writer (TensorboardWriter, optional): TensorboardWriter object
-            to writer Tensorboard log.
     """
 
     # Evaluation mode enabled. The running stats would not be updated.
@@ -222,6 +215,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
             if cfg.DATA.MULTI_LABEL:
                 if cfg.NUM_GPUS > 1:
                     preds, labels = du.all_gather([preds, labels])
+                val_meter.update_predictions(preds, labels)
             else:
                 # Compute the errors.
                 num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
@@ -246,20 +240,13 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                         cfg.NUM_GPUS, 1
                     ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
                 )
-                # write to tensorboard format if available.
-                if writer is not None:
-                    writer.add_scalars(
-                        {"Val/Top1_err": top1_err, "Val/Top5_err": top5_err},
-                        global_step=len(val_loader) * cur_epoch + cur_iter,
-                    )
-
-            val_meter.update_predictions(preds, labels)
 
         val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
 
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
+
     # write to tensorboard format if available.
     if writer is not None:
         if cfg.DETECTION.ENABLE:
@@ -404,14 +391,6 @@ def train(cfg):
         train_meter = TrainMeter(len(train_loader), cfg)
         val_meter = ValMeter(len(val_loader), cfg)
 
-    # set up writer for logging to Tensorboard format.
-    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-        cfg.NUM_GPUS * cfg.NUM_SHARDS
-    ):
-        writer = tb.TensorboardWriter(cfg)
-    else:
-        writer = None
-
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
@@ -443,9 +422,7 @@ def train(cfg):
         # Shuffle the dataset.
         loader.shuffle_dataset(train_loader, cur_epoch)
         # Train for one epoch.
-        train_epoch(
-            train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
-        )
+        train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg)
 
         # Compute precise BN stats.
         if cfg.BN.USE_PRECISE_STATS and len(get_bn_modules(model)) > 0:
@@ -466,7 +443,4 @@ def train(cfg):
         if misc.is_eval_epoch(
             cfg, cur_epoch, None if multigrid is None else multigrid.schedule
         ):
-            eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer)
-
-    if writer is not None:
-        writer.close()
+            eval_epoch(val_loader, model, val_meter, cur_epoch, cfg)

@@ -2,6 +2,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Wrapper to train and test a video classification model."""
+import torch
+
 from slowfast.utils.misc import launch_job
 from slowfast.utils.parser import load_config, parse_args
 
@@ -35,5 +37,6 @@ def main():
         demo(cfg)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
+    # torch.multiprocessing.set_start_method("forkserver")
     main()

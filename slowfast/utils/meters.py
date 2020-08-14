@@ -9,7 +9,6 @@ import os
 from collections import defaultdict, deque
 import torch
 from fvcore.common.timer import Timer
-from sklearn.metrics import average_precision_score
 
 import slowfast.datasets.ava_helper as ava_helper
 import slowfast.utils.logging as logging
@@ -21,6 +20,8 @@ from slowfast.utils.ava_eval_helper import (
     read_exclusions,
     read_labelmap,
 )
+
+from sklearn.metrics import average_precision_score
 
 logger = logging.get_logger(__name__)
 

@@ -108,6 +108,12 @@ _C.RESNET = CfgNode()
 # Transformation function.
 _C.RESNET.TRANS_FUNC = "bottleneck_transform"
 
+# Transformation for audio pathway.
+_C.RESNET.AUDIO_TRANS_FUNC = "tf_bottleneck_transform"
+
+# Number of ResStage that applies audio-specific transformation.
+_C.RESNET.AUDIO_TRANS_NUM = 2
+
 # Number of groups. 1 for ResNet, and larger than 1 for ResNeXt).
 _C.RESNET.NUM_GROUPS = 1
 
@@ -185,7 +191,7 @@ _C.MODEL.LOSS_FUNC = "cross_entropy"
 _C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow"]
 
 # Model architectures that has multiple pathways.
-_C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
+_C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast", "avslowfast"]
 
 # Dropout rate before final projection in the backbone.
 _C.MODEL.DROPOUT_RATE = 0.5
@@ -217,6 +223,37 @@ _C.SLOWFAST.FUSION_CONV_CHANNEL_RATIO = 2
 # pathway.
 _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 
+# Audio pathway channel ratio
+_C.SLOWFAST.AU_BETA_INV = 2
+
+# Frame rate ratio between audio and slow pathways
+_C.SLOWFAST.AU_ALPHA = 32
+
+_C.SLOWFAST.AU_FUSION_CONV_CHANNEL_RATIO = 0.125
+
+_C.SLOWFAST.AU_FUSION_CONV_CHANNEL_DIM = 64
+
+_C.SLOWFAST.AU_FUSION_CONV_CHANNEL_MODE = 'ByRatio' # ByDim, ByRatio
+
+_C.SLOWFAST.AU_FUSION_KERNEL_SZ = 5
+
+_C.SLOWFAST.AU_FUSION_CONV_NUM = 2
+
+_C.SLOWFAST.AU_REDUCE_TF_DIM = True
+
+_C.SLOWFAST.FS_FUSION = [True, True, True, True]
+
+_C.SLOWFAST.AFS_FUSION = [True, True, True, True]
+
+_C.SLOWFAST.AVS_FLAG = [False, False, False, False, False]
+
+_C.SLOWFAST.AVS_PROJ_DIM = 64
+
+_C.SLOWFAST.AVS_VAR_THRESH = 0.01
+
+_C.SLOWFAST.AVS_DUPLICATE_THRESH = 0.99
+
+_C.SLOWFAST.DROPPATHWAY_RATE = 0.8
 
 # -----------------------------------------------------------------------------
 # Data options
@@ -243,12 +280,18 @@ _C.DATA.SAMPLING_RATE = 8
 
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
-# List of input frame channel dimensions.
 
+# List of input frame channel dimensions.
 _C.DATA.INPUT_CHANNEL_NUM = [3, 3]
 
 # The std value of the video raw pixels across the R G B channels.
 _C.DATA.STD = [0.225, 0.225, 0.225]
+
+# Mean of logmel spectrogram
+_C.DATA.LOGMEL_MEAN = 0.0
+
+# Std of logmel spectrogram
+_C.DATA.LOGMEL_STD = 1.0
 
 # The spatial augmentation jitter scales for training.
 _C.DATA.TRAIN_JITTER_SCALES = [256, 320]
@@ -258,6 +301,29 @@ _C.DATA.TRAIN_CROP_SIZE = 224
 
 # The spatial crop size for testing.
 _C.DATA.TEST_CROP_SIZE = 256
+
+# Decode audio
+_C.DATA.USE_AUDIO = False
+
+_C.DATA.GET_MISALIGNED_AUDIO = False
+
+_C.DATA.AUDIO_SAMPLE_RATE = 16000
+
+_C.DATA.AUDIO_WIN_SZ = 32
+
+_C.DATA.AUDIO_STEP_SZ = 16
+
+_C.DATA.AUDIO_FRAME_NUM = 128
+
+_C.DATA.AUDIO_MEL_NUM = 40
+
+_C.DATA.AUDIO_MISALIGNED_GAP = 32
+
+_C.DATA.EASY_NEG_RATIO = 0.75
+
+_C.DATA.MIX_NEG_EPOCH = 96
+
+_C.DATA.USE_BGR_ORDER = False
 
 # Input videos may has different fps, convert it to the target video fps before
 # frame sampling.
@@ -530,6 +596,7 @@ _C.MULTIGRID.DEFAULT_B = 0
 _C.MULTIGRID.DEFAULT_T = 0
 _C.MULTIGRID.DEFAULT_S = 0
 
+
 # -----------------------------------------------------------------------------
 # Tensorboard Visualization Options
 # -----------------------------------------------------------------------------
@@ -701,7 +768,6 @@ _C.DEMO.COMMON_CLASS_NAMES = [
     "lie/sleep",
     "bend/bow (at the waist)",
 ]
-
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)

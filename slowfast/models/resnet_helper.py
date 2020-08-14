@@ -4,6 +4,7 @@
 """Video models."""
 
 import torch.nn as nn
+from torch import cat
 
 from slowfast.models.nonlocal_helper import Nonlocal
 
@@ -15,6 +16,13 @@ def get_trans_func(name):
     trans_funcs = {
         "bottleneck_transform": BottleneckTransform,
         "basic_transform": BasicTransform,
+        # the following two are transform that decouples 
+        # time and frequency in log-mel-spectrogram as described 
+        # in AVSlowFast paper. Specifically, tf_bottleneck_transform_v1
+        # is used in the paper, but tf_bottleneck_transform_v2 is 
+        # more memory efficient.
+        "tf_bottleneck_transform_v2": TimeFreqBottleneckTransform_v2,
+        "tf_bottleneck_transform_v1": TimeFreqBottleneckTransform_v1,
     }
     assert (
         name in trans_funcs.keys()
@@ -106,6 +114,288 @@ class BasicTransform(nn.Module):
         x = self.b_bn(x)
         return x
 
+
+class TimeFreqBottleneckTransform_v1(nn.Module):
+    """
+    The transformation function that decouples time 
+    and frequency axis in log-mel-spectrogram inputs, 
+    as described in the AVSlowFast paper.  
+    1x1x3, 1x3x1, 1x1x1
+    """
+
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        temp_kernel_size,
+        stride,
+        dim_inner,
+        num_groups,
+        stride_1x1=False,
+        inplace_relu=True,
+        eps=1e-5,
+        bn_mmt=0.1,
+        dilation=1,
+        norm_module=nn.BatchNorm3d,
+    ):
+        """
+        Args:
+            dim_in (int): the channel dimensions of the input.
+            dim_out (int): the channel dimension of the output.
+            temp_kernel_size (int): the temporal kernel sizes of the middle
+                convolution in the bottleneck.
+            stride (int): the stride of the bottleneck.
+            dim_inner (int): the inner dimension of the block.
+            num_groups (int): number of groups for the convolution. num_groups=1
+                is for standard ResNet like networks, and num_groups>1 is for
+                ResNeXt like networks.
+            stride_1x1 (bool): if True, apply stride to 1x1 conv, otherwise
+                apply stride to the 3x3 conv.
+            inplace_relu (bool): if True, calculate the relu on the original
+                input without allocating new memory.
+            eps (float): epsilon for batch norm.
+            bn_mmt (float): momentum for batch norm. Noted that BN momentum in
+                PyTorch = 1 - BN momentum in Caffe2.
+            dilation (int): size of dilation.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
+        """
+        super(TimeFreqBottleneckTransform_v1, self).__init__()
+        self.temp_kernel_size = temp_kernel_size
+        self._inplace_relu = inplace_relu
+        self._eps = eps
+        self._bn_mmt = bn_mmt
+        self._stride_1x1 = stride_1x1
+        self._construct(
+            dim_in, 
+            dim_out, 
+            stride, 
+            dim_inner, 
+            num_groups,
+            dilation,
+            norm_module,
+        )
+
+
+    def _construct(self, dim_in, dim_out, stride, dim_inner, num_groups, 
+                   dilation, norm_module):
+        (str1x1, str3x3) = (stride, 1) if self._stride_1x1 else (1, stride)
+        # 1x3x1, BN, ReLU.
+        self.t = nn.Conv3d(
+            dim_in,
+            dim_inner,
+            [1, 3, 1],
+            stride=[1, str3x3, str3x3],
+            padding=[0, 1, 0],
+            groups=num_groups,
+            bias=False,
+        )
+        self.t_bn = norm_module(
+            dim_inner, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.t_relu = nn.ReLU(inplace=self._inplace_relu)
+        
+        # 1x1x3, BN, ReLU.
+        self.f = nn.Conv3d(
+            dim_in,
+            dim_inner,
+            [1, 1, 3],
+            stride=[1, str3x3, str3x3],
+            padding=[0, 0, 1],
+            groups=num_groups,
+            bias=False,
+        )
+        self.f_bn = norm_module(
+            dim_inner, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.f_relu = nn.ReLU(inplace=self._inplace_relu)
+
+        # 1x1x1, BN.
+        self.out = nn.Conv3d(
+            dim_inner*2,
+            dim_out,
+            kernel_size=[1, 1, 1],
+            stride=[1, 1, 1],
+            padding=[0, 0, 0],
+            bias=False,
+        )
+        self.out_bn = norm_module(
+            dim_out, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.out_bn.transform_final_bn = True
+
+
+    def forward(self, x):
+        # Explicitly forward every layer.
+        # Branch2a_t.
+        x_t = self.t(x)
+        x_t = self.t_bn(x_t)
+        x_t = self.t_relu(x_t)
+        
+        # Branch2a_f.
+        x_f = self.f(x)
+        x_f = self.f_bn(x_f)
+        x_f = self.f_relu(x_f)
+        
+        # Merge 2a_t and 2a_f.
+        x = cat([x_t, x_f], 1)
+
+        # Branch2b
+        x = self.out(x)
+        x = self.out_bn(x)
+        return x
+    
+    
+class TimeFreqBottleneckTransform_v2(nn.Module):
+    """
+    A more memory efficient version of the transformation 
+    function that decouples time and frequency axis in 
+    log-mel-spectrogram inputs, as described in the 
+    AVSlowFast paper.  
+    Tx1x1, 1x1x3, 1x3x1, 1x1x1
+    """
+
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        temp_kernel_size,
+        stride,
+        dim_inner,
+        num_groups,
+        stride_1x1=False,
+        inplace_relu=True,
+        eps=1e-5,
+        bn_mmt=0.1,
+        dilation=1,
+        norm_module=nn.BatchNorm3d,
+    ):
+        """
+        Args:
+            dim_in (int): the channel dimensions of the input.
+            dim_out (int): the channel dimension of the output.
+            temp_kernel_size (int): the temporal kernel sizes of the middle
+                convolution in the bottleneck.
+            stride (int): the stride of the bottleneck.
+            dim_inner (int): the inner dimension of the block.
+            num_groups (int): number of groups for the convolution. num_groups=1
+                is for standard ResNet like networks, and num_groups>1 is for
+                ResNeXt like networks.
+            stride_1x1 (bool): if True, apply stride to 1x1 conv, otherwise
+                apply stride to the 3x3 conv.
+            inplace_relu (bool): if True, calculate the relu on the original
+                input without allocating new memory.
+            eps (float): epsilon for batch norm.
+            bn_mmt (float): momentum for batch norm. Noted that BN momentum in
+                PyTorch = 1 - BN momentum in Caffe2.
+            dilation (int): size of dilation.
+            norm_module (nn.Module): nn.Module for the normalization layer. The
+                default is nn.BatchNorm3d.
+        """
+        super(TimeFreqBottleneckTransform_v2, self).__init__()
+        self.temp_kernel_size = temp_kernel_size
+        self._inplace_relu = inplace_relu
+        self._eps = eps
+        self._bn_mmt = bn_mmt
+        self._stride_1x1 = stride_1x1
+        self._construct(
+            dim_in, 
+            dim_out, 
+            stride, 
+            dim_inner, 
+            num_groups,
+            dilation,
+            norm_module,
+        )
+
+    def _construct(self, dim_in, dim_out, stride, dim_inner, num_groups, 
+                   dilation, norm_module):
+        (str1x1, str3x3) = (stride, 1) if self._stride_1x1 else (1, stride)
+
+        # Tx1x1, BN, ReLU.
+        self.a = nn.Conv3d(
+            dim_in,
+            dim_inner,
+            kernel_size=[self.temp_kernel_size, 1, 1],
+            stride=[1, str1x1, str1x1],
+            padding=[int(self.temp_kernel_size // 2), 0, 0],
+            bias=False,
+        )
+        self.a_bn = norm_module(
+            dim_inner, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.a_relu = nn.ReLU(inplace=self._inplace_relu)
+
+        # 1x3x1, BN, ReLU.
+        self.b_t = nn.Conv3d(
+            dim_inner,
+            dim_inner,
+            [1, 3, 1],
+            stride=[1, str3x3, str3x3],
+            padding=[0, 1, 0],
+            groups=num_groups,
+            bias=False,
+        )
+        self.b_t_bn = norm_module(
+            dim_inner, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.b_t_relu = nn.ReLU(inplace=self._inplace_relu)
+        
+        # 1x1x3, BN, ReLU.
+        self.b_f = nn.Conv3d(
+            dim_inner,
+            dim_inner,
+            [1, 1, 3],
+            stride=[1, str3x3, str3x3],
+            padding=[0, 0, 1],
+            groups=num_groups,
+            bias=False,
+        )
+        self.b_f_bn = norm_module(
+            dim_inner, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.b_f_relu = nn.ReLU(inplace=self._inplace_relu)
+
+        # 1x1x1, BN.
+        self.c = nn.Conv3d(
+            dim_inner,
+            dim_out,
+            kernel_size=[1, 1, 1],
+            stride=[1, 1, 1],
+            padding=[0, 0, 0],
+            bias=False,
+        )
+        self.c_bn = norm_module(
+            dim_out, eps=self._eps, momentum=self._bn_mmt
+        )
+        self.c_bn.transform_final_bn = True
+
+
+    def forward(self, x):
+        # Explicitly forward every layer.
+        # Branch2a.
+        x = self.a(x)
+        x = self.a_bn(x)
+        x = self.a_relu(x)
+
+        # Branch2b_t.
+        x_t = self.b_t(x)
+        x_t = self.b_t_bn(x_t)
+        x_t = self.b_t_relu(x_t)
+        
+        # Branch2b_f.
+        x_f = self.b_f(x)
+        x_f = self.b_f_bn(x_f)
+        x_f = self.b_f_relu(x_f)
+        
+        # Merge 2b_t and 2b_f.
+        x = x_t + x_f
+
+        # Branch2c
+        x = self.c(x)
+        x = self.c_bn(x)
+        return x
+    
 
 class BottleneckTransform(nn.Module):
     """
@@ -496,10 +786,13 @@ class ResStage(nn.Module):
         dilation,
         norm_module,
     ):
+        if not isinstance(trans_func_name, list):
+            trans_func_name = [trans_func_name] * self.num_pathways
+        
         for pathway in range(self.num_pathways):
             for i in range(self.num_blocks[pathway]):
                 # Retrieve the transformation function.
-                trans_func = get_trans_func(trans_func_name)
+                trans_func = get_trans_func(trans_func_name[pathway])
                 # Construct the block.
                 res_block = ResBlock(
                     dim_in[pathway] if i == 0 else dim_out[pathway],
