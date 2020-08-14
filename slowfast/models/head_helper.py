@@ -91,7 +91,7 @@ class ResNetRoIHead(nn.Module):
 
         # Softmax for evaluation and testing.
         if act_func == "softmax":
-            self.act = nn.Softmax(dim=4)
+            self.act = nn.Softmax(dim=1)
         elif act_func == "sigmoid":
             self.act = nn.Sigmoid()
         else:
