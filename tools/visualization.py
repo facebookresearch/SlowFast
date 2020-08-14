@@ -3,6 +3,7 @@
 
 import numpy as np
 import torch
+import tqdm
 
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.checkpoint as cu
@@ -13,6 +14,7 @@ import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.visualization.gradcam_utils import GradCAM
+from slowfast.visualization.prediction_vis import WrongPredictionVis
 from slowfast.visualization.utils import (
     GetWeightAndActivation,
     process_layer_index_data,
@@ -74,7 +76,7 @@ def run_visualization(vis_loader, model, cfg, writer=None):
         )
     logger.info("Finish drawing weights.")
     global_idx = -1
-    for inputs, labels, _, meta in vis_loader:
+    for inputs, labels, _, meta in tqdm.tqdm(vis_loader):
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -182,7 +184,65 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                             indexing_dict=indexing_dict,
                         )
 
-            logger.info("Visualized {} videos...".format(total_vids))
+
+def perform_wrong_prediction_vis(vis_loader, model, cfg):
+    """
+    Visualize video inputs with wrong predictions on Tensorboard.
+    Args:
+        vis_loader (loader): video visualization loader.
+        model (model): the video model to visualize.
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+    """
+    wrong_prediction_visualizer = WrongPredictionVis(cfg=cfg)
+    for batch_idx, (inputs, labels, _, _) in tqdm.tqdm(enumerate(vis_loader)):
+        if cfg.NUM_GPUS:
+            # Transfer the data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
+            else:
+                inputs = inputs.cuda(non_blocking=True)
+            labels = labels.cuda()
+
+        # Some model modify the original input.
+        inputs_clone = [inp.clone() for inp in inputs]
+
+        preds = model(inputs)
+
+        if cfg.NUM_GPUS > 1:
+            preds, labels = du.all_gather([preds, labels])
+            if isinstance(inputs_clone, (list,)):
+                inputs_clone = du.all_gather(inputs_clone)
+            else:
+                inputs_clone = du.all_gather([inputs_clone])[0]
+
+        if cfg.NUM_GPUS:
+            # Transfer the data to the current CPU device.
+            labels = labels.cpu()
+            preds = preds.cpu()
+            if isinstance(inputs_clone, (list,)):
+                for i in range(len(inputs_clone)):
+                    inputs_clone[i] = inputs_clone[i].cpu()
+            else:
+                inputs_clone = inputs_clone.cpu()
+
+        # If using CPU (NUM_GPUS = 0), 1 represent 1 CPU.
+        n_devices = max(cfg.NUM_GPUS, 1)
+        for device_idx in range(1, n_devices + 1):
+            wrong_prediction_visualizer.visualize_vid(
+                video_input=inputs_clone,
+                labels=labels,
+                preds=preds.detach().clone(),
+                batch_idx=device_idx * batch_idx,
+            )
+
+    logger.info(
+        "Class indices with wrong predictions: {}".format(
+            sorted(wrong_prediction_visualizer.wrong_class_prediction)
+        )
+    )
+    wrong_prediction_visualizer.clean()
 
 
 def visualize(cfg):
@@ -192,31 +252,10 @@ def visualize(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
-    if cfg.TENSORBOARD.ENABLE and cfg.TENSORBOARD.MODEL_VIS.ENABLE:
-        if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
-            assert (
-                not cfg.DETECTION.ENABLE
-            ), "Detection task is currently not supported for Grad-CAM visualization."
-            if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
-                assert (
-                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1
-                ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
-                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
-                )
-            elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
-                assert (
-                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 2
-                ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
-                    len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
-                )
-            else:
-                raise NotImplementedError(
-                    "Model arch {} is not in {}".format(
-                        cfg.MODEL.ARCH,
-                        cfg.MODEL.SINGLE_PATHWAY_ARCH
-                        + cfg.MODEL.MULTI_PATHWAY_ARCH,
-                    )
-                )
+    if cfg.TENSORBOARD.ENABLE and (
+        cfg.TENSORBOARD.MODEL_VIS.ENABLE
+        or cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE
+    ):
         # Set up environment.
         du.init_distributed_training(cfg)
         # Set random seed from configs.
@@ -232,6 +271,7 @@ def visualize(cfg):
 
         # Build the video model and print model statistics.
         model = build_model(cfg)
+        model.eval()
         if du.is_master_proc() and cfg.LOG_MODEL_INFO:
             misc.log_model_info(model, cfg, use_train_input=False)
 
@@ -239,9 +279,6 @@ def visualize(cfg):
 
         # Create video testing loaders.
         vis_loader = loader.construct_loader(cfg, "test")
-        logger.info(
-            "Visualize model for {} data points".format(len(vis_loader))
-        )
 
         if cfg.DETECTION.ENABLE:
             assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
@@ -252,8 +289,45 @@ def visualize(cfg):
         else:
             writer = None
 
-        # Run visualization on the model
-        run_visualization(vis_loader, model, cfg, writer)
+        if cfg.TENSORBOARD.MODEL_VIS.ENABLE:
+            if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
+                assert (
+                    not cfg.DETECTION.ENABLE
+                ), "Detection task is currently not supported for Grad-CAM visualization."
+                if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
+                    assert (
+                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1
+                    ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                    )
+                elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
+                    assert (
+                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 2
+                    ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                    )
+                else:
+                    raise NotImplementedError(
+                        "Model arch {} is not in {}".format(
+                            cfg.MODEL.ARCH,
+                            cfg.MODEL.SINGLE_PATHWAY_ARCH
+                            + cfg.MODEL.MULTI_PATHWAY_ARCH,
+                        )
+                    )
+            logger.info(
+                "Visualize model analysis for {} iterations".format(
+                    len(vis_loader)
+                )
+            )
+            # Run visualization on the model
+            run_visualization(vis_loader, model, cfg, writer)
+        if cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE:
+            logger.info(
+                "Visualize Wrong Predictions for {} iterations".format(
+                    len(vis_loader)
+                )
+            )
+            perform_wrong_prediction_vis(vis_loader, model, cfg)
 
         if writer is not None:
             writer.close()

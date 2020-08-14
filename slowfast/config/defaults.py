@@ -591,6 +591,7 @@ _C.TENSORBOARD.MODEL_VIS.ACTIVATIONS = False
 # If False, skip visualizing input videos.
 _C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
 
+
 # List of strings containing data about layer names and their indexing to
 # visualize weights and activations for. The indexing is meant for
 # choosing a subset of activations outputed by a layer for visualization.
@@ -603,7 +604,8 @@ _C.TENSORBOARD.MODEL_VIS.LAYER_LIST = []
 _C.TENSORBOARD.MODEL_VIS.TOPK_PREDS = 1
 # Colormap to for text boxes and bounding boxes colors
 _C.TENSORBOARD.MODEL_VIS.COLORMAP = "Pastel2"
-
+# Config for visualization video inputs with Grad-CAM.
+# _C.TENSORBOARD.ENABLE must be True.
 _C.TENSORBOARD.MODEL_VIS.GRAD_CAM = CfgNode()
 # Whether to run visualization using Grad-CAM technique.
 _C.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE = True
@@ -615,6 +617,16 @@ _C.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST = []
 _C.TENSORBOARD.MODEL_VIS.GRAD_CAM.USE_TRUE_LABEL = False
 # Colormap to for text boxes and bounding boxes colors
 _C.TENSORBOARD.MODEL_VIS.GRAD_CAM.COLORMAP = "viridis"
+
+# Config for visualization for wrong prediction visualization.
+# _C.TENSORBOARD.ENABLE must be True.
+_C.TENSORBOARD.WRONG_PRED_VIS = CfgNode()
+_C.TENSORBOARD.WRONG_PRED_VIS.ENABLE = False
+# Folder tag to origanize model eval videos under.
+_C.TENSORBOARD.WRONG_PRED_VIS.TAG = "Incorrectly classified videos."
+# Subset of labels to visualize. Only wrong predictions with true labels
+# within this subset is visualized.
+_C.TENSORBOARD.WRONG_PRED_VIS.SUBSET_PATH = ""
 
 
 # ---------------------------------------------------------------------------- #
