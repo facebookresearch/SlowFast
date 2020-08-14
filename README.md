@@ -40,6 +40,11 @@ Please find installation instructions for PyTorch and PySlowFast in [INSTALL.md]
 
 Follow the example in [GETTING_STARTED.md](GETTING_STARTED.md) to start playing video models with PySlowFast.
 
+## Visualization Tools
+
+We offer a range of visualization tools for the train/eval/test processes, model analysis, and for running inference with trained model.
+More information at [Visualization Tools](VISUALIZATION_TOOLS.md).
+
 ## Contributors
 PySlowFast is written and maintained by [Haoqi Fan](https://haoqifan.github.io/), [Yanghao Li](https://lyttonhao.github.io/), [Bo Xiong](https://www.cs.utexas.edu/~bxiong/), [Wan-Yen Lo](https://www.linkedin.com/in/wanyenlo/), [Christoph Feichtenhofer](https://feichtenhofer.github.io/).
 
@@ -47,7 +52,7 @@ PySlowFast is written and maintained by [Haoqi Fan](https://haoqifan.github.io/)
 If you find PySlowFast useful in your research, please use the following BibTeX entry for citation.
 ```BibTeX
 @misc{fan2020pyslowfast,
-  author =       {Haoqi Fan and Yanghao Li and Bo Xiong and Wan-Yen Lo and 
+  author =       {Haoqi Fan and Yanghao Li and Bo Xiong and Wan-Yen Lo and
                   Christoph Feichtenhofer},
   title =        {PySlowFast},
   howpublished = {\url{https://github.com/facebookresearch/slowfast}},
