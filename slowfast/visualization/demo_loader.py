@@ -49,13 +49,13 @@ class VideoManager:
             raise IOError("Video {} cannot be opened".format(self.source))
 
         self.output_file = None
+        if cfg.DEMO.OUTPUT_FPS == -1:
+            self.output_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        else:
+            self.output_fps = cfg.DEMO.OUTPUT_FPS
         if cfg.DEMO.OUTPUT_FILE != "":
-            if cfg.DEMO.OUTPUT_FPS == -1:
-                output_fps = self.cap.get(cv2.CAP_PROP_FPS)
-            else:
-                output_fps = cfg.DEMO.OUTPUT_FPS
             self.output_file = self.get_output_file(
-                cfg.DEMO.OUTPUT_FILE, fps=output_fps
+                cfg.DEMO.OUTPUT_FILE, fps=self.output_fps
             )
         self.id = -1
         self.buffer = []
@@ -123,6 +123,7 @@ class VideoManager:
         for frame in task.frames[task.num_buffer_frames :]:
             if self.output_file is None:
                 cv2.imshow("SlowFast", frame)
+                time.sleep(1 / self.output_fps)
             else:
                 self.output_file.write(frame)
 
@@ -179,13 +180,14 @@ class ThreadVideoManager:
             raise IOError("Video {} cannot be opened".format(self.source))
 
         self.output_file = None
+
+        if cfg.DEMO.OUTPUT_FPS == -1:
+            self.output_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        else:
+            self.output_fps = cfg.DEMO.OUTPUT_FPS
         if cfg.DEMO.OUTPUT_FILE != "":
-            if cfg.DEMO.OUTPUT_FPS == -1:
-                output_fps = self.cap.get(cv2.CAP_PROP_FPS)
-            else:
-                output_fps = cfg.DEMO.OUTPUT_FPS
             self.output_file = self.get_output_file(
-                cfg.DEMO.OUTPUT_FILE, fps=output_fps
+                cfg.DEMO.OUTPUT_FILE, fps=self.output_fps
             )
         self.num_skip = cfg.DEMO.NUM_CLIPS_SKIP + 1
         self.get_id = -1
@@ -316,6 +318,7 @@ class ThreadVideoManager:
                 for frame in task.frames[task.num_buffer_frames :]:
                     if self.output_file is None:
                         cv2.imshow("SlowFast", frame)
+                        time.sleep(1 / self.output_fps)
                     else:
                         self.output_file.write(frame)
 

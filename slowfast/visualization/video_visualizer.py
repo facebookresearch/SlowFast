@@ -37,7 +37,7 @@ def _create_text_labels(classes, scores, class_names, ground_truth=False):
     elif scores is not None:
         assert len(classes) == len(scores)
         labels = [
-            "[{:.0f}] {}".format(s * 100, label)
+            "[{:.2f}] {}".format(s, label)
             for s, label in zip(scores, labels)
         ]
     return labels
@@ -155,14 +155,19 @@ class ImgVisualizer(Visualizer):
             )
             y_corner = 3
 
-        num_text_split = int(num_text_split)
+        text_color_sorted = sorted(zip(text_ls, box_facecolors), key=lambda x: x[0], reverse=True)
+        if len(text_color_sorted) != 0:
+            text_ls, box_facecolors = zip(*text_color_sorted)
+        else:
+            text_ls, box_facecolors = [], []
+        text_ls, box_facecolors = list(text_ls), list(box_facecolors)
         self.draw_multiple_text_upward(
-            text_ls[:num_text_split],
+            text_ls[:num_text_split][::-1],
             box_coordinate,
             y_corner=y_corner,
             font_size=font_size,
             color=color,
-            box_facecolors=box_facecolors[:num_text_split],
+            box_facecolors=box_facecolors[:num_text_split][::-1],
             alpha=alpha,
         )
         self.draw_multiple_text_downward(

@@ -72,6 +72,7 @@ class AVAVisualizerWithPrecomputedBox:
         )
 
         self.seq_length = cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE
+        self.no_frames_repeat = cfg.DEMO.SLOWMO
 
     def get_output_file(self, path):
         """
@@ -212,16 +213,15 @@ class AVAVisualizerWithPrecomputedBox:
         )
 
         all_keys = sorted(all_boxes.keys())
-        no_frames_repeat = 3
-        # Draw around the keyframe for 2/8 of the sequence length.
+        # Draw around the keyframe for 2/10 of the sequence length.
         # This is chosen using heuristics.
         draw_range = [
-            self.seq_length // 2 - self.seq_length // 8,
-            self.seq_length // 2 + self.seq_length // 8,
+            self.seq_length // 2 - self.seq_length // 10,
+            self.seq_length // 2 + self.seq_length // 10,
         ]
         draw_range_repeat = [
             draw_range[0],
-            (draw_range[1] - draw_range[0]) * no_frames_repeat + draw_range[0],
+            (draw_range[1] - draw_range[0]) * self.no_frames_repeat + draw_range[0],
         ]
         prev_buffer = []
         prev_end_idx = 0
@@ -273,7 +273,7 @@ class AVAVisualizerWithPrecomputedBox:
             # For each precomputed or gt boxes.
             for i, boxes in enumerate(pred_gt_boxes):
                 if i == 0:
-                    repeat = no_frames_repeat
+                    repeat = self.no_frames_repeat
                     current_draw_range = draw_range
                 else:
                     repeat = 1

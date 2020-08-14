@@ -701,7 +701,9 @@ _C.DEMO.COMMON_CLASS_NAMES = [
     "lie/sleep",
     "bend/bow (at the waist)",
 ]
-
+# Slow-motion rate for the visualization. The visualized portions of the
+# video will be played `_C.DEMO.SLOWMO` times slower than usual speed.
+_C.DEMO.SLOWMO = 1
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)
