@@ -34,16 +34,9 @@ More details can be found at [defaults.py](slowfast/config/defaults.py)
 ### Confusion matrices:
 
 <div align="center">
-  <img src="demo/visualization/metrics/cf_subset.png" alt="Trulli" style="width:400px">
-  <figcaption>Fig.1 - Confusion matrix with subset.</figcaption>
-  </figure>
-  <br>
-  <figure>
-  <img src="demo/visualization/metrics/cf_parent.png" alt="Trulli" style="width:400px">
-  <figcaption>Fig.2 - Confusion matrix with parent class (Communication).</figcaption>
-</figure>
+  <img src="demo/visualization/metrics/cf_subset.png" width="367px" style="margin:10px;"/>
+  <img src="demo/visualization/metrics/cf_parent.png" width="350px" style="margin:10px;"/>
 </div>
-
 
 <div align="center">
 
@@ -62,8 +55,8 @@ TENSORBOARD:
 ### Histograms of top-k most frequent predictions:
 
 <div align="center">
-  <img src="demo/visualization/metrics/hist1.png" width="380px" style="margin:10px;"/>
-  <img src="demo/visualization/metrics/hist2.png" width="385px" style="margin:10px;"/>
+  <img src="demo/visualization/metrics/hist1.png" width="400px" style="margin:10px;"/>
+  <img src="demo/visualization/metrics/hist2.png" width="406px" style="margin:10px;"/>
 </div>
 
 ## Model Analysis
