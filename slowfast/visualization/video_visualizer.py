@@ -37,8 +37,7 @@ def _create_text_labels(classes, scores, class_names, ground_truth=False):
     elif scores is not None:
         assert len(classes) == len(scores)
         labels = [
-            "[{:.2f}] {}".format(s, label)
-            for s, label in zip(scores, labels)
+            "[{:.2f}] {}".format(s, label) for s, label in zip(scores, labels)
         ]
     return labels
 
@@ -155,7 +154,9 @@ class ImgVisualizer(Visualizer):
             )
             y_corner = 3
 
-        text_color_sorted = sorted(zip(text_ls, box_facecolors), key=lambda x: x[0], reverse=True)
+        text_color_sorted = sorted(
+            zip(text_ls, box_facecolors), key=lambda x: x[0], reverse=True
+        )
         if len(text_color_sorted) != 0:
             text_ls, box_facecolors = zip(*text_color_sorted)
         else:

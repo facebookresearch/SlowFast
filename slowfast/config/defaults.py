@@ -98,8 +98,8 @@ _C.TEST.NUM_SPATIAL_CROPS = 3
 
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
-
-
+# Path to saving prediction results file.
+_C.TEST.SAVE_RESULTS_PATH = ""
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
@@ -538,7 +538,9 @@ _C.TENSORBOARD = CfgNode()
 # Log to summary writer, this will automatically.
 # log loss, lr and metrics during train/eval.
 _C.TENSORBOARD.ENABLE = False
-
+# Provide path to prediction results for visualization.
+# This is a pickle file of [prediction_tensor, label_tensor]
+_C.TENSORBOARD.PREDICTIONS_PATH = ""
 # Path to directory for tensorboard logs.
 # Default to to cfg.OUTPUT_DIR/runs-{cfg.TRAIN.DATASET}.
 _C.TENSORBOARD.LOG_DIR = ""

@@ -2,8 +2,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import numpy as np
+import pickle
 import torch
 import tqdm
+from fvcore.common.file_io import PathManager
 
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.checkpoint as cu
@@ -288,6 +290,18 @@ def visualize(cfg):
             writer = tb.TensorboardWriter(cfg)
         else:
             writer = None
+        if cfg.TENSORBOARD.PREDICTIONS_PATH != "":
+            assert not cfg.DETECTION.ENABLE, "Detection is not supported."
+            logger.info(
+                "Visualizing class-level performance from saved results..."
+            )
+            if writer is not None:
+                with PathManager.open(
+                    cfg.TENSORBOARD.PREDICTIONS_PATH, "rb"
+                ) as f:
+                    preds, labels = pickle.load(f, encoding="latin1")
+
+                writer.plot_eval(preds, labels)
 
         if cfg.TENSORBOARD.MODEL_VIS.ENABLE:
             if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:

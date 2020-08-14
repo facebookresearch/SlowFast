@@ -221,7 +221,8 @@ class AVAVisualizerWithPrecomputedBox:
         ]
         draw_range_repeat = [
             draw_range[0],
-            (draw_range[1] - draw_range[0]) * self.no_frames_repeat + draw_range[0],
+            (draw_range[1] - draw_range[0]) * self.no_frames_repeat
+            + draw_range[0],
         ]
         prev_buffer = []
         prev_end_idx = 0
