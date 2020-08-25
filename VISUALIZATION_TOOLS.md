@@ -130,13 +130,16 @@ If you would like to use webcam as an input, in place of `DEMO.INPUT_VIDEO`, set
 </div>
 
 ### Demo with AVA video(s):
-We also offer an option to use trained models to create and visualize prediction results and ground-truth labels on AVA-format videos and metadata.
+We also offer an option to use trained models to create and visualize prediction results and ground-truth labels on AVA-format videos and metadata. An example config is:
 
 ```
 DEMO:
   ENABLE: True
-  PREDS_BOXES: # Path to pre-computed bouding boxes in AVA format.
-  GT_BOXES: # Path to ground-truth boxes and labels in AVA format (optional).
+  OUTPUT_FILE: yourPath/output.mp4
+  LABEL_FILE_PATH:  yourPath/ava_classnames.json
+  INPUT_VIDEO: yourPath/frames/HVAmkvLrthQ  # Path to a video file or image folder
+  PREDS_BOXES: yourPath/ava_detection_train_boxes_and_labels_include_negative.csv # Path to pre-computed bouding boxes in AVA format.
+  GT_BOXES: yourPath/ava_train_v2.2.csv # Path to ground-truth boxes and labels in AVA format (optional).
 ```
 
 <div align="center">
