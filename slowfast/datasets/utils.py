@@ -9,6 +9,7 @@ from collections import defaultdict
 import cv2
 import torch
 from fvcore.common.file_io import PathManager
+from torch.utils.data.distributed import DistributedSampler
 
 from . import transform as transform
 
@@ -298,3 +299,29 @@ def revert_tensor_normalize(tensor, mean, std):
     tensor = tensor * std
     tensor = tensor + mean
     return tensor
+
+
+def create_sampler(dataset, shuffle, cfg):
+    """
+    Create sampler for the given dataset.
+    Args:
+        dataset (torch.utils.data.Dataset): the given dataset.
+        shuffle (bool): set to ``True`` to have the data reshuffled
+            at every epoch.
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+    Returns:
+        sampler (Sampler): the created sampler.
+    """
+    sampler = DistributedSampler(dataset) if cfg.NUM_GPUS > 1 else None
+
+    return sampler
+
+
+def loader_worker_init_fn(dataset):
+    """
+    Create init function passed to pytorch data loader.
+    Args:
+        dataset (torch.utils.data.Dataset): the given dataset.
+    """
+    return None
