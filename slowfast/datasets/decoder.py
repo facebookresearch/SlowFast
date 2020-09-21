@@ -162,22 +162,20 @@ def torchvision_decode(
         video_meta["audio_duration"] = meta.audio_duration
         video_meta["audio_sample_rate"] = meta.audio_sample_rate
 
+    fps = video_meta["video_fps"]
     if (
         video_meta["has_video"]
         and video_meta["video_denominator"] > 0
         and video_meta["video_duration"] > 0
     ):
+        # try selective decoding.
         decode_all_video = False
+        clip_size = sampling_rate * num_frames / target_fps * fps
         start_idx, end_idx = get_start_end_idx(
-            video_meta["video_fps"] * video_meta["video_duration"],
-            sampling_rate * num_frames / target_fps * video_meta["video_fps"],
-            clip_idx,
-            num_clips,
+            fps * video_meta["video_duration"], clip_size, clip_idx, num_clips
         )
         # Convert frame index to pts.
-        pts_per_frame = (
-            video_meta["video_denominator"] / video_meta["video_fps"]
-        )
+        pts_per_frame = video_meta["video_denominator"] / fps
         video_start_pts = int(start_idx * pts_per_frame)
         video_end_pts = int(end_idx * pts_per_frame)
 
@@ -193,7 +191,24 @@ def torchvision_decode(
         video_timebase_numerator=video_meta["video_numerator"],
         video_timebase_denominator=video_meta["video_denominator"],
     )
-    return v_frames, video_meta["video_fps"], decode_all_video
+
+    if v_frames.shape == torch.Size([0]):
+        # failed selective decoding
+        decode_all_video = True
+        video_start_pts, video_end_pts = 0, -1
+        v_frames, _ = io._read_video_from_memory(
+            video_tensor,
+            seek_frame_margin=1.0,
+            read_video_stream="visual" in modalities,
+            video_width=0,
+            video_height=0,
+            video_min_dimension=max_spatial_scale,
+            video_pts_range=(video_start_pts, video_end_pts),
+            video_timebase_numerator=video_meta["video_numerator"],
+            video_timebase_denominator=video_meta["video_denominator"],
+        )
+
+    return v_frames, fps, decode_all_video
 
 
 def pyav_decode(
@@ -337,9 +352,10 @@ def decode(
     if frames is None or frames.size(0) == 0:
         return None
 
+    clip_sz = sampling_rate * num_frames / target_fps * fps
     start_idx, end_idx = get_start_end_idx(
         frames.shape[0],
-        num_frames * sampling_rate * fps / target_fps,
+        clip_sz,
         clip_idx if decode_all_video else 0,
         num_clips if decode_all_video else 1,
     )

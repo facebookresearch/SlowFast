@@ -182,6 +182,8 @@ def load_checkpoint(
     optimizer=None,
     inflation=False,
     convert_from_caffe2=False,
+    epoch_reset=False,
+    clear_name_pattern=(),
 ):
     """
     Load the checkpoint from the given file. If inflation is True, inflate the
@@ -195,12 +197,17 @@ def load_checkpoint(
         inflation (bool): if True, inflate the weights from the checkpoint.
         convert_from_caffe2 (bool): if True, load the model from caffe2 and
             convert it to pytorch.
+        epoch_reset (bool): if True, reset #train iterations from the checkpoint.
+        clear_name_pattern (string): if given, this (sub)string will be cleared
+            from a layer name if it can be matched.
     Returns:
         (int): the number of training epoch of the checkpoint.
     """
     assert PathManager.exists(
         path_to_checkpoint
     ), "Checkpoint '{}' not found".format(path_to_checkpoint)
+    logger.info("Loading network weights from {}.".format(path_to_checkpoint))
+
     # Account for the DDP wrapper in the multi-gpu setting.
     ms = model.module if data_parallel else model
     if convert_from_caffe2:
@@ -214,6 +221,15 @@ def load_checkpoint(
             if converted_key in ms.state_dict():
                 c2_blob_shape = caffe2_checkpoint["blobs"][key].shape
                 model_blob_shape = ms.state_dict()[converted_key].shape
+
+                # expand shape dims if they differ (eg for converting linear to conv params)
+                if len(c2_blob_shape) < len(model_blob_shape):
+                    c2_blob_shape += (1,) * (
+                        len(model_blob_shape) - len(c2_blob_shape)
+                    )
+                    caffe2_checkpoint["blobs"][key] = np.reshape(
+                        caffe2_checkpoint["blobs"][key], c2_blob_shape
+                    )
                 # Load BN stats to Sub-BN.
                 if (
                     len(model_blob_shape) == 1
@@ -257,6 +273,10 @@ def load_checkpoint(
                             key, converted_key
                         )
                     )
+        diff = set(ms.state_dict()) - set(state_dict)
+        diff = {d for d in diff if 'num_batches_tracked' not in d}
+        if len(diff) > 0:
+            logger.warn("Not loaded {}".format(diff))
         ms.load_state_dict(state_dict, strict=False)
         epoch = -1
     else:
@@ -276,12 +296,49 @@ def load_checkpoint(
             )
             ms.load_state_dict(inflated_model_dict, strict=False)
         else:
-            ms.load_state_dict(checkpoint["model_state"])
+            if clear_name_pattern:
+                for item in clear_name_pattern:
+                    model_state_dict_new = OrderedDict()
+                    for k in checkpoint["model_state"]:
+                        if item in k:
+                            k_re = k.replace(item, "")
+                            model_state_dict_new[k_re] = checkpoint[
+                                "model_state"
+                            ][k]
+                            logger.info("renaming: {} -> {}".format(k, k_re))
+                        else:
+                            model_state_dict_new[k] = checkpoint["model_state"][
+                                k
+                            ]
+                    checkpoint["model_state"] = model_state_dict_new
+
+            pre_train_dict = checkpoint["model_state"]
+            model_dict = ms.state_dict()
+            # Match pre-trained weights that have same shape as current model.
+            pre_train_dict_match = {
+                k: v
+                for k, v in pre_train_dict.items()
+                if k in model_dict and v.size() == model_dict[k].size()
+            }
+            # Weights that do not have match from the pre-trained model.
+            not_load_layers = [
+                k
+                for k in model_dict.keys()
+                if k not in pre_train_dict_match.keys()
+            ]
+            # Log weights that are not loaded with the pre-trained weights.
+            if not_load_layers:
+                for k in not_load_layers:
+                    logger.info("Network weights {} not loaded.".format(k))
+            # Load pre-trained weights.
+            ms.load_state_dict(pre_train_dict_match, strict=False)
+            epoch = -1
+
             # Load the optimizer state (commonly not done when fine-tuning)
+        if "epoch" in checkpoint.keys() and not epoch_reset:
+            epoch = checkpoint["epoch"]
             if optimizer:
                 optimizer.load_state_dict(checkpoint["optimizer_state"])
-        if "epoch" in checkpoint.keys():
-            epoch = checkpoint["epoch"]
         else:
             epoch = -1
     return epoch
@@ -447,6 +504,8 @@ def load_train_checkpoint(cfg, model, optimizer):
             optimizer,
             inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
+            epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
+            clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
         )
         start_epoch = checkpoint_epoch + 1
     else:

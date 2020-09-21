@@ -101,6 +101,16 @@ def is_master_proc(num_gpus=8):
         return True
 
 
+def is_root_proc():
+    """
+    Determines if the current process is the root process.
+    """
+    if torch.distributed.is_initialized():
+        return dist.get_rank() == 0
+    else:
+        return True
+
+
 def get_world_size():
     """
     Get the size of the world.

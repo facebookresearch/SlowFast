@@ -11,7 +11,6 @@ from . import custom_config
 # -----------------------------------------------------------------------------
 _C = CfgNode()
 
-
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
@@ -53,10 +52,10 @@ _C.TRAIN.DATASET = "kinetics"
 _C.TRAIN.BATCH_SIZE = 64
 
 # Evaluate model on test data every eval period epochs.
-_C.TRAIN.EVAL_PERIOD = 1
+_C.TRAIN.EVAL_PERIOD = 10
 
 # Save model checkpoint every checkpoint period epochs.
-_C.TRAIN.CHECKPOINT_PERIOD = 1
+_C.TRAIN.CHECKPOINT_PERIOD = 10
 
 # Resume training from the latest checkpoint in the output directory.
 _C.TRAIN.AUTO_RESUME = True
@@ -70,6 +69,11 @@ _C.TRAIN.CHECKPOINT_TYPE = "pytorch"
 # If True, perform inflation when loading checkpoint.
 _C.TRAIN.CHECKPOINT_INFLATE = False
 
+# If True, reset epochs when loading checkpoint.
+_C.TRAIN.CHECKPOINT_EPOCH_RESET = False
+
+# If set, clear all layer names according to the pattern provided.
+_C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
 # ---------------------------------------------------------------------------- #
 # Testing options
@@ -136,6 +140,36 @@ _C.RESNET.SPATIAL_STRIDES = [[1], [2], [2], [2]]
 # Size of dilation on different res stages.
 _C.RESNET.SPATIAL_DILATIONS = [[1], [1], [1], [1]]
 
+# ---------------------------------------------------------------------------- #
+# X3D  options
+# See https://arxiv.org/abs/2004.04730 for details about X3D Networks.
+# ---------------------------------------------------------------------------- #
+_C.X3D = CfgNode()
+
+# Width expansion factor.
+_C.X3D.WIDTH_FACTOR = 1.0
+
+# Depth expansion factor.
+_C.X3D.DEPTH_FACTOR = 1.0
+
+# Bottleneck expansion factor for the 3x3x3 conv.
+_C.X3D.BOTTLENECK_FACTOR = 1.0  #
+
+# Dimensions of the last linear layer before classificaiton.
+_C.X3D.DIM_C5 = 2048
+
+# Dimensions of the first 3x3 conv layer.
+_C.X3D.DIM_C1 = 12
+
+# Whether to scale the width of Res2, default is false.
+_C.X3D.SCALE_RES2 = False
+
+# Whether to use a BatchNorm (BN) layer before the classifier, default is false.
+_C.X3D.BN_LIN5 = False
+
+# Whether to use channelwise (=depthwise) convolution in the center (3x3x3)
+# convolution operation of the residual blocks.
+_C.X3D.CHANNELWISE_3x3x3 = True
 
 # -----------------------------------------------------------------------------
 # Nonlocal options
@@ -182,13 +216,16 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow", "x3d"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
 
 # Dropout rate before final projection in the backbone.
 _C.MODEL.DROPOUT_RATE = 0.5
+
+# Randomly drop rate for Res-blocks, linearly increase from res2 to res5
+_C.MODEL.DROPCONNECT_RATE = 0.0
 
 # The std to initialize the fc layer(s).
 _C.MODEL.FC_INIT_STD = 0.01
@@ -231,9 +268,6 @@ _C.DATA.PATH_LABEL_SEPARATOR = " "
 
 # Video path prefix if any.
 _C.DATA.PATH_PREFIX = ""
-
-# The spatial crop size of the input clip.
-_C.DATA.CROP_SIZE = 224
 
 # The number of frames of the input clip.
 _C.DATA.NUM_FRAMES = 8
@@ -295,6 +329,9 @@ _C.SOLVER.BASE_LR = 0.1
 # Learning rate policy (see utils/lr_policy.py for options and examples).
 _C.SOLVER.LR_POLICY = "cosine"
 
+# Final learning rates for 'cosine' policy.
+_C.SOLVER.COSINE_END_LR = 0.0
+
 # Exponential decay factor.
 _C.SOLVER.GAMMA = 0.1
 
@@ -334,6 +371,8 @@ _C.SOLVER.WARMUP_START_LR = 0.01
 # Optimization method.
 _C.SOLVER.OPTIMIZING_METHOD = "sgd"
 
+# Base learning rate is linearly scaled with NUM_SHARDS.
+_C.SOLVER.BASE_LR_SCALE_NUM_SHARDS = False
 
 # ---------------------------------------------------------------------------- #
 # Misc options
@@ -741,10 +780,13 @@ def _assert_and_infer_cfg(cfg):
     assert cfg.RESNET.WIDTH_PER_GROUP > 0
     assert cfg.RESNET.WIDTH_PER_GROUP % cfg.RESNET.NUM_GROUPS == 0
 
+    # Execute LR scaling by num_shards.
+    if cfg.SOLVER.BASE_LR_SCALE_NUM_SHARDS:
+        cfg.SOLVER.BASE_LR *= cfg.NUM_SHARDS
+
     # General assertions.
     assert cfg.SHARD_ID < cfg.NUM_SHARDS
     return cfg
-
 
 def get_cfg():
     """

@@ -7,7 +7,15 @@ import torch
 
 
 def run(
-    local_rank, num_proc, func, init_method, shard_id, num_shards, backend, cfg
+    local_rank,
+    num_proc,
+    func,
+    init_method,
+    shard_id,
+    num_shards,
+    backend,
+    cfg,
+    output_queue=None,
 ):
     """
     Runs a function from a child process.
@@ -31,6 +39,8 @@ def run(
             https://pytorch.org/docs/stable/distributed.html
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
+        output_queue (queue): can optionally be used to return values from the
+            master process.
     """
     # Initialize the process group.
     world_size = num_proc * num_shards
@@ -47,4 +57,6 @@ def run(
         raise e
 
     torch.cuda.set_device(local_rank)
-    func(cfg)
+    ret = func(cfg)
+    if output_queue is not None and local_rank == 0:
+        output_queue.put(ret)

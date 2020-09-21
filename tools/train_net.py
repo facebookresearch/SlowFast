@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Train a video classification model."""
+
 import numpy as np
 import pprint
 import torch
@@ -19,6 +20,7 @@ from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
+
 
 logger = logging.get_logger(__name__)
 
@@ -65,12 +67,11 @@ def train_epoch(
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
         optim.set_lr(optimizer, lr)
 
-        if cfg.DETECTION.ENABLE:
-            # Compute the predictions.
-            preds = model(inputs, meta["boxes"])
+        train_meter.data_toc()
 
+        if cfg.DETECTION.ENABLE:
+            preds = model(inputs, meta["boxes"])
         else:
-            # Perform the forward pass.
             preds = model(inputs)
         # Explicitly declare reduction to mean.
         loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
@@ -86,13 +87,13 @@ def train_epoch(
         loss.backward()
         # Update the parameters.
         optimizer.step()
+        train_meter.iter_toc()  # do not measure allreduce for this meter
 
         if cfg.DETECTION.ENABLE:
             if cfg.NUM_GPUS > 1:
                 loss = du.all_reduce([loss])[0]
             loss = loss.item()
 
-            train_meter.iter_toc()
             # Update and log stats.
             train_meter.update_stats(None, None, None, loss, lr)
             # write to tensorboard format if available.
@@ -115,7 +116,6 @@ def train_epoch(
                 top1_err, top5_err = [
                     (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
                 ]
-
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
                     loss, top1_err, top5_err = du.all_reduce(
@@ -129,7 +129,6 @@ def train_epoch(
                     top5_err.item(),
                 )
 
-            train_meter.iter_toc()
             # Update and log stats.
             train_meter.update_stats(
                 top1_err,
@@ -195,6 +194,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                         val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
+        val_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
@@ -292,7 +292,7 @@ def calculate_and_update_precise_bn(loader, model, num_iters=200, use_gpu=True):
     """
 
     def _gen_loader():
-        for inputs, _, _, _ in loader:
+        for inputs, *_ in loader:
             if use_gpu:
                 if isinstance(inputs, (list,)):
                     for i in range(len(inputs)):
@@ -392,8 +392,10 @@ def train(cfg):
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
     val_loader = loader.construct_loader(cfg, "val")
-    precise_bn_loader = loader.construct_loader(
-        cfg, "train", is_precise_bn=True
+    precise_bn_loader = (
+        loader.construct_loader(cfg, "train", is_precise_bn=True)
+        if cfg.BN.USE_PRECISE_STATS
+        else None
     )
 
     # Create meters.
@@ -442,13 +444,29 @@ def train(cfg):
 
         # Shuffle the dataset.
         loader.shuffle_dataset(train_loader, cur_epoch)
+
         # Train for one epoch.
         train_epoch(
             train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
         )
 
+        is_checkp_epoch = (
+            cu.is_checkpoint_epoch(
+                cfg,
+                cur_epoch,
+                None if multigrid is None else multigrid.schedule,
+            )
+        )
+        is_eval_epoch = misc.is_eval_epoch(
+            cfg, cur_epoch, None if multigrid is None else multigrid.schedule
+        )
+
         # Compute precise BN stats.
-        if cfg.BN.USE_PRECISE_STATS and len(get_bn_modules(model)) > 0:
+        if (
+            (is_checkp_epoch or is_eval_epoch)
+            and cfg.BN.USE_PRECISE_STATS
+            and len(get_bn_modules(model)) > 0
+        ):
             calculate_and_update_precise_bn(
                 precise_bn_loader,
                 model,
@@ -458,14 +476,10 @@ def train(cfg):
         _ = misc.aggregate_sub_bn_stats(model)
 
         # Save a checkpoint.
-        if cu.is_checkpoint_epoch(
-            cfg, cur_epoch, None if multigrid is None else multigrid.schedule
-        ):
+        if is_checkp_epoch:
             cu.save_checkpoint(cfg.OUTPUT_DIR, model, optimizer, cur_epoch, cfg)
         # Evaluate the model on validation set.
-        if misc.is_eval_epoch(
-            cfg, cur_epoch, None if multigrid is None else multigrid.schedule
-        ):
+        if is_eval_epoch:
             eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer)
 
     if writer is not None:

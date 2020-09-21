@@ -167,13 +167,22 @@ class Kinetics(torch.utils.data.Dataset):
             # center, or right if width is larger than height, and top, middle,
             # or bottom if height is larger than width.
             spatial_sample_index = (
-                self._spatial_temporal_idx[index]
-                % self.cfg.TEST.NUM_SPATIAL_CROPS
+                (
+                    self._spatial_temporal_idx[index]
+                    % self.cfg.TEST.NUM_SPATIAL_CROPS
+                )
+                if self.cfg.TEST.NUM_SPATIAL_CROPS > 1
+                else 1
             )
-            min_scale, max_scale, crop_size = [self.cfg.DATA.TEST_CROP_SIZE] * 3
+            min_scale, max_scale, crop_size = (
+                [self.cfg.DATA.TEST_CROP_SIZE] * 3
+                if self.cfg.TEST.NUM_SPATIAL_CROPS > 1
+                else [self.cfg.DATA.TRAIN_JITTER_SCALES[0]] * 2
+                + [self.cfg.DATA.TEST_CROP_SIZE]
+            )
             # The testing is deterministic and no jitter should be performed.
             # min_scale, max_scale, and crop_size are expect to be the same.
-            assert len({min_scale, max_scale, crop_size}) == 1
+            assert len({min_scale, max_scale}) == 1
         else:
             raise NotImplementedError(
                 "Does not support {} mode".format(self.mode)
@@ -184,7 +193,7 @@ class Kinetics(torch.utils.data.Dataset):
         )
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
-        for _ in range(self._num_retries):
+        for i_try in range(self._num_retries):
             video_container = None
             try:
                 video_container = container.get_video_container(
@@ -200,7 +209,17 @@ class Kinetics(torch.utils.data.Dataset):
                 )
             # Select a random video if the current video was not able to access.
             if video_container is None:
-                index = random.randint(0, len(self._path_to_videos) - 1)
+                logger.warning(
+                    "Failed to meta load video idx {} from {}; trial {}".format(
+                        index, self._path_to_videos[index], i_try
+                    )
+                )
+                if (
+                    self.mode not in ["test"]
+                    and i_try > self._num_retries // 2
+                ):
+                    # let's try another one
+                    index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
 
             # Decode video. Meta info is used to perform selective decoding.
@@ -213,13 +232,23 @@ class Kinetics(torch.utils.data.Dataset):
                 video_meta=self._video_meta[index],
                 target_fps=self.cfg.DATA.TARGET_FPS,
                 backend=self.cfg.DATA.DECODING_BACKEND,
-                max_spatial_scale=max_scale,
+                max_spatial_scale=min_scale,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
             # select another video.
             if frames is None:
-                index = random.randint(0, len(self._path_to_videos) - 1)
+                logger.warning(
+                    "Failed to decode video idx {} from {}; trial {}".format(
+                        index, self._path_to_videos[index], i_try
+                    )
+                )
+                if (
+                    self.mode not in ["test"]
+                    and i_try > self._num_retries // 2
+                ):
+                    # let's try another one
+                    index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
 
             # Perform color normalization.

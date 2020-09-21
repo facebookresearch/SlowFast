@@ -64,6 +64,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                         val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
+        test_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
@@ -132,7 +133,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             )
 
     test_meter.finalize_metrics()
-    test_meter.reset()
+    return test_meter
 
 
 def test(cfg):
@@ -195,6 +196,6 @@ def test(cfg):
         writer = None
 
     # # Perform multi-view test on the entire dataset.
-    perform_test(test_loader, model, test_meter, cfg, writer)
+    test_meter = perform_test(test_loader, model, test_meter, cfg, writer)
     if writer is not None:
         writer.close()
