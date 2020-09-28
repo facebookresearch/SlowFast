@@ -1,0 +1,60 @@
+_include: !include SLOWFAST_4x16_R50.yaml
+
+log_file: ''
+debug: True
+log_upload_files: False
+logger_type: passthrough
+config_file_delete_on_exit: False
+root_dir: /mnt/c/home/mrevow
+output_dir: /mnt/c/home/mrevow/out
+input_file_storage: ''
+# init_method: tcp://localhost:9990
+log_title: ''
+master_addr: '10.3.0.4'
+master_port: '9756'
+NUM_SHARDS: 1
+SHARD_ID: 0
+
+LOG_PERIOD: 2
+
+DATA_LOADER:
+  NUM_WORKERS: 1
+NUM_GPUS: 1
+
+SOLVER:
+  MAX_EPOCH: 1
+
+DATA:
+  PATH_TO_DATA_DIR: 'data/ava'
+  PATH_LABEL_SEPARATOR: ','
+  PATH_PREFIX: data/ava/trainTensors
+  DATA_TYPE: tensors   # Format of data - can be [tensors, video]
+  NUM_FRAMES: 8    # Window size
+
+  # Column names in data description data frame
+  CLIP_NAME_COL: clip
+  FID_COL: fid
+  TRACK_COL: trId
+  START_FRAME_COL: min
+  END_FRAME_COL: max
+  LABEL_COL: label
+  LABEL_FILE_SUFFIX: Labels.pcl
+
+
+  TRAIN_CROP_SIZE: 96
+  CROP_SIZE: 96
+  TRAIN_JITTER_SCALES: [96, 128]
+
+TRAIN:
+  BATCH_SIZE: 48
+  DATASET: Ava_asd
+  CHECKPOINT_PERIOD: 0
+
+MODEL:
+  NUM_CLASSES: 2
+
+METRICS:
+  AT_RECALL: [0.85, 0.90, 0.92]
+  AT_PREC: [0.85, 0.90, 0.92]
+  PLOT_MAX_LIMITS: {'loss': 1.0}
+  PLOT_MIN_LIMITS: {'loss': 0.0}

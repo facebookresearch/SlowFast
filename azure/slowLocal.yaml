@@ -5,14 +5,14 @@ debug: True
 log_upload_files: False
 logger_type: passthrough
 config_file_delete_on_exit: False
-root_dir: /home/mrevow
-output_dir: /home/mrevow/out
+root_dir: /mnt/c/home/mrevow
+output_dir: /mnt/c/home/mrevow/out
 input_file_storage: ''
 # init_method: tcp://localhost:9990
 log_title: ''
 master_addr: '10.0.41.4'
-master_port: '9755'
-num_shards: 2
+master_port: '9756'
+num_shards: 1
 shard_id: 0
 
 DATA_LOADER:
@@ -29,3 +29,4 @@ DATA:
 
 TRAIN:
   BATCH_SIZE: 4
+

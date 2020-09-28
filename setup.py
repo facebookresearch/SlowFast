@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="slowfast",
-    version="1.0",
+    version = "1.0",
     author="FAIR",
     url="unknown",
     description="SlowFast Video Understanding",

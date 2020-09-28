@@ -9,7 +9,7 @@ import os
 from collections import defaultdict, deque
 import torch
 from fvcore.common.timer import Timer
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_curve, auc
 
 import slowfast.datasets.ava_helper as ava_helper
 import slowfast.utils.logging as logging
@@ -23,6 +23,22 @@ from slowfast.utils.ava_eval_helper import (
 )
 
 logger = logging.get_logger(__name__)
+
+def atRecall(prec, rec, thresh, atRecall=0.75):
+    at_rec = [(p, r, t) for p, r, t in zip(prec, rec, thresh) if r <= atRecall]
+    return at_rec[0] if len(at_rec) > 0 else (-1, -1, -1)
+
+def atPrec(prec, rec, thresh, atPrec=0.75):
+    at_prec = [(p, r, t) for p, r, t in zip(prec, rec, thresh) if p >= atPrec]
+    return at_prec[0] if len(at_prec) > 0 else (-1, -1, -1)
+
+def calc_binary_stats(preds, labels, stats, cfg):
+    if len(preds) == len(labels):
+        precision, recall, thresholds = precision_recall_curve(labels, preds)
+        stats.update({"auc": auc(recall, precision)})
+
+        stats.update({"pr@_{}".format(r): "{:.3f}".format(atRecall(precision, recall, thresholds, atRecall=r)[0]) for r in cfg.METRICS.AT_RECALL})
+        stats.update({"rec@_{}".format(p): "{:.3f}".format(atPrec(precision, recall, thresholds, atPrec=p)[1]) for p in cfg.METRICS.AT_PREC})
 
 
 def get_ava_mini_groundtruth(full_groundtruth):
@@ -498,7 +514,7 @@ class TrainMeter(object):
             self.num_top1_mis += top1_err * mb_size
             self.num_top5_mis += top5_err * mb_size
 
-    def log_iter_stats(self, cur_epoch, cur_iter):
+    def log_iter_stats(self, cur_epoch, cur_iter, preds=[], labels=[]):
         """
         log the stats of the current iteration.
         Args:
@@ -506,7 +522,7 @@ class TrainMeter(object):
             cur_iter (int): the number of current iteration.
         """
         if (cur_iter + 1) % self._cfg.LOG_PERIOD != 0:
-            return
+            return None
         eta_sec = self.iter_timer.seconds() * (
             self.MAX_EPOCH - (cur_epoch * self.epoch_iters + cur_iter + 1)
         )
@@ -524,9 +540,12 @@ class TrainMeter(object):
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
             stats["top5_err"] = self.mb_top5_err.get_win_median()
+        if len(preds) > 0 and len(labels) > 0:
+            calc_binary_stats(preds, labels, stats, self._cfg)
         self.logger.info(stats)
+        return stats
 
-    def log_epoch_stats(self, cur_epoch):
+    def log_epoch_stats(self, cur_epoch,  preds=[], labels=[]):
         """
         Log the stats of the current epoch.
         Args:
@@ -534,7 +553,7 @@ class TrainMeter(object):
         """
         if self.num_samples <= 0:
             self.logger.warning("TrainMeter log_epoch_stats numSample {}".format(self.num_samples))
-            return 
+            return None
            
         eta_sec = self.iter_timer.seconds() * (
             self.MAX_EPOCH - (cur_epoch + 1) * self.epoch_iters
@@ -556,7 +575,10 @@ class TrainMeter(object):
             stats["top1_err"] = top1_err
             stats["top5_err"] = top5_err
             stats["loss"] = avg_loss
+        if len(preds) > 0 and len(labels) > 0:
+            calc_binary_stats(preds, labels, stats, self._cfg)
         self.logger.info(stats)
+        return stats
 
 
 class ValMeter(object):
@@ -637,7 +659,7 @@ class ValMeter(object):
         self.all_preds.append(preds)
         self.all_labels.append(labels)
 
-    def log_iter_stats(self, cur_epoch, cur_iter):
+    def log_iter_stats(self, cur_epoch, cur_iter, preds=[], labels=[]):
         """
         log the stats of the current iteration.
         Args:
@@ -645,7 +667,7 @@ class ValMeter(object):
             cur_iter (int): the number of current iteration.
         """
         if (cur_iter + 1) % self._cfg.LOG_PERIOD != 0:
-            return
+            return None
         eta_sec = self.iter_timer.seconds() * (self.max_iter - cur_iter - 1)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
@@ -659,9 +681,15 @@ class ValMeter(object):
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
             stats["top5_err"] = self.mb_top5_err.get_win_median()
-        self.logger.info(stats)
 
-    def log_epoch_stats(self, cur_epoch):
+        if len(preds) > 0 and len(labels) > 0:
+            calc_binary_stats(preds, labels, stats, self._cfg)
+
+        self.logger.info(stats)
+        return stats
+
+
+    def log_epoch_stats(self, cur_epoch, preds=[], labels=[]):
         """
         Log the stats of the current epoch.
         Args:
@@ -669,7 +697,7 @@ class ValMeter(object):
         """
         if self.num_samples <= 0:
             self.logger.warning("ValMeter log_epoch_stats numSample {}".format(self.num_samples))
-            return
+            return None
 
         stats = {
             "_type": "val_epoch",
@@ -694,7 +722,12 @@ class ValMeter(object):
             stats["min_top1_err"] = self.min_top1_err
             stats["min_top5_err"] = self.min_top5_err
 
+        if len(preds) > 0 and len(labels) > 0:
+            calc_binary_stats(preds, labels, stats, self._cfg)
+
+
         self.logger.info(stats)
+        return stats
 
 
 def get_map(preds, labels):

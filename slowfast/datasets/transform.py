@@ -98,7 +98,7 @@ def random_crop(images, size, boxes=None):
             `num boxes` x 4.
     """
     if images.shape[2] == size and images.shape[3] == size:
-        return images
+        return images, None
     height = images.shape[2]
     width = images.shape[3]
     y_offset = 0

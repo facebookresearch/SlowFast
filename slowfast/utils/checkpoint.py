@@ -24,7 +24,7 @@ def make_checkpoint_dir(path_to_job):
     Args:
         path_to_job (string): the path to the folder of the current job.
     """
-    checkpoint_dir = os.path.join(path_to_job, "checkpoints")
+    checkpoint_dir = path_to_job
     # Create the checkpoint dir from the master process
     if du.is_master_proc() and not PathManager.exists(checkpoint_dir):
         try:
@@ -40,7 +40,7 @@ def get_checkpoint_dir(path_to_job):
     Args:
         path_to_job (string): the path to the folder of the current job.
     """
-    return os.path.join(path_to_job, "checkpoints")
+    return path_to_job
 
 
 def get_path_to_checkpoint(path_to_job, epoch):
@@ -101,7 +101,7 @@ def is_checkpoint_epoch(cfg, cur_epoch, multigrid_schedule=None):
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
-    return (cur_epoch + 1) % cfg.TRAIN.CHECKPOINT_PERIOD == 0
+    return cfg.TRAIN.CHECKPOINT_PERIOD > 0 and (cur_epoch + 1) % cfg.TRAIN.CHECKPOINT_PERIOD == 0
 
 
 def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):

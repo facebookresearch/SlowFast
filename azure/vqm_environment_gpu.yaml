@@ -3,36 +3,30 @@ dependencies:
 - python=3.8.3
 
 - pip:
-  - azure-cosmosdb-table
   - azureml-defaults
+  - opencv-python-headless
   - numpy
   - git+https://github.com/facebookresearch/fvcore
   - scikit-learn
+  - pandas
   - Pillow
   - PyYAML
   - matplotlib
   - pyyaml-include
   - azureml-sdk
   - mysql-connector-python
-  - torch
-  - torchvision==0.7.0
-  - cython
-  - 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
+  - onnx
   - onnxruntime
-  - numba==0.48.0
-  - simplejson
-  - librosa
-  - tqdm
-  - psutil
-  - tensorboard
+  - h5py
+  - soundfile
+  - torchvision
   - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/ic3_ai-0.13-py3-none-any.whl
-  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/detectron2-0.2-cp38-cp38-linux_x86_64.whl
-  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/slowfast-1596465006.340789-py3-none-any.whl
-- pytorch=1.6.0
-- cudatoolkit=10.2
+  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/detectron2-0.3-cp38-cp38-linux_x86_64.whl
+  - https://videoclass5546875181.blob.core.windows.net/azureml/Environment/azureml-private-packages/slowfast-1601246753.5852637-py3-none-any.whl
 - opencv
 - mesa-libgl-cos6-x86_64
+- pytorch
+- ffmpeg
 channels:
 - conda-forge
-- pytorch
-- nvidia
+- pytorch-nightly

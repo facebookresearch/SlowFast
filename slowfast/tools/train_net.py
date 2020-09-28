@@ -30,6 +30,20 @@ class Trainer(object):
         self.logger = None
         self.cfg = cfg
 
+    def plotStats(self, stats, ite, typ):
+        if du.is_master_proc() and stats is not None:
+            for k, v in stats.items():
+                try:
+                    val = float(v)
+                    nme = "{}_{}".format(typ, k)
+                    maxx = self.cfg.METRICS.PLOT_MAX_LIMITS.get(k, None)
+                    val = min(val, maxx) if maxx is not None else val
+                    minn = self.cfg.METRICS.PLOT_MIN_LIMITS.get(k, None)
+                    val = max(val, minn) if minn is not None else val
+                    self.logger.log_row(name=nme, iter=ite, val=val, description="{} master proc".format(nme))
+                except ValueError:
+                    pass
+
     def train_epoch(
         self, train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None
     ):
@@ -52,13 +66,16 @@ class Trainer(object):
         train_meter.iter_tic()
         data_size = len(train_loader)
         start = time.time()
-        btch = cfg.TRAIN.BATCH_SIZE
+        btch = cfg.TRAIN.BATCH_SIZE * self.cfg.NUM_SHARDS
         rankE = os.environ.get("RANK", None)
         worldE = os.environ.get("WORLD_SIZE", None)
-        self.logger.info("Start Epoch {} dLen {} Batch {} dSize {} localRank {} rank {} {} world {} {}".format(
-            cur_epoch, data_size, btch, data_size * btch, du.get_local_rank(), du.get_rank(), rankE, du.get_world_size(), worldE))
+        dSize = data_size * btch
+        self.logger.info("Train Epoch {} dLen {} Batch {} dSize {} localRank {} rank {} {} world {} {}".format(
+            cur_epoch, data_size, btch, dSize, du.get_local_rank(), du.get_rank(), rankE, du.get_world_size(), worldE))
         tot = 0
         first = True
+        predsAll = []
+        labelsAll = []
 
         for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
@@ -137,8 +154,12 @@ class Trainer(object):
                         [loss] = du.all_reduce([loss])
                     loss = loss.item()
                 else:
+                    # Binary classifier - save preds / labels for metrics
+                    if cfg.MODEL.NUM_CLASSES == 2:
+                        predsAll.extend(preds.detach().cpu().numpy()[:,-1])
+                        labelsAll.extend(labels.detach().cpu().numpy())
                     # Compute the errors.
-                    num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                    num_topks_correct = metrics.topks_correct(preds, labels, (1, min(5, cfg.MODEL.NUM_CLASSES)))
                     top1_err, top5_err = [
                         (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
                     ]
@@ -173,19 +194,19 @@ class Trainer(object):
                         },
                         global_step=data_size * cur_epoch + cur_iter,
                     )
-                if du.is_master_proc():
-                    ite = data_size * cur_epoch + cur_iter
-                    self.logger.log_row(name='TrainLoss', iter=ite, loss=loss, description="train loss")
-                    self.logger.log_row(name='TrainLr', iter=ite, lr=lr, description="train learn rate")
-                    self.logger.log_row(name='Top1', iter=ite, lr=top1_err, description="Top 1 Err")
-                    self.logger.log_row(name='Top5', iter=ite, lr=top5_err, description="Top 5 Err")
 
-
-            train_meter.log_iter_stats(cur_epoch, cur_iter)
+            stats = train_meter.log_iter_stats(cur_epoch, cur_iter, predsAll, labelsAll)
+            ite = dSize * cur_epoch + btch * (cur_iter+1)
+            self.plotStats(stats, ite, 'TrainIter')
             train_meter.iter_tic()
 
+        if du.is_master_proc() and cfg.LOG_MODEL_INFO:
+            misc.log_model_info(model, cfg, use_train_input=True)
         # Log epoch stats.
-        train_meter.log_epoch_stats(cur_epoch)
+        gathered = du.all_gather([torch.tensor(predsAll).to(torch.device("cuda")), torch.tensor(labelsAll).to(torch.device("cuda"))])
+        stats = train_meter.log_epoch_stats(cur_epoch, gathered[0].detach().cpu().numpy(), gathered[1].detach().cpu().numpy())
+        ite = (cur_epoch+1) * dSize
+        self.plotStats(stats, ite, 'TrainEpoch')
         train_meter.reset()
         end = time.time()
         el = end - start
@@ -215,7 +236,18 @@ class Trainer(object):
 
         # Evaluation mode enabled. The running stats would not be updated.
         model.eval()
+        data_size = len(val_loader)
+        btch = cfg.TRAIN.BATCH_SIZE * self.cfg.NUM_SHARDS
+        rankE = os.environ.get("RANK", None)
+        worldE = os.environ.get("WORLD_SIZE", None)
+        dSize = data_size * btch
+        self.logger.info("Val Epoch {} dLen {} Batch {} dSize {} localRank {} rank {} {} world {} {}".format(
+            cur_epoch, data_size, btch, dSize, du.get_local_rank(), du.get_rank(), rankE, du.get_world_size(), worldE))
+
         val_meter.iter_tic()
+        predsAll = []
+        labelsAll = []
+        data_size = len(val_loader)
 
         for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
             # Transferthe data to the current GPU device.
@@ -256,8 +288,12 @@ class Trainer(object):
                     if cfg.NUM_GPUS > 1:
                         preds, labels = du.all_gather([preds, labels])
                 else:
+                    if cfg.MODEL.NUM_CLASSES == 2:
+                        predsAll.extend(preds.detach().cpu().numpy()[:,-1])
+                        labelsAll.extend(labels.detach().cpu().numpy())
+
                     # Compute the errors.
-                    num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+                    num_topks_correct = metrics.topks_correct(preds, labels, (1, min(5, cfg.MODEL.NUM_CLASSES)))
 
                     # Combine the errors across the GPUs.
                     top1_err, top5_err = [
@@ -283,16 +319,23 @@ class Trainer(object):
 
                     if du.is_master_proc():
                         ite = len(val_loader) * cur_epoch + cur_iter
-                        self.logger.log_row(name='Top1', iter=ite, lr=top1_err, description="Top 1 Err")
-                        self.logger.log_row(name='Top5', iter=ite, lr=top5_err, description="Top 5 Err")
+                        self.logger.log_row(name='ValTop1', iter=ite, lr=top1_err, description="Top 1 Err")
+                        self.logger.log_row(name='ValTop5', iter=ite, lr=top5_err, description="Top 5 Err")
 
                 val_meter.update_predictions(preds, labels)
 
-            val_meter.log_iter_stats(cur_epoch, cur_iter)
+            stats = val_meter.log_iter_stats(cur_epoch, cur_iter, predsAll, labelsAll)
+            ite = dSize * cur_epoch + btch * (cur_iter+1)
+            self.plotStats(stats, ite, 'ValIter')
+
             val_meter.iter_tic()
 
         # Log epoch stats.
-        val_meter.log_epoch_stats(cur_epoch)
+        gathered = du.all_gather([torch.tensor(predsAll).to(torch.device("cuda")), torch.tensor(labelsAll).to(torch.device("cuda"))])
+        stats = val_meter.log_epoch_stats(cur_epoch, gathered[0].detach().cpu().numpy(), gathered[1].detach().cpu().numpy())
+        ite = (cur_epoch+1) * dSize
+        self.plotStats(stats, ite, 'ValEpoch')
+
         # write to tensorboard format if available.
         if writer is not None:
             if cfg.DETECTION.ENABLE:
@@ -430,7 +473,9 @@ class Trainer(object):
 
         # Create the video train and val loaders.
         train_loader = loader.construct_loader(cfg, "train")
+        self.logger.info("Train: Loaded {} labels".format(len(train_loader)))
         val_loader = loader.construct_loader(cfg, "val")
+        self.logger.info("Val: Loaded {} labels".format(len(val_loader)))
         precise_bn_loader = loader.construct_loader(
             cfg, "train", is_precise_bn=True
         )
@@ -500,7 +545,8 @@ class Trainer(object):
             if cu.is_checkpoint_epoch(
                 cfg, cur_epoch, None if multigrid is None else multigrid.schedule
             ):
-                cu.save_checkpoint(cfg.OUTPUT_DIR, model, optimizer, cur_epoch, cfg)
+                chkFile = cu.save_checkpoint(cfg.OUTPUT_DIR, model, optimizer, cur_epoch, cfg)
+                self.logger.info("Created checkpont {}".format(chkFile))
             # Evaluate the model on validation set.
             if misc.is_eval_epoch(
                 cfg, cur_epoch, None if multigrid is None else multigrid.schedule

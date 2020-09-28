@@ -4,6 +4,8 @@ import os
 import copy
 import datetime
 import socket
+import cv2
+import torchvision
 
 from common.utils.yamlConfig import YamlConfig
 from common.utils.logger import CreateLogger
@@ -39,13 +41,13 @@ def ParseArgs():
   parser.add_argument("--log_title", type=str, help="Run title", default='None')
   parser.add_argument("--cfg_file", type=str, help="", default=None)
   parser.add_argument(
-      "--shard_id",
-      help="The shard id of current node, Starts from 0 to num_shards - 1",
+      "--SHARD_ID",
+      help="The shard id of current node, Starts from 0 to NUM_SHARDS - 1",
       default=None,
       type=int,
   )
   parser.add_argument(
-      "--num_shards",
+      "--NUM_SHARDS",
       help="Number of shards using by the job",
       default=None,
       type=int,
@@ -60,6 +62,10 @@ def ParseArgs():
   return args
 
 def updatePaths(args):
+  '''
+  Update the data paths to take into account root_dir
+  After this update teh data path are absolute and we no longer need to use root_dir or output_dir
+  '''
   args.DATA['PATH_TO_DATA_DIR'] = os.path.join(args.root_dir, args.DATA['PATH_TO_DATA_DIR'])
   args.DATA['PATH_PREFIX'] = os.path.join(args.root_dir, args.DATA['PATH_PREFIX'])
   args.OUTPUT_DIR = args.output_dir
@@ -79,6 +85,7 @@ def main():
       args = updatePaths(args)
 
       with TempDir(baseDir=args.output_dir, deleteOnExit=True) as tmp:
+        # Convert args to cfg format
         tmpFile = createFullPathTree(tmp.tempDir, 'cfgTmp')
         args.cfg_file = tmpFile
         config.SaveConfig(file=tmpFile)
@@ -87,17 +94,20 @@ def main():
       with CreateLogger(args, logger_type=args.logger_type) as logger:
         logger.log_value('title', args.log_title, 'Run Title entered when job started')
         logger.info("Starting on host {} host_ip {}".format(host_name, host_ip))
+        logger.info("cv2 version {}".format(cv2.__version__))
+        logger.info("torch version {}".format(torch.__version__))
+        logger.info("Cuda enabled {} num GPU {}".format(torch.cuda.is_available(), torch.cuda.device_count()))
+        logger.info("Torchvision version {}".format(torchvision.__version__))
 
-        # logger.info(config.ReportConfig())
-        args.master_addr = args.master_addr if cfg.NUM_SHARDS > 1 else host_ip
+        logger.info(config.ReportConfig())
+        args.master_addr = host_ip if cfg.NUM_SHARDS <= 1  or cfg.SHARD_ID == 0 else args.master_addr
         os.environ["MASTER_ADDR"] = args.master_addr
         os.environ["MASTER_PORT"] = str(args.master_port)
         os.environ["WORLD_SIZE"] = str(cfg.NUM_SHARDS * cfg.NUM_GPUS)
         logger.info("MASTER_ADDR {} MASTER_PORT {} WORLD_SIZE {}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"], os.environ["WORLD_SIZE"]))
+        logger.info("MASTER_ADDR {} MASTER_PORT {} ".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"], ))
         logger.info("CFG")
         logger.info(cfg)
-        ite = 0
-        loss = 1.1
         trainer = Trainer(cfg)
         launch_job(cfg=cfg, init_method=None, func=trainer.train)
 

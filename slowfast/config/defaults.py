@@ -5,17 +5,18 @@
 from fvcore.common.config import CfgNode
 
 from . import custom_config
+new_allowed = True
 
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
-_C = CfgNode(new_allowed=True)
+_C = CfgNode(new_allowed=new_allowed)
 
 
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
-_C.BN = CfgNode()
+_C.BN = CfgNode(new_allowed=new_allowed)
 
 # Precise BN stats.
 _C.BN.USE_PRECISE_STATS = False
@@ -41,7 +42,7 @@ _C.BN.NUM_SYNC_DEVICES = 1
 # ---------------------------------------------------------------------------- #
 # Training options.
 # ---------------------------------------------------------------------------- #
-_C.TRAIN = CfgNode()
+_C.TRAIN = CfgNode(new_allowed=new_allowed)
 
 # If True Train the model, else skip training.
 _C.TRAIN.ENABLE = True
@@ -74,7 +75,7 @@ _C.TRAIN.CHECKPOINT_INFLATE = False
 # ---------------------------------------------------------------------------- #
 # Testing options
 # ---------------------------------------------------------------------------- #
-_C.TEST = CfgNode()
+_C.TEST = CfgNode(new_allowed=new_allowed)
 
 # If True test the model, else skip the testing.
 _C.TEST.ENABLE = True
@@ -103,7 +104,7 @@ _C.TEST.CHECKPOINT_TYPE = "pytorch"
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
-_C.RESNET = CfgNode()
+_C.RESNET = CfgNode(new_allowed=new_allowed)
 
 # Transformation function.
 _C.RESNET.TRANS_FUNC = "bottleneck_transform"
@@ -140,7 +141,7 @@ _C.RESNET.SPATIAL_DILATIONS = [[1], [1], [1], [1]]
 # -----------------------------------------------------------------------------
 # Nonlocal options
 # -----------------------------------------------------------------------------
-_C.NONLOCAL = CfgNode()
+_C.NONLOCAL = CfgNode(new_allowed=new_allowed)
 
 # Index of each stage and block to add nonlocal layers.
 _C.NONLOCAL.LOCATION = [[[]], [[]], [[]], [[]]]
@@ -167,7 +168,7 @@ _C.NONLOCAL.POOL = [
 # -----------------------------------------------------------------------------
 # Model options
 # -----------------------------------------------------------------------------
-_C.MODEL = CfgNode()
+_C.MODEL = CfgNode(new_allowed=new_allowed)
 
 # Model architecture.
 _C.MODEL.ARCH = "slowfast"
@@ -200,7 +201,7 @@ _C.MODEL.HEAD_ACT = "softmax"
 # -----------------------------------------------------------------------------
 # SlowFast options
 # -----------------------------------------------------------------------------
-_C.SLOWFAST = CfgNode()
+_C.SLOWFAST = CfgNode(new_allowed=new_allowed)
 
 # Corresponds to the inverse of the channel reduction ratio, $\beta$ between
 # the Slow and Fast pathways.
@@ -221,7 +222,7 @@ _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 # -----------------------------------------------------------------------------
 # Data options
 # -----------------------------------------------------------------------------
-_C.DATA = CfgNode()
+_C.DATA = CfgNode(new_allowed=new_allowed)
 
 # The path to the data directory.
 _C.DATA.PATH_TO_DATA_DIR = ""
@@ -287,7 +288,7 @@ _C.DATA.REVERSE_INPUT_CHANNEL = False
 # ---------------------------------------------------------------------------- #
 # Optimizer options
 # ---------------------------------------------------------------------------- #
-_C.SOLVER = CfgNode()
+_C.SOLVER = CfgNode(new_allowed=new_allowed)
 
 # Base learning rate.
 _C.SOLVER.BASE_LR = 0.1
@@ -367,7 +368,7 @@ _C.DIST_BACKEND = "nccl"
 # ---------------------------------------------------------------------------- #
 # Benchmark options
 # ---------------------------------------------------------------------------- #
-_C.BENCHMARK = CfgNode()
+_C.BENCHMARK = CfgNode(new_allowed=new_allowed)
 
 # Number of epochs for data loading benchmark.
 _C.BENCHMARK.NUM_EPOCHS = 5
@@ -382,7 +383,7 @@ _C.BENCHMARK.SHUFFLE = True
 # ---------------------------------------------------------------------------- #
 # Common train/test data loader options
 # ---------------------------------------------------------------------------- #
-_C.DATA_LOADER = CfgNode()
+_C.DATA_LOADER = CfgNode(new_allowed=new_allowed)
 
 # Number of data loader workers per training process.
 _C.DATA_LOADER.NUM_WORKERS = 8
@@ -397,7 +398,7 @@ _C.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE = False
 # ---------------------------------------------------------------------------- #
 # Detection options.
 # ---------------------------------------------------------------------------- #
-_C.DETECTION = CfgNode()
+_C.DETECTION = CfgNode(new_allowed=new_allowed)
 
 # Whether enable video detection.
 _C.DETECTION.ENABLE = False
@@ -415,7 +416,7 @@ _C.DETECTION.ROI_XFORM_RESOLUTION = 7
 # -----------------------------------------------------------------------------
 # AVA Dataset options
 # -----------------------------------------------------------------------------
-_C.AVA = CfgNode()
+_C.AVA = CfgNode(new_allowed=new_allowed)
 
 # Directory path of frames.
 _C.AVA.FRAME_DIR = "/mnt/fair-flash3-east/ava_trainval_frames.img/"
@@ -491,7 +492,7 @@ _C.AVA.IMG_PROC_BACKEND = "cv2"
 # Multigrid training options
 # See https://arxiv.org/abs/1912.00998 for details about multigrid training.
 # ---------------------------------------------------------------------------- #
-_C.MULTIGRID = CfgNode()
+_C.MULTIGRID = CfgNode(new_allowed=new_allowed)
 
 # Multigrid training allows us to train for more epochs with fewer iterations.
 # This hyperparameter specifies how many times more epochs to train.
@@ -533,7 +534,7 @@ _C.MULTIGRID.DEFAULT_S = 0
 # -----------------------------------------------------------------------------
 # Tensorboard Visualization Options
 # -----------------------------------------------------------------------------
-_C.TENSORBOARD = CfgNode()
+_C.TENSORBOARD = CfgNode(new_allowed=new_allowed)
 
 # Log to summary writer, this will automatically.
 # log loss, lr and metrics during train/eval.
@@ -553,7 +554,7 @@ _C.TENSORBOARD.CLASS_NAMES_PATH = ""
 _C.TENSORBOARD.CATEGORIES_PATH = ""
 
 # Config for confusion matrices visualization.
-_C.TENSORBOARD.CONFUSION_MATRIX = CfgNode()
+_C.TENSORBOARD.CONFUSION_MATRIX = CfgNode(new_allowed=new_allowed)
 # Visualize confusion matrix.
 _C.TENSORBOARD.CONFUSION_MATRIX.ENABLE = False
 # Figure size of the confusion matrices plotted.
@@ -563,7 +564,7 @@ _C.TENSORBOARD.CONFUSION_MATRIX.FIGSIZE = [8, 8]
 _C.TENSORBOARD.CONFUSION_MATRIX.SUBSET_PATH = ""
 
 # Config for histogram visualization.
-_C.TENSORBOARD.HISTOGRAM = CfgNode()
+_C.TENSORBOARD.HISTOGRAM = CfgNode(new_allowed=new_allowed)
 # Visualize histograms.
 _C.TENSORBOARD.HISTOGRAM.ENABLE = False
 # Path to a subset of classes to plot histograms.
@@ -577,7 +578,7 @@ _C.TENSORBOARD.HISTOGRAM.FIGSIZE = [8, 8]
 
 # Config for layers' weights and activations visualization.
 # _C.TENSORBOARD.ENABLE must be True.
-_C.TENSORBOARD.MODEL_VIS = CfgNode()
+_C.TENSORBOARD.MODEL_VIS = CfgNode(new_allowed=new_allowed)
 
 # If False, skip model visualization.
 _C.TENSORBOARD.MODEL_VIS.ENABLE = False
@@ -613,7 +614,7 @@ custom_config.add_custom_config(_C)
 # ---------------------------------------------------------------------------- #
 # Demo options
 # ---------------------------------------------------------------------------- #
-_C.DEMO = CfgNode()
+_C.DEMO = CfgNode(new_allowed=new_allowed)
 
 _C.DEMO.ENABLE = False
 

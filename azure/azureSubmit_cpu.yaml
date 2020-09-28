@@ -8,7 +8,7 @@ azure_package_path: wheels_canary
 config_overwrite: True
 azure_script: run.py
 conda_environment: vqm_environment_cpu.yaml
-datastore: videoclass
+datastore: plaza
 datastore_fileStorage: videoclass
 dist_dir: dist
 docker_image: mcr.microsoft.com/azureml/base:intelmpi2018.3-ubuntu16.04
