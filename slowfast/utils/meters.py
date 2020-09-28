@@ -133,6 +133,8 @@ class AVAMeter(object):
         else:
             raise NotImplementedError("Unknown mode: {}".format(self.mode))
 
+        logging.log_json_stats(stats)
+
     def iter_tic(self):
         """
         Start to record time.

@@ -87,7 +87,6 @@ def train_epoch(
         loss.backward()
         # Update the parameters.
         optimizer.step()
-        train_meter.iter_toc()  # do not measure allreduce for this meter
 
         if cfg.DETECTION.ENABLE:
             if cfg.NUM_GPUS > 1:
@@ -152,6 +151,7 @@ def train_epoch(
                     global_step=data_size * cur_epoch + cur_iter,
                 )
 
+        train_meter.iter_toc()  # measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         train_meter.iter_tic()
 
