@@ -469,7 +469,7 @@ class Trainer(object):
         optimizer = optim.construct_optimizer(model, cfg)
 
         # Load a checkpoint to resume training if applicable.
-        start_epoch = cu.load_train_checkpoint(cfg, model, optimizer)
+        start_epoch = cu.load_train_checkpoint(cfg, model, optimizer, self.logger)
 
         # Create the video train and val loaders.
         train_loader = loader.construct_loader(cfg, "train")

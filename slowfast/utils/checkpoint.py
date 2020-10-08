@@ -427,19 +427,19 @@ def load_test_checkpoint(cfg, model):
         )
 
 
-def load_train_checkpoint(cfg, model, optimizer):
+def load_train_checkpoint(cfg, model, optimizer, loger):
     """
     Loading checkpoint logic for training.
     """
     if cfg.TRAIN.AUTO_RESUME and has_checkpoint(cfg.OUTPUT_DIR):
         last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
-        logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
+        loger.info("Load from last checkpoint, {}.".format(last_checkpoint))
         checkpoint_epoch = load_checkpoint(
             last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
         )
         start_epoch = checkpoint_epoch + 1
     elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
-        logger.info("Load from given checkpoint file.")
+        loger.info("Load checkpoint from {}".format(cfg.TRAIN.CHECKPOINT_FILE_PATH))
         checkpoint_epoch = load_checkpoint(
             cfg.TRAIN.CHECKPOINT_FILE_PATH,
             model,

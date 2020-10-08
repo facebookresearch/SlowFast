@@ -11,20 +11,22 @@ master_port: '9756'
 NUM_SHARDS: 1
 SHARD_ID: 0
 
-LOG_PERIOD: 100
+LOG_PERIOD: 10
 
 DATA_LOADER:
-  NUM_WORKERS: 1
+  NUM_WORKERS: 4
 NUM_GPUS: 1
 
 SOLVER:
-  MAX_EPOCH: 20
+  MAX_EPOCH: 31
   BASE_LR: 0.1
+  WARMUP_EPOCHS: 5.0
+  WARMUP_START_LR: 0.04
 
 DATA:
-  PATH_TO_DATA_DIR: 'ava'
+  PATH_TO_DATA_DIRS: [ 'ava',]
   PATH_LABEL_SEPARATOR: ','
-  PATH_PREFIX: ava/trainTensors
+  PATH_PREFIXS: [ 'ava/trainTensors', ]
   DATA_TYPE: tensors   # Format of data - can be [tensors, video]
   NUM_FRAMES: 8    # Window size
 
@@ -36,8 +38,8 @@ DATA:
   END_FRAME_COL: max
   LABEL_COL: label
   LABEL_FILE_SUFFIX: ShortLabels.pcl
-  TRAIN_LABEL_FILE_SUFFIX: 50kLabels.pcl
-  VAL_LABEL_FILE_SUFFIX: 20kLabels.pcl
+  TRAIN_LABEL_FILE_SUFFIXS: ['500kLabels.pcl', ]
+  VAL_LABEL_FILE_SUFFIXS: ['200kLabels.pcl', ]
 
 
   TRAIN_CROP_SIZE: 96
@@ -45,9 +47,11 @@ DATA:
   TRAIN_JITTER_SCALES: [96, 128]
 
 TRAIN:
-  BATCH_SIZE: 32
+  BATCH_SIZE: 48
   DATASET: Ava_asd
-  CHECKPOINT_PERIOD: 5
+  CHECKPOINT_PERIOD: 4
+  AUTO_RESUME: False
+  CHECKPOINT_FILE_PATH: princetonTrain/checkPoints/checkpoint_epoch_run_444_00030.pyth
 
 MODEL:
   NUM_CLASSES: 2

@@ -22,12 +22,16 @@ DATA_LOADER:
 NUM_GPUS: 1
 
 SOLVER:
-  MAX_EPOCH: 1
+  MAX_EPOCH: 31
+  WARMUP_EPOCHS: 5.0
+  WARMUP_START_LR: 0.01
 
 DATA:
-  PATH_TO_DATA_DIR: 'data/ava'
+  # PATH_TO_DATA_DIRS: ['data/ava', 'data/princeton']
+  # PATH_PREFIXS: ['data/ava/trainTensors', 'data/princeton/trainTensors']
+  PATH_TO_DATA_DIRS: ['data/princeton']
+  PATH_PREFIXS: ['data/princeton/trainTensors']
   PATH_LABEL_SEPARATOR: ','
-  PATH_PREFIX: data/ava/trainTensors
   DATA_TYPE: tensors   # Format of data - can be [tensors, video]
   NUM_FRAMES: 8    # Window size
 
@@ -38,8 +42,11 @@ DATA:
   START_FRAME_COL: min
   END_FRAME_COL: max
   LABEL_COL: label
-  LABEL_FILE_SUFFIX: Labels.pcl
-
+  LABEL_FILE_SUFFIXS: ['Old']
+  # TRAIN_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
+  # VAL_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
+  TRAIN_LABEL_FILE_SUFFIXS: ['490.pcl']
+  VAL_LABEL_FILE_SUFFIXS: [ '490.pcl']
 
   TRAIN_CROP_SIZE: 96
   CROP_SIZE: 96
@@ -49,6 +56,8 @@ TRAIN:
   BATCH_SIZE: 48
   DATASET: Ava_asd
   CHECKPOINT_PERIOD: 0
+  AUTO_RESUME: False
+  CHECKPOINT_FILE_PATH: checkPoints/checkpoint_epoch_run_444_00030.pyth
 
 MODEL:
   NUM_CLASSES: 2

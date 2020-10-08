@@ -66,9 +66,12 @@ def updatePaths(args):
   Update the data paths to take into account root_dir
   After this update teh data path are absolute and we no longer need to use root_dir or output_dir
   '''
-  args.DATA['PATH_TO_DATA_DIR'] = os.path.join(args.root_dir, args.DATA['PATH_TO_DATA_DIR'])
-  args.DATA['PATH_PREFIX'] = os.path.join(args.root_dir, args.DATA['PATH_PREFIX'])
+  args.DATA['PATH_TO_DATA_DIRS'] = [os.path.join(args.root_dir,d) for d in  args.DATA['PATH_TO_DATA_DIRS']]
+  args.DATA['PATH_PREFIXS'] = [os.path.join(args.root_dir, d) for d in  args.DATA['PATH_PREFIXS']]
   args.OUTPUT_DIR = args.output_dir
+
+  if args.TRAIN.get('CHECKPOINT_FILE_PATH', None) is not None:
+    args.TRAIN['CHECKPOINT_FILE_PATH'] = os.path.join(args.root_dir, args.TRAIN['CHECKPOINT_FILE_PATH'])
 
   return args
 

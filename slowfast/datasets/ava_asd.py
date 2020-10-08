@@ -56,36 +56,50 @@ class Ava_asd(torch.utils.data.Dataset):
         self.cfg = cfg
 
         self._num_retries = num_retries
-        self.labelSuffix = labelSuffix
-        if self.labelSuffix is None:
-            labelName = "{}_LABEL_FILE_SUFFIX".format(mode.upper())
-            self.labelSuffix = getattr(cfg.DATA, labelName) if hasattr(cfg.DATA, labelName) else cfg.DATA.LABEL_FILE_SUFFIX
+        self.labelSuffixs = labelSuffix
+        if self.labelSuffixs is None:
+            labelName = "{}_LABEL_FILE_SUFFIXS".format(mode.upper())
+            self.labelSuffixs = getattr(cfg.DATA, labelName) if hasattr(cfg.DATA, labelName) else cfg.DATA.LABEL_FILE_SUFFIXS
 
-        self.dataDesc = None
-        self._construct_loader()
+        self.dataDescs = []
+        self.dataPrefixs = []
+        assert len(self.cfg.DATA.PATH_TO_DATA_DIRS) == len(self.cfg.DATA.PATH_PREFIXS), \
+            "Ava_asd len(PATH_TO_DATA_DIR) {} != len(PATH_PREFIX) {}".format(len(self.cfg.DATA.PATH_TO_DATA_DIRS), len(self.cfg.DATA.PATH_PREFIXS))
+        assert len(self.cfg.DATA.PATH_TO_DATA_DIRS) == len(self.labelSuffixs), \
+            "Ava_asd len(PATH_TO_DATA_DIR) {} != len(LABEL_FILE_SUFFIXS) {}".format(len(self.cfg.DATA.PATH_TO_DATA_DIRS), self.labelSuffixs)
+        for dataDescPath, dataPrefix, labelSuffix in zip(self.cfg.DATA.PATH_TO_DATA_DIRS, self.cfg.DATA.PATH_PREFIXS, self.labelSuffixs): 
+            self._construct_loader(dataDescPath, dataPrefix, labelSuffix)
+        ll = torch.tensor([len(l) for l in self.dataDescs])
+        self.dataDescsLengths = torch.cumsum(ll, dim=0).numpy().tolist()
         
-    def _construct_loader(self):
+    def _construct_loader(self, dataDescPath, dataPrefix, labelSuffix):
         path_to_file = createFullPathTree(
-            self.cfg.DATA.PATH_TO_DATA_DIR, "{}{}".format(self.mode,  self.labelSuffix)
+            dataDescPath, "{}{}".format(self.mode,  labelSuffix)
         )
         assert os.path.exists(path_to_file), "{} not found. Looking for data description pandas table".format(
             path_to_file
         )
 
-        self.dataDesc = loadPickle(path_to_file)
-        print("AvaAsd Load {} from {}".format(len(self.dataDesc), path_to_file))
-        assert os.path.exists(self.cfg.DATA.PATH_PREFIX), "{} not found - path to data files"
+        self.dataDescs.append(loadPickle(path_to_file))
+        print("AvaAsd Load {} from {}".format(len(self.dataDescs[-1]), path_to_file))
+        assert os.path.exists(dataPrefix), "{} not found - path to data files"
+        self.dataPrefixs.append(dataPrefix)
         if self.cfg.DATA.DATA_TYPE == 'tensors':
             self.dataAccessFn = self.loadFromTensorFile
         else:
             raise Exception("Unknown data access type {} Expect one of [tensors] ".format(self.cfg.DATA.DATA_TYPE))
 
-    def loadFromTensorFile(self, row):
-        fid = row[self.cfg.DATA.FID_COL] - row[self.cfg.DATA.START_FRAME_COL]
+    def loadFromTensorFile(self, row, setIdx):
+        '''
+        Load a data row from a tensor file
+        row - Row from dataDescription table decriping the file
+        idxSet - set offset for the row - This indexes onto self.dataPrefixs
+        '''
+        fid = row[self.cfg.DATA.FID_COL] - row[self.cfg.DATA.START_FRAME_COL]+1
         fid_start = fid-self.cfg.DATA.NUM_FRAMES
         if fid_start < 0:
             return None
-        tensorPath = createFullPathTree(self.cfg.DATA.PATH_PREFIX,  '{}_tr_{}_st_{}_end_{}.pt'.format(
+        tensorPath = createFullPathTree(self.dataPrefixs[setIdx],  '{}_tr_{}_st_{}_end_{}.pt'.format(
             row[self.cfg.DATA.CLIP_NAME_COL], row[self.cfg.DATA.TRACK_COL],
             row[self.cfg.DATA.START_FRAME_COL], row[self.cfg.DATA.END_FRAME_COL]))
         if not os.path.exists(tensorPath):
@@ -100,6 +114,26 @@ class Ava_asd(torch.utils.data.Dataset):
             print("PATH {} start {} fid {} shape {}".format(tensorPath, fid_start, fid, dat[fid_start:fid,:,:,:].shape))
         return dat[fid_start:fid,:,:,:]
 
+    def convertGlobalIndexToDesc(self, index):
+        """
+        Convert a global index (An index that spans the entire collection of sets) to an index within
+        the applicable set.  
+        Returns setIndex and the row index within the set
+        For example say there are 3 sets of data of lengths 500, 300, 200. means Index can be
+        in range [0 - 999]. 
+        Index   setIdx   rowIdx    
+        250     set0       25
+        530     set1       30
+        900     set2       100             
+        """
+        setIdx = 0
+        assert index < self.dataDescsLengths[-1], "Data Index {} is out of range Max data {} ".format(self.dataDescsLengths[-1])
+        while index >= self.dataDescsLengths[setIdx]:
+            setIdx += 1
+
+        indexOffset = 0 if setIdx <= 0 else self.dataDescsLengths[setIdx-1]
+        return setIdx, index - indexOffset
+        
     def __getitem__(self, index):
         """
         Given the video index, return the list of frames, label, and video
@@ -168,11 +202,12 @@ class Ava_asd(torch.utils.data.Dataset):
         # extract a sequnce of cfg.DATA_NUM_FRAMES. 
         # If given index is invalid will pick another random index
         for _ in range(self._num_retries):
-            row = self.dataDesc.iloc[index]
-            frames = self.dataAccessFn(row)
+            setIdx, rowIdx = self.convertGlobalIndexToDesc(index)
+            row = self.dataDescs[setIdx].iloc[rowIdx]
+            frames = self.dataAccessFn(row, setIdx)
             # Access failed - try another 
             if frames is None:
-                index = random.randint(0, len(self.dataDesc) - 1)
+                index = random.randint(0, len(self) - 1)
                 continue
 
             if frames.shape[0] != self.cfg.DATA.NUM_FRAMES:
@@ -212,4 +247,4 @@ class Ava_asd(torch.utils.data.Dataset):
         Returns:
             (int): the number of videos in the dataset.
         """
-        return len(self.dataDesc)
+        return self.dataDescsLengths[-1]
