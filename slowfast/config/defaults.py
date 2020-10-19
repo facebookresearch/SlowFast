@@ -788,6 +788,7 @@ def _assert_and_infer_cfg(cfg):
     assert cfg.SHARD_ID < cfg.NUM_SHARDS
     return cfg
 
+
 def get_cfg():
     """
     Get a copy of the default config.

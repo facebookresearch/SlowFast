@@ -274,7 +274,7 @@ def load_checkpoint(
                         )
                     )
         diff = set(ms.state_dict()) - set(state_dict)
-        diff = {d for d in diff if 'num_batches_tracked' not in d}
+        diff = {d for d in diff if "num_batches_tracked" not in d}
         if len(diff) > 0:
             logger.warn("Not loaded {}".format(diff))
         ms.load_state_dict(state_dict, strict=False)

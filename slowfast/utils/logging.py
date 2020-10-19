@@ -3,6 +3,7 @@
 
 """Logging."""
 
+import atexit
 import builtins
 import decimal
 import functools
@@ -28,7 +29,9 @@ def _suppress_print():
 
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
-    return PathManager.open(filename, "a")
+    io = PathManager.open(filename, "a", buffering=1024)
+    atexit.register(io.close)
+    return io
 
 
 def setup_logging(output_dir=None):

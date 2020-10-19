@@ -49,6 +49,7 @@ def params_count(model, ignore_bn=False):
                     count += p.numel()
     return count
 
+
 def gpu_mem_usage():
     """
     Compute the GPU memory usage for the current device (GB).

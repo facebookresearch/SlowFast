@@ -24,7 +24,7 @@ def parse_args():
         cfg (str): path to the config file.
         opts (argument): provide addtional options from the command line, it
             overwrites the config loaded from file.
-        """
+    """
     parser = argparse.ArgumentParser(
         description="Provide SlowFast video training and testing pipeline."
     )

@@ -7,8 +7,7 @@ import torch
 import torch.nn as nn
 
 from slowfast.models.nonlocal_helper import Nonlocal
-from slowfast.models.operators import Swish
-from slowfast.models.operators import SE
+from slowfast.models.operators import SE, Swish
 
 
 def get_trans_func(name):
@@ -507,7 +506,9 @@ class ResBlock(nn.Module):
     def _drop_connect(self, x, drop_ratio):
         """Apply dropconnect to x"""
         keep_ratio = 1.0 - drop_ratio
-        mask = torch.empty([x.shape[0], 1, 1, 1, 1], dtype=x.dtype, device=x.device)
+        mask = torch.empty(
+            [x.shape[0], 1, 1, 1, 1], dtype=x.dtype, device=x.device
+        )
         mask.bernoulli_(keep_ratio)
         x.div_(keep_ratio)
         x.mul_(mask)
@@ -685,7 +686,7 @@ class ResStage(nn.Module):
                     dilation=dilation[pathway],
                     norm_module=norm_module,
                     block_idx=i,
-                    drop_connect_rate=self._drop_connect_rate
+                    drop_connect_rate=self._drop_connect_rate,
                 )
                 self.add_module("pathway{}_res{}".format(pathway, i), res_block)
                 if i in nonlocal_inds[pathway]:

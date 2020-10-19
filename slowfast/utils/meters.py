@@ -50,9 +50,9 @@ class AVAMeter(object):
 
     def __init__(self, overall_iters, cfg, mode):
         """
-            overall_iters (int): the overall number of iterations of one epoch.
-            cfg (CfgNode): configs.
-            mode (str): `train`, `val`, or `test` mode.
+        overall_iters (int): the overall number of iterations of one epoch.
+        cfg (CfgNode): configs.
+        mode (str): `train`, `val`, or `test` mode.
         """
         self.cfg = cfg
         self.lr = None

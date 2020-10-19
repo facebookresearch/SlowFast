@@ -214,10 +214,7 @@ class Kinetics(torch.utils.data.Dataset):
                         index, self._path_to_videos[index], i_try
                     )
                 )
-                if (
-                    self.mode not in ["test"]
-                    and i_try > self._num_retries // 2
-                ):
+                if self.mode not in ["test"] and i_try > self._num_retries // 2:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
@@ -243,10 +240,7 @@ class Kinetics(torch.utils.data.Dataset):
                         index, self._path_to_videos[index], i_try
                     )
                 )
-                if (
-                    self.mode not in ["test"]
-                    and i_try > self._num_retries // 2
-                ):
+                if self.mode not in ["test"] and i_try > self._num_retries // 2:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_videos) - 1)
                 continue

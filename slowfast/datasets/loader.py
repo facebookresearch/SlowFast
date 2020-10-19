@@ -115,7 +115,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
 
 
 def shuffle_dataset(loader, cur_epoch):
-    """"
+    """ "
     Shuffles the data.
     Args:
         loader (loader): data loader to perform shuffle.

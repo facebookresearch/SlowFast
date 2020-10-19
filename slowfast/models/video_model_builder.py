@@ -732,8 +732,9 @@ class X3D(nn.Module):
                 stride_1x1=cfg.RESNET.STRIDE_1X1,
                 norm_module=self.norm_module,
                 dilation=cfg.RESNET.SPATIAL_DILATIONS[stage],
-                drop_connect_rate=cfg.MODEL.DROPCONNECT_RATE * (
-                    stage + 2) / (len(self.block_basis) + 1)
+                drop_connect_rate=cfg.MODEL.DROPCONNECT_RATE
+                * (stage + 2)
+                / (len(self.block_basis) + 1),
             )
             dim_in = dim_out
             self.add_module(prefix, s)

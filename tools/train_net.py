@@ -21,7 +21,6 @@ from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
-
 logger = logging.get_logger(__name__)
 
 
@@ -450,12 +449,10 @@ def train(cfg):
             train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
         )
 
-        is_checkp_epoch = (
-            cu.is_checkpoint_epoch(
-                cfg,
-                cur_epoch,
-                None if multigrid is None else multigrid.schedule,
-            )
+        is_checkp_epoch = cu.is_checkpoint_epoch(
+            cfg,
+            cur_epoch,
+            None if multigrid is None else multigrid.schedule,
         )
         is_eval_epoch = misc.is_eval_epoch(
             cfg, cur_epoch, None if multigrid is None else multigrid.schedule

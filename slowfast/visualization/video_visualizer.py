@@ -289,17 +289,17 @@ class ImgVisualizer(Visualizer):
 
     def _align_x_coordinate(self, box_coordinate):
         """
-            Choose an x-coordinate from the box to make sure the text label
-            does not go out of frames. By default, the left x-coordinate is
-            chosen and text is aligned left. If the box is too close to the
-            right side of the image, then the right x-coordinate is chosen
-            instead and the text is aligned right.
-            Args:
-                box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
-                coordinates of the box.
-            Returns:
-                x_coordinate (float): the chosen x-coordinate.
-                alignment (str): whether to align left or right.
+        Choose an x-coordinate from the box to make sure the text label
+        does not go out of frames. By default, the left x-coordinate is
+        chosen and text is aligned left. If the box is too close to the
+        right side of the image, then the right x-coordinate is chosen
+        instead and the text is aligned right.
+        Args:
+            box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
+            coordinates of the box.
+        Returns:
+            x_coordinate (float): the chosen x-coordinate.
+            alignment (str): whether to align left or right.
         """
         # If the x-coordinate is greater than 5/6 of the image width,
         # then we align test to the right of the box. This is
@@ -311,13 +311,13 @@ class ImgVisualizer(Visualizer):
 
     def _align_y_top(self, box_coordinate, num_text, textbox_width):
         """
-            Calculate the number of text labels to plot on top of the box
-            without going out of frames.
-            Args:
-                box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
-                coordinates of the box.
-                num_text (int): the number of text labels to plot.
-                textbox_width (float): the width of the box wrapped around text label.
+        Calculate the number of text labels to plot on top of the box
+        without going out of frames.
+        Args:
+            box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
+            coordinates of the box.
+            num_text (int): the number of text labels to plot.
+            textbox_width (float): the width of the box wrapped around text label.
         """
         dist_to_top = box_coordinate[1]
         num_text_top = dist_to_top // textbox_width
@@ -329,13 +329,13 @@ class ImgVisualizer(Visualizer):
 
     def _align_y_bottom(self, box_coordinate, num_text, textbox_width):
         """
-            Calculate the number of text labels to plot at the bottom of the box
-            without going out of frames.
-            Args:
-                box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
-                coordinates of the box.
-                num_text (int): the number of text labels to plot.
-                textbox_width (float): the width of the box wrapped around text label.
+        Calculate the number of text labels to plot at the bottom of the box
+        without going out of frames.
+        Args:
+            box_coordinate (array-like): shape (4,). The (x_left, y_top, x_right, y_bottom)
+            coordinates of the box.
+            num_text (int): the number of text labels to plot.
+            textbox_width (float): the width of the box wrapped around text label.
         """
         dist_to_bottom = self.output.height - box_coordinate[3]
         num_text_bottom = dist_to_bottom // textbox_width
@@ -411,23 +411,23 @@ class VideoVisualizer:
         ground_truth=False,
     ):
         """
-            Draw labels and bouding boxes for one image. By default, predicted labels are drawn in
-            the top left corner of the image or corresponding bounding boxes. For ground truth labels
-            (setting True for ground_truth flag), labels will be drawn in the bottom left corner.
-            Args:
-                frame (array-like): a tensor or numpy array of shape (H, W, C), where H and W correspond to
-                    the height and width of the image respectively. C is the number of
-                    color channels. The image is required to be in RGB format since that
-                    is a requirement of the Matplotlib library. The image is also expected
-                    to be in the range [0, 255].
-                preds (tensor or list): If ground_truth is False, provide a float tensor of shape (num_boxes, num_classes)
-                    that contains all of the confidence scores of the model.
-                    For recognition task, input shape can be (num_classes,). To plot true label (ground_truth is True),
-                    preds is a list contains int32 of the shape (num_boxes, true_class_ids) or (true_class_ids,).
-                bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
-                alpha (Optional[float]): transparency level of the bounding boxes.
-                text_alpha (Optional[float]): transparency level of the box wrapped around text labels.
-                ground_truth (bool): whether the prodived bounding boxes are ground-truth.
+        Draw labels and bouding boxes for one image. By default, predicted labels are drawn in
+        the top left corner of the image or corresponding bounding boxes. For ground truth labels
+        (setting True for ground_truth flag), labels will be drawn in the bottom left corner.
+        Args:
+            frame (array-like): a tensor or numpy array of shape (H, W, C), where H and W correspond to
+                the height and width of the image respectively. C is the number of
+                color channels. The image is required to be in RGB format since that
+                is a requirement of the Matplotlib library. The image is also expected
+                to be in the range [0, 255].
+            preds (tensor or list): If ground_truth is False, provide a float tensor of shape (num_boxes, num_classes)
+                that contains all of the confidence scores of the model.
+                For recognition task, input shape can be (num_classes,). To plot true label (ground_truth is True),
+                preds is a list contains int32 of the shape (num_boxes, true_class_ids) or (true_class_ids,).
+            bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
+            alpha (Optional[float]): transparency level of the bounding boxes.
+            text_alpha (Optional[float]): transparency level of the box wrapped around text labels.
+            ground_truth (bool): whether the prodived bounding boxes are ground-truth.
         """
         if isinstance(preds, torch.Tensor):
             if preds.ndim == 1:
@@ -523,20 +523,20 @@ class VideoVisualizer:
         repeat_frame=1,
     ):
         """
-            Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
-            if bboxes is provided. Boxes will gradually fade in and out the clip, centered around
-            the clip's central frame, within the provided `draw_range`.
-            Args:
-                frames (array-like): video data in the shape (T, H, W, C).
-                preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
-                    of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
-                bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
-                text_alpha (float): transparency label of the box wrapped around text labels.
-                ground_truth (bool): whether the prodived bounding boxes are ground-truth.
-                keyframe_idx (int): the index of keyframe in the clip.
-                draw_range (Optional[list[ints]): only draw frames in range [start_idx, end_idx] inclusively in the clip.
-                    If None, draw on the entire clip.
-                repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
+        Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
+        if bboxes is provided. Boxes will gradually fade in and out the clip, centered around
+        the clip's central frame, within the provided `draw_range`.
+        Args:
+            frames (array-like): video data in the shape (T, H, W, C).
+            preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
+                of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
+            bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
+            text_alpha (float): transparency label of the box wrapped around text labels.
+            ground_truth (bool): whether the prodived bounding boxes are ground-truth.
+            keyframe_idx (int): the index of keyframe in the clip.
+            draw_range (Optional[list[ints]): only draw frames in range [start_idx, end_idx] inclusively in the clip.
+                If None, draw on the entire clip.
+            repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
         """
         if draw_range is None:
             draw_range = [0, len(frames) - 1]
@@ -576,18 +576,18 @@ class VideoVisualizer:
         repeat_frame=1,
     ):
         """
-            Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
-            if bboxes is provided. Boxes will gradually fade in and out the clip, centered around
-            the clip's central frame.
-            Args:
-                frames (array-like): video data in the shape (T, H, W, C).
-                preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
-                    of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
-                bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
-                text_alpha (float): transparency label of the box wrapped around text labels.
-                ground_truth (bool): whether the prodived bounding boxes are ground-truth.
-                keyframe_idx (int): the index of keyframe in the clip.
-                repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
+        Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
+        if bboxes is provided. Boxes will gradually fade in and out the clip, centered around
+        the clip's central frame.
+        Args:
+            frames (array-like): video data in the shape (T, H, W, C).
+            preds (tensor): a tensor of shape (num_boxes, num_classes) that contains all of the confidence scores
+                of the model. For recognition task or for ground_truth labels, input shape can be (num_classes,).
+            bboxes (Optional[tensor]): shape (num_boxes, 4) that contains the coordinates of the bounding boxes.
+            text_alpha (float): transparency label of the box wrapped around text labels.
+            ground_truth (bool): whether the prodived bounding boxes are ground-truth.
+            keyframe_idx (int): the index of keyframe in the clip.
+            repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
         """
         assert repeat_frame >= 1, "`repeat_frame` must be a positive integer."
 
@@ -634,12 +634,12 @@ class VideoVisualizer:
 
     def _adjust_frames_type(self, frames):
         """
-            Modify video data to have dtype of uint8 and values range in [0, 255].
-            Args:
-                frames (array-like): 4D array of shape (T, H, W, C).
-            Returns:
-                frames (list of frames): list of frames in range [0, 1].
-                adjusted (bool): whether the original frames need adjusted.
+        Modify video data to have dtype of uint8 and values range in [0, 255].
+        Args:
+            frames (array-like): 4D array of shape (T, H, W, C).
+        Returns:
+            frames (list of frames): list of frames in range [0, 1].
+            adjusted (bool): whether the original frames need adjusted.
         """
         assert (
             frames is not None and len(frames) != 0
