@@ -66,9 +66,9 @@ class AVAMeter(object):
 
     def __init__(self, overall_iters, cfg, mode):
         """
-            overall_iters (int): the overall number of iterations of one epoch.
-            cfg (CfgNode): configs.
-            mode (str): `train`, `val`, or `test` mode.
+        overall_iters (int): the overall number of iterations of one epoch.
+        cfg (CfgNode): configs.
+        mode (str): `train`, `val`, or `test` mode.
         """
         self.cfg = cfg
         self.lr = None
@@ -76,6 +76,8 @@ class AVAMeter(object):
         self.full_ava_test = cfg.AVA.FULL_TEST_ON_VAL
         self.mode = mode
         self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
         self.all_preds = []
         self.all_ori_boxes = []
         self.all_metadata = []
@@ -95,6 +97,7 @@ class AVAMeter(object):
         _, self.video_idx_to_name = ava_helper.load_image_lists(
             cfg, mode == "train"
         )
+        self.output_dir = cfg.OUTPUT_DIR
 
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
@@ -115,7 +118,9 @@ class AVAMeter(object):
                 "cur_epoch": "{}".format(cur_epoch + 1),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
-                "time_diff": self.iter_timer.seconds(),
+                "dt": self.iter_timer.seconds(),
+                "dt_data": self.data_timer.seconds(),
+                "dt_net": self.net_timer.seconds(),
                 "mode": self.mode,
                 "loss": self.loss.get_win_median(),
                 "lr": self.lr,
@@ -126,7 +131,9 @@ class AVAMeter(object):
                 "cur_epoch": "{}".format(cur_epoch + 1),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
-                "time_diff": self.iter_timer.seconds(),
+                "dt": self.iter_timer.seconds(),
+                "dt_data": self.data_timer.seconds(),
+                "dt_net": self.net_timer.seconds(),
                 "mode": self.mode,
             }
         elif self.mode == "test":
@@ -134,7 +141,9 @@ class AVAMeter(object):
                 "_type": "{}_iter".format(self.mode),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
-                "time_diff": self.iter_timer.seconds(),
+                "dt": self.iter_timer.seconds(),
+                "dt_data": self.data_timer.seconds(),
+                "dt_net": self.net_timer.seconds(),
                 "mode": self.mode,
             }
         else:
@@ -147,12 +156,18 @@ class AVAMeter(object):
         Start to record time.
         """
         self.iter_timer.reset()
+        self.data_timer.reset()
 
     def iter_toc(self):
         """
         Stop to record time.
         """
         self.iter_timer.pause()
+        self.net_timer.pause()
+
+    def data_toc(self):
+        self.data_timer.pause()
+        self.net_timer.reset()
 
     def reset(self):
         """
@@ -223,8 +238,8 @@ class AVAMeter(object):
                 "cur_epoch": "{}".format(cur_epoch + 1),
                 "mode": self.mode,
                 "map": self.full_map,
-                "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
-                "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
+                "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
+                "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
             }
             logging.log_json_stats(stats)
 
@@ -262,6 +277,8 @@ class TestMeter(object):
         """
 
         self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
         self.num_clips = num_clips
         self.overall_iters = overall_iters
         self.multi_label = multi_label
@@ -277,6 +294,9 @@ class TestMeter(object):
             else torch.zeros((num_videos)).long()
         )
         self.clip_count = torch.zeros((num_videos)).long()
+        self.topk_accs = []
+        self.stats = {}
+
         # Reset metric.
         self.reset()
 
@@ -342,10 +362,22 @@ class TestMeter(object):
         logging.log_json_stats(stats)
 
     def iter_tic(self):
+        """
+        Start to record time.
+        """
         self.iter_timer.reset()
+        self.data_timer.reset()
 
     def iter_toc(self):
+        """
+        Stop to record time.
+        """
         self.iter_timer.pause()
+        self.net_timer.pause()
+
+    def data_toc(self):
+        self.data_timer.pause()
+        self.net_timer.reset()
 
     def finalize_metrics(self, ks=(1, 5)):
         """
@@ -366,12 +398,12 @@ class TestMeter(object):
                 )
             )
 
-        stats = {"split": "test_final"}
+        self.stats = {"split": "test_final"}
         if self.multi_label:
             map = get_map(
                 self.video_preds.cpu().numpy(), self.video_labels.cpu().numpy()
             )
-            stats["map"] = map
+            self.stats["map"] = map
         else:
             num_topks_correct = metrics.topks_correct(
                 self.video_preds, self.video_labels, ks
@@ -382,10 +414,10 @@ class TestMeter(object):
             ]
             assert len({len(ks), len(topks)}) == 1
             for k, topk in zip(ks, topks):
-                stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
+                self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
                     topk, prec=2
                 )
-        logging.log_json_stats(stats)
+        logging.log_json_stats(self.stats)
 
 
 class ScalarMeter(object):
@@ -455,6 +487,8 @@ class TrainMeter(object):
         self.epoch_iters = epoch_iters
         self.MAX_EPOCH = cfg.SOLVER.MAX_EPOCH * epoch_iters
         self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
         self.loss = ScalarMeter(cfg.LOG_PERIOD)
         self.loss_total = 0.0
         self.lr = None
@@ -465,6 +499,7 @@ class TrainMeter(object):
         self.num_top1_mis = 0
         self.num_top5_mis = 0
         self.num_samples = 0
+        self.output_dir = cfg.OUTPUT_DIR
 
     def reset(self):
         """
@@ -484,12 +519,18 @@ class TrainMeter(object):
         Start to record time.
         """
         self.iter_timer.reset()
+        self.data_timer.reset()
 
     def iter_toc(self):
         """
         Stop to record time.
         """
         self.iter_timer.pause()
+        self.net_timer.pause()
+
+    def data_toc(self):
+        self.data_timer.pause()
+        self.net_timer.reset()
 
     def update_stats(self, top1_err, top5_err, loss, lr, mb_size):
         """
@@ -531,11 +572,13 @@ class TrainMeter(object):
             "_type": "train_iter",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
-            "time_diff": self.iter_timer.seconds(),
+            "dt": self.iter_timer.seconds(),
+            "dt_data": self.data_timer.seconds(),
+            "dt_net": self.net_timer.seconds(),
             "eta": eta,
             "loss": self.loss.get_win_median(),
             "lr": self.lr,
-            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
+            "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
@@ -562,11 +605,13 @@ class TrainMeter(object):
         stats = {
             "_type": "train_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
-            "time_diff": self.iter_timer.seconds(),
+            "dt": self.iter_timer.seconds(),
+            "dt_data": self.data_timer.seconds(),
+            "dt_net": self.net_timer.seconds(),
             "eta": eta,
             "lr": self.lr,
-            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
-            "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
+            "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
+            "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             top1_err = self.num_top1_mis / self.num_samples
@@ -596,6 +641,8 @@ class ValMeter(object):
         self.logger = logger
         self.max_iter = max_iter
         self.iter_timer = Timer()
+        self.data_timer = Timer()
+        self.net_timer = Timer()
         # Current minibatch errors (smoothed over a window).
         self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
         self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
@@ -608,6 +655,7 @@ class ValMeter(object):
         self.num_samples = 0
         self.all_preds = []
         self.all_labels = []
+        self.output_dir = cfg.OUTPUT_DIR
 
     def reset(self):
         """
@@ -627,12 +675,18 @@ class ValMeter(object):
         Start to record time.
         """
         self.iter_timer.reset()
+        self.data_timer.reset()
 
     def iter_toc(self):
         """
         Stop to record time.
         """
         self.iter_timer.pause()
+        self.net_timer.pause()
+
+    def data_toc(self):
+        self.data_timer.pause()
+        self.net_timer.reset()
 
     def update_stats(self, top1_err, top5_err, mb_size):
         """
@@ -676,7 +730,7 @@ class ValMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
+            "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
         }
         if not self._cfg.DATA.MULTI_LABEL:
             stats["top1_err"] = self.mb_top1_err.get_win_median()
@@ -703,8 +757,8 @@ class ValMeter(object):
             "_type": "val_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
-            "gpu_mem": "{:.2f} GB".format(misc.gpu_mem_usage()),
-            "RAM": "{:.2f}/{:.2f} GB".format(*misc.cpu_mem_usage()),
+            "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
+            "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
         }
         if self._cfg.DATA.MULTI_LABEL:
             stats["map"] = get_map(

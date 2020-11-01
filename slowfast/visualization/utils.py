@@ -8,6 +8,7 @@ import torch
 from sklearn.metrics import confusion_matrix
 
 import slowfast.utils.logging as logging
+from slowfast.datasets.utils import pack_pathway_output, tensor_normalize
 
 logger = logging.get_logger(__name__)
 
@@ -197,7 +198,7 @@ class GetWeightAndActivation:
         def hook_fn(module, input, output):
             self.hooks[layer_name] = output.clone().detach()
 
-        layer = self._get_layer(layer_name)
+        layer = get_layer(self.model, layer_name)
         layer.register_forward_hook(hook_fn)
 
     def _register_hooks(self):
@@ -219,11 +220,11 @@ class GetWeightAndActivation:
                 {layer_name: list of activations}, where activations are outputs returned
                 by the layer.
         """
+        input_clone = [inp.clone() for inp in input]
         if bboxes is not None:
-            input_clone = [inp.clone() for inp in input]
             preds = self.model(input_clone, bboxes)
         else:
-            preds = self.model(input)
+            preds = self.model(input_clone)
 
         activation_dict = {}
         for layer_name, hook in self.hooks.items():
@@ -241,7 +242,7 @@ class GetWeightAndActivation:
         """
         weights = {}
         for layer in self.layers_names:
-            cur_layer = self._get_layer(layer)
+            cur_layer = get_layer(self.model, layer)
             if hasattr(cur_layer, "weight"):
                 weights[layer] = cur_layer.weight.clone().detach()
             else:
@@ -298,3 +299,77 @@ def process_layer_index_data(layer_ls, layer_name_prefix=""):
         else:
             indexing_dict[name] = ()
     return layer_name, indexing_dict
+
+
+def process_cv2_inputs(frames, cfg):
+    """
+    Normalize and prepare inputs as a list of tensors. Each tensor
+    correspond to a unique pathway.
+    Args:
+        frames (list of array): list of input images (correspond to one clip) in range [0, 255].
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+    """
+    inputs = torch.from_numpy(np.array(frames)).float() / 255
+    inputs = tensor_normalize(inputs, cfg.DATA.MEAN, cfg.DATA.STD)
+    # T H W C -> C T H W.
+    inputs = inputs.permute(3, 0, 1, 2)
+    # Sample frames for num_frames specified.
+    index = torch.linspace(0, inputs.shape[1] - 1, cfg.DATA.NUM_FRAMES).long()
+    inputs = torch.index_select(inputs, 1, index)
+    inputs = pack_pathway_output(cfg, inputs)
+    inputs = [inp.unsqueeze(0) for inp in inputs]
+    return inputs
+
+
+def get_layer(model, layer_name):
+    """
+    Return the targeted layer (nn.Module Object) given a hierarchical layer name,
+    separated by /.
+    Args:
+        model (model): model to get layers from.
+        layer_name (str): name of the layer.
+    Returns:
+        prev_module (nn.Module): the layer from the model with `layer_name` name.
+    """
+    layer_ls = layer_name.split("/")
+    prev_module = model
+    for layer in layer_ls:
+        prev_module = prev_module._modules[layer]
+
+    return prev_module
+
+
+class TaskInfo:
+    def __init__(self):
+        self.frames = None
+        self.id = -1
+        self.bboxes = None
+        self.action_preds = None
+        self.num_buffer_frames = 0
+        self.img_height = -1
+        self.img_width = -1
+        self.crop_size = -1
+        self.clip_vis_size = -1
+
+    def add_frames(self, idx, frames):
+        """
+        Add the clip and corresponding id.
+        Args:
+            idx (int): the current index of the clip.
+            frames (list[ndarray]): list of images in "BGR" format.
+        """
+        self.frames = frames
+        self.id = idx
+
+    def add_bboxes(self, bboxes):
+        """
+        Add correspondding bounding boxes.
+        """
+        self.bboxes = bboxes
+
+    def add_action_preds(self, preds):
+        """
+        Add the corresponding action predictions.
+        """
+        self.action_preds = preds

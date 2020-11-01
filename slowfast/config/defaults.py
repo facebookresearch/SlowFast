@@ -12,7 +12,6 @@ new_allowed = True
 # -----------------------------------------------------------------------------
 _C = CfgNode(new_allowed=new_allowed)
 
-
 # ---------------------------------------------------------------------------- #
 # Batch norm options
 # ---------------------------------------------------------------------------- #
@@ -54,10 +53,10 @@ _C.TRAIN.DATASET = "kinetics"
 _C.TRAIN.BATCH_SIZE = 64
 
 # Evaluate model on test data every eval period epochs.
-_C.TRAIN.EVAL_PERIOD = 1
+_C.TRAIN.EVAL_PERIOD = 10
 
 # Save model checkpoint every checkpoint period epochs.
-_C.TRAIN.CHECKPOINT_PERIOD = 1
+_C.TRAIN.CHECKPOINT_PERIOD = 10
 
 # Resume training from the latest checkpoint in the output directory.
 _C.TRAIN.AUTO_RESUME = True
@@ -71,6 +70,11 @@ _C.TRAIN.CHECKPOINT_TYPE = "pytorch"
 # If True, perform inflation when loading checkpoint.
 _C.TRAIN.CHECKPOINT_INFLATE = False
 
+# If True, reset epochs when loading checkpoint.
+_C.TRAIN.CHECKPOINT_EPOCH_RESET = False
+
+# If set, clear all layer names according to the pattern provided.
+_C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
 # ---------------------------------------------------------------------------- #
 # Testing options
@@ -99,8 +103,8 @@ _C.TEST.NUM_SPATIAL_CROPS = 3
 
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
-
-
+# Path to saving prediction results file.
+_C.TEST.SAVE_RESULTS_PATH = ""
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
@@ -137,6 +141,36 @@ _C.RESNET.SPATIAL_STRIDES = [[1], [2], [2], [2]]
 # Size of dilation on different res stages.
 _C.RESNET.SPATIAL_DILATIONS = [[1], [1], [1], [1]]
 
+# ---------------------------------------------------------------------------- #
+# X3D  options
+# See https://arxiv.org/abs/2004.04730 for details about X3D Networks.
+# ---------------------------------------------------------------------------- #
+_C.X3D = CfgNode()
+
+# Width expansion factor.
+_C.X3D.WIDTH_FACTOR = 1.0
+
+# Depth expansion factor.
+_C.X3D.DEPTH_FACTOR = 1.0
+
+# Bottleneck expansion factor for the 3x3x3 conv.
+_C.X3D.BOTTLENECK_FACTOR = 1.0  #
+
+# Dimensions of the last linear layer before classificaiton.
+_C.X3D.DIM_C5 = 2048
+
+# Dimensions of the first 3x3 conv layer.
+_C.X3D.DIM_C1 = 12
+
+# Whether to scale the width of Res2, default is false.
+_C.X3D.SCALE_RES2 = False
+
+# Whether to use a BatchNorm (BN) layer before the classifier, default is false.
+_C.X3D.BN_LIN5 = False
+
+# Whether to use channelwise (=depthwise) convolution in the center (3x3x3)
+# convolution operation of the residual blocks.
+_C.X3D.CHANNELWISE_3x3x3 = True
 
 # -----------------------------------------------------------------------------
 # Nonlocal options
@@ -183,13 +217,16 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow", "x3d"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
 
 # Dropout rate before final projection in the backbone.
 _C.MODEL.DROPOUT_RATE = 0.5
+
+# Randomly drop rate for Res-blocks, linearly increase from res2 to res5
+_C.MODEL.DROPCONNECT_RATE = 0.0
 
 # The std to initialize the fc layer(s).
 _C.MODEL.FC_INIT_STD = 0.01
@@ -232,9 +269,6 @@ _C.DATA.PATH_LABEL_SEPARATOR = " "
 
 # Video path prefix if any.
 _C.DATA.PATH_PREFIX = ""
-
-# The spatial crop size of the input clip.
-_C.DATA.CROP_SIZE = 224
 
 # The number of frames of the input clip.
 _C.DATA.NUM_FRAMES = 8
@@ -296,6 +330,9 @@ _C.SOLVER.BASE_LR = 0.1
 # Learning rate policy (see utils/lr_policy.py for options and examples).
 _C.SOLVER.LR_POLICY = "cosine"
 
+# Final learning rates for 'cosine' policy.
+_C.SOLVER.COSINE_END_LR = 0.0
+
 # Exponential decay factor.
 _C.SOLVER.GAMMA = 0.1
 
@@ -335,6 +372,8 @@ _C.SOLVER.WARMUP_START_LR = 0.01
 # Optimization method.
 _C.SOLVER.OPTIMIZING_METHOD = "sgd"
 
+# Base learning rate is linearly scaled with NUM_SHARDS.
+_C.SOLVER.BASE_LR_SCALE_NUM_SHARDS = False
 
 # ---------------------------------------------------------------------------- #
 # Misc options
@@ -539,7 +578,9 @@ _C.TENSORBOARD = CfgNode(new_allowed=new_allowed)
 # Log to summary writer, this will automatically.
 # log loss, lr and metrics during train/eval.
 _C.TENSORBOARD.ENABLE = False
-
+# Provide path to prediction results for visualization.
+# This is a pickle file of [prediction_tensor, label_tensor]
+_C.TENSORBOARD.PREDICTIONS_PATH = ""
 # Path to directory for tensorboard logs.
 # Default to to cfg.OUTPUT_DIR/runs-{cfg.TRAIN.DATASET}.
 _C.TENSORBOARD.LOG_DIR = ""
@@ -592,6 +633,7 @@ _C.TENSORBOARD.MODEL_VIS.ACTIVATIONS = False
 # If False, skip visualizing input videos.
 _C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
 
+
 # List of strings containing data about layer names and their indexing to
 # visualize weights and activations for. The indexing is meant for
 # choosing a subset of activations outputed by a layer for visualization.
@@ -602,13 +644,31 @@ _C.TENSORBOARD.MODEL_VIS.INPUT_VIDEO = False
 _C.TENSORBOARD.MODEL_VIS.LAYER_LIST = []
 # Top-k predictions to plot on videos
 _C.TENSORBOARD.MODEL_VIS.TOPK_PREDS = 1
-
 # Colormap to for text boxes and bounding boxes colors
 _C.TENSORBOARD.MODEL_VIS.COLORMAP = "Pastel2"
+# Config for visualization video inputs with Grad-CAM.
+# _C.TENSORBOARD.ENABLE must be True.
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM = CfgNode()
+# Whether to run visualization using Grad-CAM technique.
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE = True
+# CNN layers to use for Grad-CAM. The number of layers must be equal to
+# number of pathway(s).
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST = []
+# If True, visualize Grad-CAM using true labels for each instances.
+# If False, use the highest predicted class.
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.USE_TRUE_LABEL = False
+# Colormap to for text boxes and bounding boxes colors
+_C.TENSORBOARD.MODEL_VIS.GRAD_CAM.COLORMAP = "viridis"
 
-
-# Add custom config with default values.
-custom_config.add_custom_config(_C)
+# Config for visualization for wrong prediction visualization.
+# _C.TENSORBOARD.ENABLE must be True.
+_C.TENSORBOARD.WRONG_PRED_VIS = CfgNode()
+_C.TENSORBOARD.WRONG_PRED_VIS.ENABLE = False
+# Folder tag to origanize model eval videos under.
+_C.TENSORBOARD.WRONG_PRED_VIS.TAG = "Incorrectly classified videos."
+# Subset of labels to visualize. Only wrong predictions with true labels
+# within this subset is visualized.
+_C.TENSORBOARD.WRONG_PRED_VIS.SUBSET_PATH = ""
 
 
 # ---------------------------------------------------------------------------- #
@@ -616,21 +676,91 @@ custom_config.add_custom_config(_C)
 # ---------------------------------------------------------------------------- #
 _C.DEMO = CfgNode(new_allowed=new_allowed)
 
+# Run model in DEMO mode.
 _C.DEMO.ENABLE = False
 
+# Path to a json file providing class_name - id mapping
+# in the format {"class_name1": id1, "class_name2": id2, ...}.
 _C.DEMO.LABEL_FILE_PATH = ""
 
-_C.DEMO.DATA_SOURCE = 0
+# Specify a camera device as input. This will be prioritized
+# over input video if set.
+# If -1, use input video instead.
+_C.DEMO.WEBCAM = -1
 
+# Path to input video for demo.
+_C.DEMO.INPUT_VIDEO = ""
+# Custom width for reading input video data.
 _C.DEMO.DISPLAY_WIDTH = 0
-
+# Custom height for reading input video data.
 _C.DEMO.DISPLAY_HEIGHT = 0
-
-_C.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_CFG = ""
-
-_C.DEMO.DETECTRON2_OBJECT_DETECTION_MODEL_WEIGHTS = ""
-
+# Path to Detectron2 object detection model configuration,
+# only used for detection tasks.
+_C.DEMO.DETECTRON2_CFG = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+# Path to Detectron2 object detection model pre-trained weights.
+_C.DEMO.DETECTRON2_WEIGHTS = "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+# Threshold for choosing predicted bounding boxes by Detectron2.
+_C.DEMO.DETECTRON2_THRESH = 0.9
+# Number of overlapping frames between 2 consecutive clips.
+# Increase this number for more frequent action predictions.
+# The number of overlapping frames cannot be larger than
+# half of the sequence length `cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE`
+_C.DEMO.BUFFER_SIZE = 0
+# If specified, the visualized outputs will be written this a video file of
+# this path. Otherwise, the visualized outputs will be displayed in a window.
 _C.DEMO.OUTPUT_FILE = ""
+# Frames per second rate for writing to output video file.
+# If not set (-1), use fps rate from input file.
+_C.DEMO.OUTPUT_FPS = -1
+# Input format from demo video reader ("RGB" or "BGR").
+_C.DEMO.INPUT_FORMAT = "BGR"
+# Draw visualization frames in [keyframe_idx - CLIP_VIS_SIZE, keyframe_idx + CLIP_VIS_SIZE] inclusively.
+_C.DEMO.CLIP_VIS_SIZE = 10
+# Number of processes to run video visualizer.
+_C.DEMO.NUM_VIS_INSTANCES = 2
+
+# Path to pre-computed predicted boxes
+_C.DEMO.PREDS_BOXES = ""
+# Whether to run in with multi-threaded video reader.
+_C.DEMO.THREAD_ENABLE = False
+# Take one clip for every `DEMO.NUM_CLIPS_SKIP` + 1 for prediction and visualization.
+# This is used for fast demo speed by reducing the prediction/visualiztion frequency.
+# If -1, take the most recent read clip for visualization. This mode is only supported
+# if `DEMO.THREAD_ENABLE` is set to True.
+_C.DEMO.NUM_CLIPS_SKIP = 0
+# Path to ground-truth boxes and labels (optional)
+_C.DEMO.GT_BOXES = ""
+# The starting second of the video w.r.t bounding boxes file.
+_C.DEMO.STARTING_SECOND = 900
+# Frames per second of the input video/folder of images.
+_C.DEMO.FPS = 30
+# Visualize with top-k predictions or predictions above certain threshold(s).
+# Option: {"thres", "top-k"}
+_C.DEMO.VIS_MODE = "thres"
+# Threshold for common class names.
+_C.DEMO.COMMON_CLASS_THRES = 0.7
+# Theshold for uncommon class names. This will not be
+# used if `_C.DEMO.COMMON_CLASS_NAMES` is empty.
+_C.DEMO.UNCOMMON_CLASS_THRES = 0.3
+# This is chosen based on distribution of examples in
+# each classes in AVA dataset.
+_C.DEMO.COMMON_CLASS_NAMES = [
+    "watch (a person)",
+    "talk to (e.g., self, a person, a group)",
+    "listen to (a person)",
+    "touch (an object)",
+    "carry/hold (an object)",
+    "walk",
+    "sit",
+    "lie/sleep",
+    "bend/bow (at the waist)",
+]
+# Slow-motion rate for the visualization. The visualized portions of the
+# video will be played `_C.DEMO.SLOWMO` times slower than usual speed.
+_C.DEMO.SLOWMO = 1
+
+# Add custom config with default values.
+custom_config.add_custom_config(_C)
 
 
 def _assert_and_infer_cfg(cfg):
@@ -650,6 +780,10 @@ def _assert_and_infer_cfg(cfg):
     assert cfg.RESNET.NUM_GROUPS > 0
     assert cfg.RESNET.WIDTH_PER_GROUP > 0
     assert cfg.RESNET.WIDTH_PER_GROUP % cfg.RESNET.NUM_GROUPS == 0
+
+    # Execute LR scaling by num_shards.
+    if cfg.SOLVER.BASE_LR_SCALE_NUM_SHARDS:
+        cfg.SOLVER.BASE_LR *= cfg.NUM_SHARDS
 
     # General assertions.
     assert cfg.SHARD_ID < cfg.NUM_SHARDS

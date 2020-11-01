@@ -36,6 +36,7 @@ import pprint
 import time
 from collections import defaultdict
 from fvcore.common.file_io import PathManager
+import slowfast.utils.distributed as du
 
 from slowfast.utils.ava_evaluation import (
     object_detection_evaluation,
@@ -242,7 +243,8 @@ def run_evaluation(
 
     metrics = pascal_evaluator.evaluate()
 
-    pprint.pprint(metrics, indent=2)
+    if du.is_master_proc():
+        pprint.pprint(metrics, indent=2)
     return metrics
 
 

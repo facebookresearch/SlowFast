@@ -5,7 +5,7 @@ TRAIN:
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  CHECKPOINT_FILE_PATH: "./SLOWFAST_32x2_R101_50_50.pkl" #path to pretrain model
+  CHECKPOINT_FILE_PATH: ./SLOWFAST_32x2_R101_50_50.pkl  #path to pretrain model
   CHECKPOINT_TYPE: pytorch
 DATA:
   NUM_FRAMES: 32
@@ -44,8 +44,6 @@ NONLOCAL:
 BN:
   USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
-  MOMENTUM: 0.1
-  WEIGHT_DECAY: 0.0
 SOLVER:
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-7
@@ -53,8 +51,10 @@ SOLVER:
 MODEL:
   NUM_CLASSES: 80
   ARCH: slowfast
+  MODEL_NAME: SlowFast
   LOSS_FUNC: bce
   DROPOUT_RATE: 0.5
+  HEAD_ACT: sigmoid
 TEST:
   ENABLE: False
   DATASET: ava
@@ -62,15 +62,17 @@ TEST:
 DATA_LOADER:
   NUM_WORKERS: 2
   PIN_MEMORY: True
-DEMO:
-  ENABLE: True
-  LABEL_FILE_PATH: "./demo/AVA/ava.names"
-  DATA_SOURCE: 2
-  # DISPLAY_WIDTH: 640
-  # DISPLAY_HEIGHT: 480
-  DETECTRON2_OBJECT_DETECTION_MODEL_CFG: "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
-  DETECTRON2_OBJECT_DETECTION_MODEL_WEIGHTS: "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+
 NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
+TENSORBOARD:
+  MODEL_VIS:
+    TOPK: 2
+DEMO:
+  ENABLE: True
+  LABEL_FILE_PATH:  # Add local label file path here.
+  WEBCAM: 0
+  DETECTRON2_CFG: "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+  DETECTRON2_WEIGHTS: detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl

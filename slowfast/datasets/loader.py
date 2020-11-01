@@ -12,6 +12,7 @@ from torch.utils.data.sampler import RandomSampler
 
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 
+from . import utils as utils
 from .build import build_dataset
 
 
@@ -64,17 +65,17 @@ def construct_loader(cfg, split, is_precise_bn=False):
     assert split in ["train", "val", "test"]
     if split in ["train"]:
         dataset_name = cfg.TRAIN.DATASET
-        batch_size = int(cfg.TRAIN.BATCH_SIZE / cfg.NUM_GPUS)
+        batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = True
         drop_last = True
     elif split in ["val"]:
         dataset_name = cfg.TRAIN.DATASET
-        batch_size = int(cfg.TRAIN.BATCH_SIZE / cfg.NUM_GPUS)
+        batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = False
         drop_last = False
     elif split in ["test"]:
         dataset_name = cfg.TEST.DATASET
-        batch_size = int(cfg.TEST.BATCH_SIZE / cfg.NUM_GPUS)
+        batch_size = int(cfg.TEST.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = False
         drop_last = False
 
@@ -83,11 +84,12 @@ def construct_loader(cfg, split, is_precise_bn=False):
 
     if cfg.MULTIGRID.SHORT_CYCLE and split in ["train"] and not is_precise_bn:
         # Create a sampler for multi-process training
-        sampler = (
-            DistributedSampler(dataset)
-            if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1)
-            else RandomSampler(dataset)
-        )
+        # sampler = (
+        #     DistributedSampler(dataset)
+        #     if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1)
+        #     else RandomSampler(dataset)
+        # )
+        sampler = utils.create_sampler(dataset, shuffle, cfg)
         batch_sampler = ShortCycleBatchSampler(
             sampler, batch_size=batch_size, drop_last=drop_last, cfg=cfg
         )
@@ -97,10 +99,12 @@ def construct_loader(cfg, split, is_precise_bn=False):
             batch_sampler=batch_sampler,
             num_workers=cfg.DATA_LOADER.NUM_WORKERS,
             pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+            worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
     else:
         # Create a sampler for multi-process training
-        sampler = DistributedSampler(dataset) if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1) else None
+        # sampler = DistributedSampler(dataset) if (cfg.NUM_GPUS > 1 or cfg.NUM_SHARDS > 1) else None
+        sampler = utils.create_sampler(dataset, shuffle, cfg)
         # Create a loader
         loader = torch.utils.data.DataLoader(
             dataset,
@@ -111,12 +115,13 @@ def construct_loader(cfg, split, is_precise_bn=False):
             pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
             drop_last=drop_last,
             collate_fn=detection_collate if cfg.DETECTION.ENABLE else None,
+            worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
     return loader
 
 
 def shuffle_dataset(loader, cur_epoch):
-    """"
+    """ "
     Shuffles the data.
     Args:
         loader (loader): data loader to perform shuffle.

@@ -104,6 +104,16 @@ def is_master_proc(num_gpus=8):
         return True
 
 
+def is_root_proc():
+    """
+    Determines if the current process is the root process.
+    """
+    if torch.distributed.is_initialized():
+        return dist.get_rank() == 0
+    else:
+        return True
+
+
 def get_world_size():
     """
     Get the size of the world.
@@ -264,6 +274,8 @@ def init_distributed_training(cfg):
     """
     # if cfg.NUM_GPUS == 1:
     #     return
+    if cfg.NUM_GPUS <= 1:
+        return
     num_gpus_per_machine = cfg.NUM_GPUS
     num_machines = dist.get_world_size() // num_gpus_per_machine
     for i in range(num_machines):

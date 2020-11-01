@@ -4,7 +4,10 @@
 """Multi-view test a video classification model."""
 
 import numpy as np
+import os
+import pickle
 import torch
+from fvcore.common.file_io import PathManager
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -44,29 +47,38 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     test_meter.iter_tic()
 
     for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
-        # Transfer the data to the current GPU device.
-        if isinstance(inputs, (list,)):
-            for i in range(len(inputs)):
-                inputs[i] = inputs[i].cuda(non_blocking=True)
-        else:
-            inputs = inputs.cuda(non_blocking=True)
-
-        # Transfer the data to the current GPU device.
-        labels = labels.cuda()
-        video_idx = video_idx.cuda()
-        for key, val in meta.items():
-            if isinstance(val, (list,)):
-                for i in range(len(val)):
-                    val[i] = val[i].cuda(non_blocking=True)
+        if cfg.NUM_GPUS:
+            # Transfer the data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
-                meta[key] = val.cuda(non_blocking=True)
+                inputs = inputs.cuda(non_blocking=True)
+
+            # Transfer the data to the current GPU device.
+            labels = labels.cuda()
+            video_idx = video_idx.cuda()
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
+        test_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:
             # Compute the predictions.
             preds = model(inputs, meta["boxes"])
-            preds = preds.cpu()
-            ori_boxes = meta["ori_boxes"].cpu()
-            metadata = meta["metadata"].cpu()
+            ori_boxes = meta["ori_boxes"]
+            metadata = meta["metadata"]
+
+            preds = preds.detach().cpu() if cfg.NUM_GPUS else preds.detach()
+            ori_boxes = (
+                ori_boxes.detach().cpu() if cfg.NUM_GPUS else ori_boxes.detach()
+            )
+            metadata = (
+                metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
+            )
 
             if cfg.NUM_GPUS > 1:
                 preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
@@ -75,11 +87,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
             test_meter.iter_toc()
             # Update and log stats.
-            test_meter.update_stats(
-                preds.detach().cpu(),
-                ori_boxes.detach().cpu(),
-                metadata.detach().cpu(),
-            )
+            test_meter.update_stats(preds, ori_boxes, metadata)
             test_meter.log_iter_stats(None, cur_iter)
         else:
             # Perform the forward pass.
@@ -90,29 +98,42 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 preds, labels, video_idx = du.all_gather(
                     [preds, labels, video_idx]
                 )
+            if cfg.NUM_GPUS:
+                preds = preds.cpu()
+                labels = labels.cpu()
+                video_idx = video_idx.cpu()
 
             test_meter.iter_toc()
             # Update and log stats.
             test_meter.update_stats(
-                preds.detach().cpu(),
-                labels.detach().cpu(),
-                video_idx.detach().cpu(),
+                preds.detach(), labels.detach(), video_idx.detach()
             )
             test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
+
     # Log epoch stats and print the final testing results.
-    if writer is not None:
-        all_preds_cpu = [
-            pred.clone().detach().cpu() for pred in test_meter.video_preds
-        ]
-        all_labels_cpu = [
-            label.clone().detach().cpu() for label in test_meter.video_labels
-        ]
-        writer.plot_eval(preds=all_preds_cpu, labels=all_labels_cpu)
+    if not cfg.DETECTION.ENABLE:
+        all_preds = test_meter.video_preds.clone().detach()
+        all_labels = test_meter.video_labels
+        if cfg.NUM_GPUS:
+            all_preds = all_preds.cpu()
+            all_labels = all_labels.cpu()
+        if writer is not None:
+            writer.plot_eval(preds=all_preds, labels=all_labels)
+
+        if cfg.TEST.SAVE_RESULTS_PATH != "":
+            save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
+
+            with PathManager.open(save_path, "wb") as f:
+                pickle.dump([all_labels, all_labels], f)
+
+            logger.info(
+                "Successfully saved prediction results to {}".format(save_path)
+            )
 
     test_meter.finalize_metrics()
-    test_meter.reset()
+    return test_meter
 
 
 def test(cfg):
@@ -147,7 +168,7 @@ def test(cfg):
     logger.info("Testing model for {} iterations".format(len(test_loader)))
 
     if cfg.DETECTION.ENABLE:
-        assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE
+        assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
         test_meter = AVAMeter(len(test_loader), cfg, mode="test")
     else:
         assert (
@@ -175,6 +196,6 @@ def test(cfg):
         writer = None
 
     # # Perform multi-view test on the entire dataset.
-    perform_test(test_loader, model, test_meter, cfg, writer)
+    test_meter = perform_test(test_loader, model, test_meter, cfg, writer)
     if writer is not None:
         writer.close()

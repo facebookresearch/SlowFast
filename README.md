@@ -5,6 +5,7 @@ PySlowFast is an open source video understanding codebase from FAIR that provide
 - [SlowFast Networks for Video Recognition](https://arxiv.org/abs/1812.03982)
 - [Non-local Neural Networks](https://arxiv.org/abs/1711.07971)
 - [A Multigrid Method for Efficiently Training Video Models](https://arxiv.org/abs/1912.00998)
+- [X3D: Progressive Network Expansion for Efficient Video Recognition](https://arxiv.org/abs/2004.04730)
 
 <div align="center">
   <img src="demo/ava_demo.gif" width="600px"/>
@@ -19,8 +20,10 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - C2D
 - I3D
 - Non-local Network
+- X3D
 
 ## Updates
+ - We now support [X3D Models](https://arxiv.org/abs/2004.04730). See [`projects/x3d`](./projects/x3d/README.md) for more information.
  - We now support [Multigrid Training](https://arxiv.org/abs/1912.00998) for efficiently training video models. See [`projects/multigrid`](./projects/multigrid/README.md) for more information.
  - PySlowFast is released in conjunction with our [ICCV 2019 Tutorial](https://alexander-kirillov.github.io/tutorials/visual-recognition-iccv19/).
 
@@ -40,5 +43,22 @@ Please find installation instructions for PyTorch and PySlowFast in [INSTALL.md]
 
 Follow the example in [GETTING_STARTED.md](GETTING_STARTED.md) to start playing video models with PySlowFast.
 
+## Visualization Tools
+
+We offer a range of visualization tools for the train/eval/test processes, model analysis, and for running inference with trained model.
+More information at [Visualization Tools](VISUALIZATION_TOOLS.md).
+
 ## Contributors
 PySlowFast is written and maintained by [Haoqi Fan](https://haoqifan.github.io/), [Yanghao Li](https://lyttonhao.github.io/), [Bo Xiong](https://www.cs.utexas.edu/~bxiong/), [Wan-Yen Lo](https://www.linkedin.com/in/wanyenlo/), [Christoph Feichtenhofer](https://feichtenhofer.github.io/).
+
+## Citing PySlowFast
+If you find PySlowFast useful in your research, please use the following BibTeX entry for citation.
+```BibTeX
+@misc{fan2020pyslowfast,
+  author =       {Haoqi Fan and Yanghao Li and Bo Xiong and Wan-Yen Lo and
+                  Christoph Feichtenhofer},
+  title =        {PySlowFast},
+  howpublished = {\url{https://github.com/facebookresearch/slowfast}},
+  year =         {2020}
+}
+```
