@@ -1,0 +1,52 @@
+_include: !include SLOWFAST_SHUFFLE_V2_x0_5.yaml
+
+log_file: ''
+debug: True
+log_upload_files: False
+logger_type: passthrough
+config_file_delete_on_exit: False
+root_dir: /mnt/e/tmp
+output_dir: /mnt/e/tmp/slowFastOut
+input_file_storage: ''
+# init_method: tcp://localhost:9990
+log_title: ''
+master_addr: '10.3.0.4'
+master_port: '9756'
+NUM_SHARDS: 1
+SHARD_ID: 0
+
+LOG_PERIOD: 2
+NUM_GPUS: 0
+
+DATA:
+  # PATH_TO_DATA_DIRS: ['data/ava', 'data/princeton']
+  # PATH_PREFIXS: ['data/ava/trainTensors', 'data/princeton/trainTensors']
+  PATH_TO_DATA_DIRS: ['data/princeton']
+  PATH_PREFIXS: ['data/princeton/trainTensors']
+  PATH_LABEL_SEPARATOR: ','
+  DATA_TYPE: tensors   # Format of data - can be [tensors, video]
+  NUM_FRAMES: 8    # Window size
+
+  # Column names in data description data frame
+  CLIP_NAME_COL: clip
+  FID_COL: fid
+  TRACK_COL: trId
+  START_FRAME_COL: min
+  END_FRAME_COL: max
+  LABEL_COL: label
+  LABEL_FILE_SUFFIXS: ['Old']
+  # TRAIN_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
+  # VAL_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
+  TRAIN_LABEL_FILE_SUFFIXS: ['490.pcl']
+  VAL_LABEL_FILE_SUFFIXS: [ '490.pcl']
+
+  TRAIN_CROP_SIZE: 96
+  CROP_SIZE: 96
+  TRAIN_JITTER_SCALES: [96, 128]
+
+TRAIN:
+  BATCH_SIZE: 48
+  DATASET: Ava_asd
+  CHECKPOINT_PERIOD: 0
+  AUTO_RESUME: False
+  CHECKPOINT_FILE_PATH: checkPoints/checkpoint_epoch_run_444_00030.pyth
