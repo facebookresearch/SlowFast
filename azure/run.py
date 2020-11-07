@@ -17,6 +17,7 @@ from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
 from slowfast.utils.misc import launch_job
 from slowfast.tools.train_net import Trainer
+from slowfast.tools.onnxUtils import OnnxUtils
 from slowfast.utils.parser import load_config
 
 from common.utils.pathUtils import createFullPathTree, ensureDir
@@ -111,8 +112,19 @@ def main():
         logger.info("MASTER_ADDR {} MASTER_PORT {} ".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"], ))
         logger.info("CFG")
         logger.info(cfg)
-        trainer = Trainer(cfg)
-        launch_job(cfg=cfg, init_method=None, func=trainer.train)
+        for op in args.operations: 
+          if op.lower() =='train':
+            trainer = Trainer(cfg)
+            launch_job(cfg=cfg, init_method=None, func=trainer.train)
+          elif op.lower() =='to_onnx':
+            onnx = OnnxUtils(cfg, logger)
+            onnx.saveOnnxModel()
+          elif op.lower() == 'eval_onnx':
+            onnx = OnnxUtils(cfg, logger)
+            onnx.evalOnnx()            
+          else:
+            logger.info("Unrecognized option {} expect one of [train, to_onnx, eval_onnx]")  
+
 
 if __name__ == "__main__":
   main()  

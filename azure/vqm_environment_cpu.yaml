@@ -26,6 +26,7 @@ dependencies:
 - opencv
 - mesa-libgl-cos6-x86_64
 - pytorch
+- cpuonly
 - ffmpeg
 channels:
 - conda-forge
