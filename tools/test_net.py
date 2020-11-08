@@ -126,7 +126,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
             with PathManager.open(save_path, "wb") as f:
-                pickle.dump([all_labels, all_labels], f)
+                pickle.dump([all_preds, all_labels], f)
 
             logger.info(
                 "Successfully saved prediction results to {}".format(save_path)
