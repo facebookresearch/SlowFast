@@ -4,7 +4,7 @@
 import logging
 import os
 from collections import defaultdict
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def load_image_lists(cfg, is_train):
     video_name_to_idx = {}
     video_idx_to_name = []
     for list_filename in list_filenames:
-        with PathManager.open(list_filename, "r") as f:
+        with g_pathmgr.open(list_filename, "r") as f:
             f.readline()
             for line in f:
                 row = line.split()
@@ -194,7 +194,7 @@ def parse_bboxes_file(
     count = 0
     unique_box_count = 0
     for filename, is_gt_box in zip(ann_filenames, ann_is_gt_box):
-        with PathManager.open(filename, "r") as f:
+        with g_pathmgr.open(filename, "r") as f:
             for line in f:
                 row = line.strip().split(",")
                 # When we use predicted boxes to train/eval, we need to

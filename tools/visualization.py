@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import torch
 import tqdm
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.checkpoint as cu
@@ -296,7 +296,7 @@ def visualize(cfg):
                 "Visualizing class-level performance from saved results..."
             )
             if writer is not None:
-                with PathManager.open(
+                with g_pathmgr.open(
                     cfg.TENSORBOARD.PREDICTIONS_PATH, "rb"
                 ) as f:
                     preds, labels = pickle.load(f, encoding="latin1")

@@ -6,7 +6,7 @@ import os
 import cv2
 import torch
 import tqdm
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.logging as logging
@@ -33,9 +33,9 @@ class AVAVisualizerWithPrecomputedBox:
             cfg (CfgNode): configs. Details can be found in
                 slowfast/config/defaults.py
         """
-        self.source = PathManager.get_local_path(path=cfg.DEMO.INPUT_VIDEO)
+        self.source = g_pathmgr.get_local_path(path=cfg.DEMO.INPUT_VIDEO)
         self.fps = None
-        if PathManager.isdir(self.source):
+        if g_pathmgr.isdir(self.source):
             self.fps = cfg.DEMO.FPS
             self.video_name = self.source.split("/")[-1]
             self.source = os.path.join(

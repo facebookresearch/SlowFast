@@ -8,7 +8,7 @@ import random
 from itertools import chain as chain
 import torch
 import torch.utils.data
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.logging as logging
 
@@ -75,7 +75,7 @@ class Ssv2(torch.utils.data.Dataset):
         Construct the video loader.
         """
         # Loading label names.
-        with PathManager.open(
+        with g_pathmgr.open(
             os.path.join(
                 self.cfg.DATA.PATH_TO_DATA_DIR,
                 "something-something-v2-labels.json",
@@ -91,7 +91,7 @@ class Ssv2(torch.utils.data.Dataset):
                 "train" if self.mode == "train" else "validation"
             ),
         )
-        with PathManager.open(label_file, "r") as f:
+        with g_pathmgr.open(label_file, "r") as f:
             label_json = json.load(f)
 
         self._video_names = []
@@ -109,7 +109,7 @@ class Ssv2(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert PathManager.exists(path_to_file), "{} dir not found".format(
+        assert g_pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
 

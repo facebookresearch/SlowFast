@@ -7,7 +7,7 @@ import numpy as np
 import os
 import pickle
 import torch
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -125,7 +125,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if cfg.TEST.SAVE_RESULTS_PATH != "":
             save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
-            with PathManager.open(save_path, "wb") as f:
+            with g_pathmgr.open(save_path, "wb") as f:
                 pickle.dump([all_labels, all_labels], f)
 
             logger.info(

@@ -13,6 +13,7 @@
 - ffmpeg (4.0 is prefereed, will be installed along with PyAV)
 - PyYaml: (will be installed along with fvcore)
 - tqdm: (will be installed along with fvcore)
+- iopath: `pip install -U iopath` or `conda install -c iopath iopath`
 - psutil: `pip install psutil`
 - OpenCV: `pip install opencv-python`
 - torchvision: `pip install torchvision` or `conda install torchvision -c pytorch`
