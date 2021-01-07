@@ -172,13 +172,13 @@ def test(cfg):
         test_meter = AVAMeter(len(test_loader), cfg, mode="test")
     else:
         assert (
-            len(test_loader.dataset)
+            test_loader.dataset.num_videos
             % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
             == 0
         )
         # Create meters for multi-view testing.
         test_meter = TestMeter(
-            len(test_loader.dataset)
+            test_loader.dataset.num_videos
             // (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS),
             cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
             cfg.MODEL.NUM_CLASSES,

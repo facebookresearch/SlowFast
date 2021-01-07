@@ -96,6 +96,18 @@ class Ava(torch.utils.data.Dataset):
         logger.info("Number of boxes: {}.".format(self._num_boxes_used))
 
     def __len__(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
+        return self.num_videos
+
+    @property
+    def num_videos(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
         return len(self._keyframe_indices)
 
     def _images_and_boxes_preprocessing_cv2(self, imgs, boxes):
