@@ -125,17 +125,19 @@ class AsycnActionPredictor:
 
 class AsyncVis:
     class _VisWorker(mp.Process):
-        def __init__(self, video_vis, task_queue, result_queue):
+        def __init__(self, video_vis, task_queue, result_queue, prediction_processor):
             """
             Visualization Worker for AsyncVis.
             Args:
                 video_vis (VideoVisualizer object): object with tools for visualization.
                 task_queue (mp.Queue): a shared queue for incoming task for visualization.
                 result_queue (mp.Queue): a shared queue for visualized results.
+                prediction_processor (func): function that processes frames using (task, video_vis) inputs
             """
             self.video_vis = video_vis
             self.task_queue = task_queue
             self.result_queue = result_queue
+            self.process_predictions = prediction_processor
             super().__init__()
 
         def run(self):
@@ -147,17 +149,20 @@ class AsyncVis:
                 if isinstance(task, _StopToken):
                     break
 
-                frames = draw_predictions(task, self.video_vis)
+                frames = self.process_predictions(task, self.video_vis)
                 task.frames = np.array(frames)
                 self.result_queue.put(task)
 
-    def __init__(self, video_vis, n_workers=None):
+    def __init__(self, video_vis, n_workers=None, prediction_processor=None):
         """
         Args:
             cfg (CfgNode): configs. Details can be found in
                 slowfast/config/defaults.py
             n_workers (Optional[int]): number of CPUs for running video visualizer.
                 If not given, use all CPUs.
+            prediction_processor (func):
+                function that processes frames using (task, video_vis) inputs
+                passed down to video visualizer.
         """
 
         num_workers = mp.cpu_count() if n_workers is None else n_workers
@@ -168,10 +173,11 @@ class AsyncVis:
         self.procs = []
         self.result_data = {}
         self.put_id = -1
+        predictor = prediction_processor or draw_predictions
         for _ in range(max(num_workers, 1)):
             self.procs.append(
                 AsyncVis._VisWorker(
-                    video_vis, self.task_queue, self.result_queue
+                    video_vis, self.task_queue, self.result_queue, predictor
                 )
             )
 
@@ -279,6 +285,52 @@ def draw_predictions(task, video_vis):
     Args:
         task (TaskInfo object): task object that contain
             the necessary information for visualization. (e.g. frames, preds)
+            All attributes must lie on CPU devices.
+        video_vis (VideoVisualizer object): the video visualizer object.
+    """
+    boxes = task.bboxes
+    frames = task.frames
+    preds = task.action_preds
+    if boxes is not None:
+        img_width = task.img_width
+        img_height = task.img_height
+        if boxes.device != torch.device("cpu"):
+            boxes = boxes.cpu()
+        boxes = cv2_transform.revert_scaled_boxes(
+            task.crop_size, boxes, img_height, img_width
+        )
+
+    keyframe_idx = len(frames) // 2 - task.num_buffer_frames
+    draw_range = [
+        keyframe_idx - task.clip_vis_size,
+        keyframe_idx + task.clip_vis_size,
+    ]
+    buffer = frames[: task.num_buffer_frames]
+    frames = frames[task.num_buffer_frames :]
+    if boxes is not None:
+        if len(boxes) != 0:
+            frames = video_vis.draw_clip_range(
+                frames,
+                preds,
+                boxes,
+                keyframe_idx=keyframe_idx,
+                draw_range=draw_range,
+            )
+    else:
+        frames = video_vis.draw_clip_range(
+            frames, preds, keyframe_idx=keyframe_idx, draw_range=draw_range
+        )
+    del task
+
+    return buffer + frames
+
+
+def log_predictions(task, video_vis):
+    """
+    Log prediction for the given task.
+    Args:
+        task (TaskInfo object): task object that contain
+            the necessary information for logging. (e.g. frames, preds)
             All attributes must lie on CPU devices.
         video_vis (VideoVisualizer object): the video visualizer object.
     """

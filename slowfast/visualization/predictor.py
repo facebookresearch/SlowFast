@@ -33,6 +33,8 @@ class Predictor:
             self.gpu_id = (
                 torch.cuda.current_device() if gpu_id is None else gpu_id
             )
+        else:
+            self.gpu_id = None
 
         # Build the video model and print model statistics.
         self.model = build_model(cfg, gpu_id=gpu_id)

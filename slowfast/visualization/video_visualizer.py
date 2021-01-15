@@ -675,3 +675,81 @@ class VideoVisualizer:
         )
         thres_array[common_class_ids] = self.thres
         self.thres = torch.from_numpy(thres_array)
+
+
+class VideoLogger(VideoVisualizer):
+    """
+    Core is identical to visualizer. Override draw method to only log.
+    """
+    def __init__(self, *_, **__):
+        super(VideoLogger, self).__init__(*_, **__)
+        self.clip_index = 0
+
+    def draw_clip_range(
+        self,
+        frames,
+        preds,
+        bboxes=None,
+        text_alpha=0.5,
+        ground_truth=False,
+        keyframe_idx=None,
+        draw_range=None,
+        repeat_frame=1,
+    ):
+        self.clip_index += 1
+
+        if isinstance(preds, torch.Tensor):
+            if preds.ndim == 1:
+                preds = preds.unsqueeze(0)
+            n_instances = preds.shape[0]
+        elif isinstance(preds, list):
+            n_instances = len(preds)
+        else:
+            logger.error("Unsupported type of prediction input.")
+            return
+
+        if ground_truth:
+            method = "ground-truth"
+            top_scores, top_classes = [None] * n_instances, preds
+        elif self.mode == "top-k":
+            method = "top-k={}".format(self.top_k)
+            top_scores, top_classes = torch.topk(preds, k=self.top_k)
+            top_scores, top_classes = top_scores.tolist(), top_classes.tolist()
+        elif self.mode == "thres":
+            method = "thres>={}".format(self.thres)
+            top_scores, top_classes = [], []
+            for pred in preds:
+                mask = pred >= self.thres
+                top_scores.append(pred[mask].tolist())
+                top_class = torch.squeeze(torch.nonzero(mask), dim=-1).tolist()
+                top_classes.append(top_class)
+
+        text_labels = []
+        for i in range(n_instances):
+            text_labels.append(
+                _create_text_labels(
+                    top_classes[i],
+                    top_scores[i],
+                    self.class_names,
+                    ground_truth=ground_truth,
+                )
+            )
+
+        if bboxes is not None:
+            assert len(preds) == len(
+                bboxes
+            ), "Encounter {} predictions and {} bounding boxes".format(
+                len(preds), len(bboxes)
+            )
+            logger.info("%04d", self.clip_index)
+            for i, box in enumerate(bboxes):
+                label = " labeled '{}'".format(text_labels[i]) if ground_truth else ""
+                text_box = "bbox: {},".format(list(box))
+                logger.info("    %s %s is predicted to class %s, %s: %s, %s",
+                            text_box, label, top_classes[i], method, list(top_classes[i]), list(top_scores[i]))
+        else:
+            label = " labeled '{}'".format(text_labels[0]) if ground_truth else ""
+            logger.info("%04d%s is predicted to class %s, %s: %s, %s",
+                        self.clip_index, label, top_classes[0], method, list(top_classes), list(top_scores))
+
+        return []
