@@ -64,11 +64,16 @@ def setup_logging(output_dir=None):
         logger.addHandler(ch)
 
     if output_dir is not None and du.is_master_proc(du.get_world_size()):
-        filename = os.path.join(output_dir, "stdout.log")
-        fh = logging.StreamHandler(_cached_log_stream(filename))
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(plain_formatter)
-        logger.addHandler(fh)
+        setup_file_logger(logger, output_dir, "stdout.log", plain_formatter)
+
+
+def setup_file_logger(logger, output_dir, file_name, formatter=None):
+    filename = os.path.join(output_dir, file_name)
+    fh = logging.StreamHandler(_cached_log_stream(filename))
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter or logging.Formatter("%(message)s"))
+    logger.addHandler(fh)
+    logger.setLevel(logging.DEBUG)
 
 
 def get_logger(name):

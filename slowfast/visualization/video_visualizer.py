@@ -13,6 +13,7 @@ from slowfast.utils.misc import get_class_names
 
 logger = logging.get_logger(__name__)
 log.getLogger("matplotlib").setLevel(log.ERROR)
+pred_log = logging.get_logger("slowfast-predictions")
 
 
 def _create_text_labels(classes, scores, class_names, ground_truth=False):
@@ -684,6 +685,7 @@ class VideoLogger(VideoVisualizer):
     def __init__(self, *_, **__):
         super(VideoLogger, self).__init__(*_, **__)
         self.clip_index = 0
+        self.frame_range = []
 
     def draw_clip_range(
         self,
@@ -697,6 +699,12 @@ class VideoLogger(VideoVisualizer):
         repeat_frame=1,
     ):
         self.clip_index += 1
+        frame_range = [0, len(frames) - 1]
+        if not self.frame_range:
+            self.frame_range = frame_range
+        else:
+            self.frame_range[0] = self.frame_range[1] + frame_range[0]
+            self.frame_range[1] = self.frame_range[1] + frame_range[1]
 
         if isinstance(preds, torch.Tensor):
             if preds.ndim == 1:
@@ -723,6 +731,9 @@ class VideoLogger(VideoVisualizer):
                 top_scores.append(pred[mask].tolist())
                 top_class = torch.squeeze(torch.nonzero(mask), dim=-1).tolist()
                 top_classes.append(top_class)
+        else:
+            logger.error("Unknown mode: %s", self.mode)
+            return
 
         text_labels = []
         for i in range(n_instances):
@@ -735,21 +746,23 @@ class VideoLogger(VideoVisualizer):
                 )
             )
 
+        frames_info = "{:04d} [{:08d}, {:08d}]:".format(self.clip_index, self.frame_range[0], self.frame_range[1])
         if bboxes is not None:
-            assert len(preds) == len(
-                bboxes
-            ), "Encounter {} predictions and {} bounding boxes".format(
-                len(preds), len(bboxes)
-            )
-            logger.info("%04d", self.clip_index)
+            assert len(preds) == len(bboxes), \
+                "Encounter {} predictions and {} bounding boxes".format(len(preds), len(bboxes))
+            pred_log.info(frames_info)
             for i, box in enumerate(bboxes):
+                top_labels = [self.class_names[i] for i in top_classes[i]]
+                txt_scores = [float("{:.4f}".format(float(score))) for score in top_scores[i]]
                 label = " labeled '{}'".format(text_labels[i]) if ground_truth else ""
-                text_box = "bbox: {},".format(list(box))
-                logger.info("    %s %s is predicted to class %s, %s: %s, %s",
-                            text_box, label, top_classes[i], method, list(top_classes[i]), list(top_scores[i]))
+                text_box = "bbox: {},".format(list(float("{:04.2f}".format(float(c))) for c in list(box)))
+                pred_log.info("    %s%s is predicted to class %s, %s: %s, %s",
+                              text_box, label, text_labels[i][0], method, top_labels, txt_scores)
         else:
             label = " labeled '{}'".format(text_labels[0]) if ground_truth else ""
-            logger.info("%04d%s is predicted to class %s, %s: %s, %s",
-                        self.clip_index, label, top_classes[0], method, list(top_classes), list(top_scores))
+            top_labels = [self.class_names[i] for i in top_classes[0]]
+            txt_scores = [float("{:.4f}".format(float(score))) for score in top_scores[0]]
+            pred_log.info("%s%s is predicted to class %s, %s: %s, %s",
+                          frames_info, label, text_labels[0], method, top_labels, txt_scores)
 
-        return []
+        return []  # drop frames to speed up process (no writing)
