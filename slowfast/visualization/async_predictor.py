@@ -315,7 +315,7 @@ def draw_predictions(task, video_vis):
                 boxes,
                 keyframe_idx=keyframe_idx,
                 draw_range=draw_range,
-                task=task,
+                task_id=task.id,
             )
     else:
         frames = video_vis.draw_clip_range(
@@ -323,7 +323,7 @@ def draw_predictions(task, video_vis):
             preds,
             keyframe_idx=keyframe_idx,
             draw_range=draw_range,
-            task=task,
+            task_id=task.id,
         )
     del task
 
@@ -366,7 +366,7 @@ def log_predictions(task, video_vis):
                 boxes,
                 keyframe_idx=keyframe_idx,
                 draw_range=draw_range,
-                task=task,
+                task_id=task.id,
             )
     else:
         frames = video_vis.draw_clip_range(
@@ -374,7 +374,7 @@ def log_predictions(task, video_vis):
             preds,
             keyframe_idx=keyframe_idx,
             draw_range=draw_range,
-            task=task,
+            task_id=task.id,
         )
     del task
 

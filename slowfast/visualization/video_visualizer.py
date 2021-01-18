@@ -522,7 +522,7 @@ class VideoVisualizer:
         keyframe_idx=None,
         draw_range=None,
         repeat_frame=1,
-        task=None,
+        task_id=None,
     ):
         """
         Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
@@ -539,6 +539,7 @@ class VideoVisualizer:
             draw_range (Optional[list[ints]): only draw frames in range [start_idx, end_idx] inclusively in the clip.
                 If None, draw on the entire clip.
             repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
+            task_id (int): reference index of the task where frames and predictions originated from.
         """
         if draw_range is None:
             draw_range = [0, len(frames) - 1]
@@ -681,7 +682,9 @@ class VideoVisualizer:
 
 class VideoLogger(VideoVisualizer):
     """
-    Core is identical to visualizer. Override draw method to only log.
+    Log predictions to file instead of drawing onto output video frames.
+
+    Core is identical to `VideoVisualizer`. Override draw method to log.
     """
     def __init__(self, *_, **__):
         super(VideoLogger, self).__init__(*_, **__)
@@ -697,9 +700,9 @@ class VideoLogger(VideoVisualizer):
         keyframe_idx=None,
         draw_range=None,
         repeat_frame=1,
-        task=None,
+        task_id=None,
     ):
-        self.clip_index = task.id if task else self.clip_index + 1
+        self.clip_index = task_id or self.clip_index + 1
         num_frames = len(frames)
         start_frame = self.clip_index * num_frames
         frame_range = [start_frame, start_frame + num_frames - 1]
