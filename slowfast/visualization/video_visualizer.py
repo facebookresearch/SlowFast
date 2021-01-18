@@ -522,6 +522,7 @@ class VideoVisualizer:
         keyframe_idx=None,
         draw_range=None,
         repeat_frame=1,
+        task=None,
     ):
         """
         Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
@@ -684,8 +685,7 @@ class VideoLogger(VideoVisualizer):
     """
     def __init__(self, *_, **__):
         super(VideoLogger, self).__init__(*_, **__)
-        self.clip_index = 0
-        self.frame_range = []
+        self.clip_index = -1
 
     def draw_clip_range(
         self,
@@ -697,14 +697,12 @@ class VideoLogger(VideoVisualizer):
         keyframe_idx=None,
         draw_range=None,
         repeat_frame=1,
+        task=None,
     ):
-        self.clip_index += 1
-        frame_range = [0, len(frames) - 1]
-        if not self.frame_range:
-            self.frame_range = frame_range
-        else:
-            self.frame_range[0] = self.frame_range[1] + frame_range[0]
-            self.frame_range[1] = self.frame_range[1] + frame_range[1]
+        self.clip_index = task.id if task else self.clip_index + 1
+        num_frames = len(frames)
+        start_frame = self.clip_index * num_frames
+        frame_range = [start_frame, start_frame + num_frames - 1]
 
         if isinstance(preds, torch.Tensor):
             if preds.ndim == 1:
@@ -746,7 +744,7 @@ class VideoLogger(VideoVisualizer):
                 )
             )
 
-        frames_info = "{:04d} [{:08d}, {:08d}]:".format(self.clip_index, self.frame_range[0], self.frame_range[1])
+        frames_info = "{:04d} [{:08d}, {:08d}]:".format(self.clip_index, frame_range[0], frame_range[1])
         if bboxes is not None:
             assert len(preds) == len(bboxes), \
                 "Encounter {} predictions and {} bounding boxes".format(len(preds), len(bboxes))

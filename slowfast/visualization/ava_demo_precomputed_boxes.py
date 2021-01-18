@@ -294,6 +294,7 @@ class AVAVisualizerWithPrecomputedBox:
                     ground_truth=ground_truth,
                     draw_range=current_draw_range,
                     repeat_frame=repeat,
+                    task=task,
                 )
             # Store the current clip as buffer.
             prev_buffer = clip
