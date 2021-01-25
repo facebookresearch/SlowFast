@@ -9,7 +9,7 @@ import os
 import pickle
 from collections import OrderedDict
 import torch
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
@@ -26,9 +26,9 @@ def make_checkpoint_dir(path_to_job):
     """
     checkpoint_dir = os.path.join(path_to_job, "checkpoints")
     # Create the checkpoint dir from the master process
-    if du.is_master_proc() and not PathManager.exists(checkpoint_dir):
+    if du.is_master_proc() and not g_pathmgr.exists(checkpoint_dir):
         try:
-            PathManager.mkdirs(checkpoint_dir)
+            g_pathmgr.mkdirs(checkpoint_dir)
         except Exception:
             pass
     return checkpoint_dir
@@ -62,7 +62,7 @@ def get_last_checkpoint(path_to_job):
     """
 
     d = get_checkpoint_dir(path_to_job)
-    names = PathManager.ls(d) if PathManager.exists(d) else []
+    names = g_pathmgr.ls(d) if g_pathmgr.exists(d) else []
     names = [f for f in names if "checkpoint" in f]
     assert len(names), "No checkpoints found in '{}'.".format(d)
     # Sort the checkpoints by epoch.
@@ -77,7 +77,7 @@ def has_checkpoint(path_to_job):
         path_to_job (string): the path to the folder of the current job.
     """
     d = get_checkpoint_dir(path_to_job)
-    files = PathManager.ls(d) if PathManager.exists(d) else []
+    files = g_pathmgr.ls(d) if g_pathmgr.exists(d) else []
     return any("checkpoint" in f for f in files)
 
 
@@ -117,7 +117,7 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
     if not du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
         return
     # Ensure that the checkpoint dir exists.
-    PathManager.mkdirs(get_checkpoint_dir(path_to_job))
+    g_pathmgr.mkdirs(get_checkpoint_dir(path_to_job))
     # Omit the DDP wrapper in the multi-gpu setting.
     sd = model.module.state_dict() if cfg.NUM_GPUS > 1 else model.state_dict()
     normalized_sd = sub_to_normal_bn(sd)
@@ -131,7 +131,7 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
     }
     # Write the checkpoint.
     path_to_checkpoint = get_path_to_checkpoint(path_to_job, epoch + 1)
-    with PathManager.open(path_to_checkpoint, "wb") as f:
+    with g_pathmgr.open(path_to_checkpoint, "wb") as f:
         torch.save(checkpoint, f)
     return path_to_checkpoint
 
@@ -203,7 +203,7 @@ def load_checkpoint(
     Returns:
         (int): the number of training epoch of the checkpoint.
     """
-    assert PathManager.exists(
+    assert g_pathmgr.exists(
         path_to_checkpoint
     ), "Checkpoint '{}' not found".format(path_to_checkpoint)
     logger.info("Loading network weights from {}.".format(path_to_checkpoint))
@@ -211,7 +211,7 @@ def load_checkpoint(
     # Account for the DDP wrapper in the multi-gpu setting.
     ms = model.module if data_parallel else model
     if convert_from_caffe2:
-        with PathManager.open(path_to_checkpoint, "rb") as f:
+        with g_pathmgr.open(path_to_checkpoint, "rb") as f:
             caffe2_checkpoint = pickle.load(f, encoding="latin1")
         state_dict = OrderedDict()
         name_convert_func = get_name_convert_func()
@@ -281,7 +281,7 @@ def load_checkpoint(
         epoch = -1
     else:
         # Load the checkpoint on CPU to avoid GPU mem spike.
-        with PathManager.open(path_to_checkpoint, "rb") as f:
+        with g_pathmgr.open(path_to_checkpoint, "rb") as f:
             checkpoint = torch.load(f, map_location="cpu")
         model_state_dict_3d = (
             model.module.state_dict() if data_parallel else model.state_dict()

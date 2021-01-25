@@ -27,11 +27,14 @@ def construct_optimizer(model, cfg):
     bn_params = []
     # Non-batchnorm parameters.
     non_bn_parameters = []
-    for name, p in model.named_parameters():
-        if "bn" in name:
-            bn_params.append(p)
-        else:
-            non_bn_parameters.append(p)
+    for m in model.modules():
+        is_bn = isinstance(m, torch.nn.modules.batchnorm._NormBase)
+        for p in m.parameters(recurse=False):
+            if is_bn:
+                bn_params.append(p)
+            else:
+                non_bn_parameters.append(p)
+
     # Apply different weight decay to Batchnorm and non-batchnorm parameters.
     # In Caffe2 classification codebase the weight decay for batchnorm is 0.0.
     # Having a different weight decay on batchnorm might cause a performance

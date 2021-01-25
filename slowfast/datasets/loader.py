@@ -82,35 +82,50 @@ def construct_loader(cfg, split, is_precise_bn=False):
     # Construct the dataset
     dataset = build_dataset(dataset_name, cfg, split)
 
-    if cfg.MULTIGRID.SHORT_CYCLE and split in ["train"] and not is_precise_bn:
-        # Create a sampler for multi-process training
-        sampler = utils.create_sampler(dataset, shuffle, cfg)
-        batch_sampler = ShortCycleBatchSampler(
-            sampler, batch_size=batch_size, drop_last=drop_last, cfg=cfg
-        )
-        # Create a loader
-        loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_sampler=batch_sampler,
-            num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-            pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
-            worker_init_fn=utils.loader_worker_init_fn(dataset),
-        )
-    else:
-        # Create a sampler for multi-process training
-        sampler = utils.create_sampler(dataset, shuffle, cfg)
-        # Create a loader
+    if isinstance(dataset, torch.utils.data.IterableDataset):
         loader = torch.utils.data.DataLoader(
             dataset,
             batch_size=batch_size,
-            shuffle=(False if sampler else shuffle),
-            sampler=sampler,
             num_workers=cfg.DATA_LOADER.NUM_WORKERS,
             pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
             drop_last=drop_last,
             collate_fn=detection_collate if cfg.DETECTION.ENABLE else None,
             worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
+    else:
+        if (
+            cfg.MULTIGRID.SHORT_CYCLE
+            and split in ["train"]
+            and not is_precise_bn
+        ):
+            # Create a sampler for multi-process training
+            sampler = utils.create_sampler(dataset, shuffle, cfg)
+            batch_sampler = ShortCycleBatchSampler(
+                sampler, batch_size=batch_size, drop_last=drop_last, cfg=cfg
+            )
+            # Create a loader
+            loader = torch.utils.data.DataLoader(
+                dataset,
+                batch_sampler=batch_sampler,
+                num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+                pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+                worker_init_fn=utils.loader_worker_init_fn(dataset),
+            )
+        else:
+            # Create a sampler for multi-process training
+            sampler = utils.create_sampler(dataset, shuffle, cfg)
+            # Create a loader
+            loader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=batch_size,
+                shuffle=(False if sampler else shuffle),
+                sampler=sampler,
+                num_workers=cfg.DATA_LOADER.NUM_WORKERS,
+                pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+                drop_last=drop_last,
+                collate_fn=detection_collate if cfg.DETECTION.ENABLE else None,
+                worker_init_fn=utils.loader_worker_init_fn(dataset),
+            )
     return loader
 
 
@@ -121,11 +136,22 @@ def shuffle_dataset(loader, cur_epoch):
         loader (loader): data loader to perform shuffle.
         cur_epoch (int): number of the current epoch.
     """
-    sampler = (
-        loader.batch_sampler.sampler
-        if isinstance(loader.batch_sampler, ShortCycleBatchSampler)
-        else loader.sampler
-    )
+    if (
+        loader._dataset_kind
+        == torch.utils.data.dataloader._DatasetKind.Iterable
+    ):
+        if hasattr(loader.dataset, "sampler"):
+            sampler = loader.dataset.sampler
+        else:
+            raise RuntimeError(
+                "Unknown sampler for IterableDataset when shuffling dataset"
+            )
+    else:
+        sampler = (
+            loader.batch_sampler.sampler
+            if isinstance(loader.batch_sampler, ShortCycleBatchSampler)
+            else loader.sampler
+        )
     assert isinstance(
         sampler, (RandomSampler, DistributedSampler)
     ), "Sampler type '{}' not supported".format(type(sampler))

@@ -6,7 +6,7 @@ import random
 from itertools import chain as chain
 import torch
 import torch.utils.data
-from fvcore.common.file_io import PathManager
+from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.logging as logging
 
@@ -79,7 +79,7 @@ class Charades(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert PathManager.exists(path_to_file), "{} dir not found".format(
+        assert g_pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
         (self._path_to_videos, self._labels) = utils.load_image_lists(
@@ -230,6 +230,14 @@ class Charades(torch.utils.data.Dataset):
         return frames, label, index, {}
 
     def __len__(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
+        return self.num_videos
+
+    @property
+    def num_videos(self):
         """
         Returns:
             (int): the number of videos in the dataset.
