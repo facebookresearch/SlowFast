@@ -26,6 +26,7 @@ from slowfast.visualization.video_visualizer import VideoVisualizer
 logger = logging.get_logger(__name__)
 
 
+@torch.no_grad()
 def run_visualization(vis_loader, model, cfg, writer=None):
     """
     Run model visualization (weights, activations and model inputs) and visualize
@@ -187,6 +188,7 @@ def run_visualization(vis_loader, model, cfg, writer=None):
                         )
 
 
+@torch.no_grad()
 def perform_wrong_prediction_vis(vis_loader, model, cfg):
     """
     Visualize video inputs with wrong predictions on Tensorboard.
