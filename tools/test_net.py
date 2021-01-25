@@ -125,8 +125,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if cfg.TEST.SAVE_RESULTS_PATH != "":
             save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
-            with g_pathmgr.open(save_path, "wb") as f:
-                pickle.dump([all_preds, all_labels], f)
+            if du.is_root_proc():
+                with g_pathmgr.open(save_path, "wb") as f:
+                    pickle.dump([all_preds, all_labels], f)
 
             logger.info(
                 "Successfully saved prediction results to {}".format(save_path)
