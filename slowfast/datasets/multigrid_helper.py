@@ -4,7 +4,6 @@
 """Helper functions for multigrid training."""
 
 import numpy as np
-from torch._six import int_classes as _int_classes
 from torch.utils.data.sampler import Sampler
 
 
@@ -22,7 +21,7 @@ class ShortCycleBatchSampler(Sampler):
                 "torch.utils.data.Sampler, but got sampler={}".format(sampler)
             )
         if (
-            not isinstance(batch_size, _int_classes)
+            not isinstance(batch_size, int)
             or isinstance(batch_size, bool)
             or batch_size <= 0
         ):
