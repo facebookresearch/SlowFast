@@ -156,6 +156,29 @@ class Ssv2(torch.utils.data.Dataset):
             )
         )
 
+    def get_seq_frames(self, index):
+        """
+        Given the video index, return the list of sampled frame indexes.
+        Args:
+            index (int): the video index.
+        Returns:
+            seq (list): the indexes of frames of sampled from the video.
+        """
+        num_frames = self.cfg.DATA.NUM_FRAMES
+        video_length = len(self._path_to_videos[index])
+
+        seg_size = float(video_length - 1) / num_frames
+        seq = []
+        for i in range(num_frames):
+            start = int(np.round(seg_size * i))
+            end = int(np.round(seg_size * (i + 1)))
+            if self.mode == "train":
+                seq.append(random.randint(start, end))
+            else:
+                seq.append((start + end) // 2)
+
+        return seq
+
     def __getitem__(self, index):
         """
         Given the video index, return the list of frames, label, and video
@@ -215,18 +238,7 @@ class Ssv2(torch.utils.data.Dataset):
 
         label = self._labels[index]
 
-        num_frames = self.cfg.DATA.NUM_FRAMES
-        video_length = len(self._path_to_videos[index])
-
-        seg_size = float(video_length - 1) / num_frames
-        seq = []
-        for i in range(num_frames):
-            start = int(np.round(seg_size * i))
-            end = int(np.round(seg_size * (i + 1)))
-            if self.mode == "train":
-                seq.append(random.randint(start, end))
-            else:
-                seq.append((start + end) // 2)
+        seq = self.get_seq_frames(index)
 
         frames = torch.as_tensor(
             utils.retry_load_images(
