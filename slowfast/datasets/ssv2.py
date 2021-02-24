@@ -265,6 +265,7 @@ class Ssv2(torch.utils.data.Dataset):
             inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
         )
         frames = utils.pack_pathway_output(self.cfg, frames)
+
         return frames, label, index, {}
 
     def __len__(self):

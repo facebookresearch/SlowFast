@@ -25,7 +25,7 @@ def temporal_sampling(frames, start_idx, end_idx, num_samples):
     index = torch.linspace(start_idx, end_idx, num_samples)
     index = torch.clamp(index, 0, frames.shape[0] - 1).long()
     frames = torch.index_select(frames, 0, index)
-    return frames
+    return frames, index
 
 
 def get_start_end_idx(video_size, clip_size, clip_idx, num_clips):
@@ -212,7 +212,7 @@ def torchvision_decode(
 
 
 def pyav_decode(
-    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30
+    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30, force_all_video=False
 ):
     """
     Convert the video from its original fps to the target_fps. If the video
@@ -233,6 +233,7 @@ def pyav_decode(
             given video.
         target_fps (int): the input video may has different fps, convert it to
             the target video fps before frame sampling.
+        force_all_video (bool): fetch all video's frames
     Returns:
         frames (tensor): decoded frames from the video. Return None if the no
             video stream was found.
@@ -246,7 +247,7 @@ def pyav_decode(
     frames_length = container.streams.video[0].frames
     duration = container.streams.video[0].duration
 
-    if duration is None:
+    if duration is None or force_all_video:
         # If failed to fetch the decoding information, decode the entire video.
         decode_all_video = True
         video_start_pts, video_end_pts = 0, math.inf
@@ -290,6 +291,7 @@ def decode(
     target_fps=30,
     backend="pyav",
     max_spatial_scale=0,
+    force_all_video=False,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -313,6 +315,7 @@ def decode(
         max_spatial_scale (int): keep the aspect ratio and resize the frame so
             that shorter edge size is max_spatial_scale. Only used in
             `torchvision` backend.
+        force_all_video (bool): fetch all video's frames - only supported with pyav backend
     Returns:
         frames (tensor): decoded frames from the video.
     """
@@ -327,6 +330,7 @@ def decode(
                 clip_idx,
                 num_clips,
                 target_fps,
+                force_all_video,
             )
         elif backend == "torchvision":
             frames, fps, decode_all_video = torchvision_decode(
@@ -346,11 +350,11 @@ def decode(
             )
     except Exception as e:
         print("Failed to decode by {} with exception: {}".format(backend, e))
-        return None
+        return None, None
 
     # Return None if the frames was not decoded successfully.
     if frames is None or frames.size(0) == 0:
-        return None
+        return None, None
 
     clip_sz = sampling_rate * num_frames / target_fps * fps
     start_idx, end_idx = get_start_end_idx(
@@ -359,6 +363,11 @@ def decode(
         clip_idx if decode_all_video else 0,
         num_clips if decode_all_video else 1,
     )
+
+    if force_all_video:
+        # To avoid duplicate the last frame for videos smaller then 250 frames
+        end_idx = min(float(frames.shape[0]), end_idx)
+
     # Perform temporal sampling from the decoded video.
-    frames = temporal_sampling(frames, start_idx, end_idx, num_frames)
-    return frames
+    frames, frames_index = temporal_sampling(frames, start_idx, end_idx, num_frames)
+    return frames, frames_index

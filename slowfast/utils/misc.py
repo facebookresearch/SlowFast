@@ -103,7 +103,13 @@ def _get_model_analysis_input(cfg, use_train_input):
             cfg.DATA.TEST_CROP_SIZE,
             cfg.DATA.TEST_CROP_SIZE,
         )
-    model_inputs = pack_pathway_output(cfg, input_tensors)
+
+    if cfg.MODEL.MODEL_NAME == "VTN":
+        frames_index = torch.arange(input_tensors.shape[1])
+    else:
+        frames_index = None
+
+    model_inputs = pack_pathway_output(cfg, input_tensors, frames_index)
     for i in range(len(model_inputs)):
         model_inputs[i] = model_inputs[i].unsqueeze(0)
         if cfg.NUM_GPUS:

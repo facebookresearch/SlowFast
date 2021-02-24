@@ -70,6 +70,17 @@ class Kinetics(torch.utils.data.Dataset):
                 cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
             )
 
+        if self.mode in ["val", "test"] and cfg.TRAIN.EVAL_FULL_VIDEO:
+            # supporting full video evaluation
+            self.force_all_video = True
+            self.num_frames = self.cfg.TRAIN.EVAL_NUM_FRAMES
+            self.sampling_rate = 1
+            self._num_clips = 1
+        else:
+            self.force_all_video = False
+            self.num_frames = self.cfg.DATA.NUM_FRAMES
+            self.sampling_rate = self.cfg.DATA.SAMPLING_RATE
+
         logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
 
@@ -158,6 +169,16 @@ class Kinetics(torch.utils.data.Dataset):
                         / self.cfg.MULTIGRID.DEFAULT_S
                     )
                 )
+            if self.mode in ["val"] and self.cfg.TRAIN.EVAL_FULL_VIDEO:
+                # supporting full video evaluation:
+                # spatial_sample_index=1 to take only the center
+                # The testing is deterministic and no jitter should be performed.
+                # min_scale, max_scale, and crop_size are expect to be the same.
+                # temporal_sample_index = -1  # this can be random - in the end we take [0,inf]
+                spatial_sample_index = 1
+                min_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
+                max_scale = self.cfg.DATA.TRAIN_JITTER_SCALES[0]
+                crop_size = self.cfg.DATA.TEST_CROP_SIZE
         elif self.mode in ["test"]:
             temporal_sample_index = (
                 self._spatial_temporal_idx[index]
@@ -189,7 +210,7 @@ class Kinetics(torch.utils.data.Dataset):
             )
         sampling_rate = utils.get_random_sampling_rate(
             self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
-            self.cfg.DATA.SAMPLING_RATE,
+            self.sampling_rate,
         )
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
@@ -220,16 +241,17 @@ class Kinetics(torch.utils.data.Dataset):
                 continue
 
             # Decode video. Meta info is used to perform selective decoding.
-            frames = decoder.decode(
+            frames, frames_index = decoder.decode(
                 video_container,
                 sampling_rate,
-                self.cfg.DATA.NUM_FRAMES,
+                self.num_frames,
                 temporal_sample_index,
                 self.cfg.TEST.NUM_ENSEMBLE_VIEWS,
                 video_meta=self._video_meta[index],
                 target_fps=self.cfg.DATA.TARGET_FPS,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 max_spatial_scale=min_scale,
+                force_all_video=self.force_all_video
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
@@ -263,7 +285,7 @@ class Kinetics(torch.utils.data.Dataset):
             )
 
             label = self._labels[index]
-            frames = utils.pack_pathway_output(self.cfg, frames)
+            frames = utils.pack_pathway_output(self.cfg, frames, frames_index)
             return frames, label, index, {}
         else:
             raise RuntimeError(
