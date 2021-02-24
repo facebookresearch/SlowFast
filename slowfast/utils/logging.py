@@ -29,7 +29,7 @@ def _suppress_print():
 
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
-    io = g_pathmgr.open(filename, "a", buffering=1024)
+    io = g_pathmgr.open(filename, "a")
     atexit.register(io.close)
     return io
 
