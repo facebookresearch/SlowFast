@@ -18,7 +18,7 @@ import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
-from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
+from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter, EpochTimer
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
@@ -416,6 +416,7 @@ def train(cfg):
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
+    epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
         if cfg.MULTIGRID.LONG_CYCLE:
             cfg, changed = multigrid.update_long_cycle(cfg, cur_epoch)
@@ -445,8 +446,22 @@ def train(cfg):
         loader.shuffle_dataset(train_loader, cur_epoch)
 
         # Train for one epoch.
+        epoch_timer.epoch_tic()
         train_epoch(
             train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
+        )
+        epoch_timer.epoch_toc()
+        logger.info(
+            f"Epoch {cur_epoch} takes {epoch_timer.last_epoch_time():.2f}s. Epochs "
+            f"from {start_epoch} to {cur_epoch} take "
+            f"{epoch_timer.avg_epoch_time():.2f}s in average and "
+            f"{epoch_timer.median_epoch_time():.2f}s in median."
+        )
+        logger.info(
+            f"For epoch {cur_epoch}, each iteraction takes "
+            f"{epoch_timer.last_epoch_time()/len(train_loader):.2f}s in average. "
+            f"From epoch {start_epoch} to {cur_epoch}, each iteraction takes "
+            f"{epoch_timer.avg_epoch_time()/len(train_loader):.2f}s in average."
         )
 
         is_checkp_epoch = cu.is_checkpoint_epoch(

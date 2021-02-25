@@ -766,3 +766,58 @@ def get_map(preds, labels):
 
     mean_ap = np.mean(aps)
     return mean_ap
+
+
+class EpochTimer:
+    """
+    A timer which computes the epoch time.
+    """
+
+    def __init__(self) -> None:
+        self.timer = Timer()
+        self.timer.reset()
+        self.epoch_times = []
+
+    def reset(self) -> None:
+        """
+        Reset the epoch timer.
+        """
+        self.timer.reset()
+        self.epoch_times = []
+
+    def epoch_tic(self):
+        """
+        Start to record time.
+        """
+        self.timer.reset()
+
+    def epoch_toc(self):
+        """
+        Stop to record time.
+        """
+        self.timer.pause()
+        self.epoch_times.append(self.timer.seconds())
+
+    def last_epoch_time(self):
+        """
+        Get the time for the last epoch.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return self.epoch_times[-1]
+
+    def avg_epoch_time(self):
+        """
+        Calculate the average epoch time among the recorded epochs.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return np.mean(self.epoch_times)
+
+    def median_epoch_time(self):
+        """
+        Calculate the median epoch time among the recorded epochs.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return np.median(self.epoch_times)
