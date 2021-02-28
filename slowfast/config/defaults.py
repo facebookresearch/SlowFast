@@ -762,7 +762,7 @@ _C.DEMO.SLOWMO = 1
 custom_config.add_custom_config(_C)
 
 
-def _assert_and_infer_cfg(cfg):
+def assert_and_infer_cfg(cfg):
     # BN assertions.
     if cfg.BN.USE_PRECISE_STATS:
         assert cfg.BN.NUM_BATCHES_PRECISE >= 0
@@ -773,7 +773,6 @@ def _assert_and_infer_cfg(cfg):
     # TEST assertions.
     assert cfg.TEST.CHECKPOINT_TYPE in ["pytorch", "caffe2"]
     assert cfg.TEST.BATCH_SIZE % cfg.NUM_GPUS == 0
-    assert cfg.TEST.NUM_SPATIAL_CROPS == 3
 
     # RESNET assertions.
     assert cfg.RESNET.NUM_GROUPS > 0
@@ -793,4 +792,4 @@ def get_cfg():
     """
     Get a copy of the default config.
     """
-    return _assert_and_infer_cfg(_C.clone())
+    return _C.clone()

@@ -3,7 +3,7 @@
 
 """Wrapper to train and test a video classification model."""
 from slowfast.utils.misc import launch_job
-from slowfast.utils.parser import load_config, parse_args
+from slowfast.utils.parser import load_config, parse_args, assert_and_infer_cfg
 
 from demo_net import demo
 from test_net import test
@@ -17,6 +17,7 @@ def main():
     """
     args = parse_args()
     cfg = load_config(args)
+    cfg = assert_and_infer_cfg(cfg)
 
     # Perform training.
     if cfg.TRAIN.ENABLE:
