@@ -29,7 +29,10 @@ def _suppress_print():
 
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
-    io = g_pathmgr.open(filename, "a")
+    # Use 1K buffer if writing to cloud storage.
+    io = g_pathmgr.open(
+        filename, "a", buffering=1024 if "://" in filename else -1
+    )
     atexit.register(io.close)
     return io
 
