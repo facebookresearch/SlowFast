@@ -202,7 +202,7 @@ class ObjectDetectionEvaluator(DetectionEvaluator):
         else:
             groundtruth_difficult = None
             if not len(self._image_ids) % 1000:
-                logging.warn(
+                logging.warning(
                     "image %s does not have groundtruth difficult flag specified",
                     image_id,
                 )
@@ -496,7 +496,7 @@ class OpenImagesDetectionEvaluator(ObjectDetectionEvaluator):
         else:
             groundtruth_group_of = None
             if not len(self._image_ids) % 1000:
-                logging.warn(
+                logging.warning(
                     "image %s does not have groundtruth group_of flag specified",
                     image_id,
                 )
@@ -601,7 +601,7 @@ class ObjectDetectionEvaluation(object):
         The mask values range from 0 to 1.
     """
         if image_key in self.groundtruth_boxes:
-            logging.warn(
+            logging.warning(
                 "image %s has already been added to the ground truth database.",
                 image_key,
             )
@@ -668,7 +668,7 @@ class ObjectDetectionEvaluation(object):
             )
 
         if image_key in self.detection_keys:
-            logging.warn(
+            logging.warning(
                 "image %s has already been added to the detection result database",
                 image_key,
             )
