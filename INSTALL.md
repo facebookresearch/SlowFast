@@ -19,6 +19,7 @@
 - torchvision: `pip install torchvision` or `conda install torchvision -c pytorch`
 - tensorboard: `pip install tensorboard`
 - moviepy: (optional, for visualizing video on tensorboard) `conda install -c conda-forge moviepy` or `pip install moviepy`
+- PyTorchVideo: `pip install pytorchvideo`
 - [Detectron2](https://github.com/facebookresearch/detectron2):
 ```
     pip install -U torch torchvision cython

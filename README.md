@@ -23,6 +23,7 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - X3D
 
 ## Updates
+ - We now support [PyTorchvideo] models and datasets. See [`projects/pytorchvideo`](./projects/pytorchvideo/README.md) for more information.
  - We now support [X3D Models](https://arxiv.org/abs/2004.04730). See [`projects/x3d`](./projects/x3d/README.md) for more information.
  - We now support [Multigrid Training](https://arxiv.org/abs/1912.00998) for efficiently training video models. See [`projects/multigrid`](./projects/multigrid/README.md) for more information.
  - PySlowFast is released in conjunction with our [ICCV 2019 Tutorial](https://alexander-kirillov.github.io/tutorials/visual-recognition-iccv19/).

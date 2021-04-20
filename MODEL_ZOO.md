@@ -68,3 +68,8 @@ We also release the imagenet pretrained model if finetuning from ImageNet is pre
 | architecture | depth |  Top1 |  Top5  |  model  |
 | ------------- | ------------- | ------------- | ------------- | ------------- |
 | ResNet | R50 | 23.6 | 6.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) |
+
+
+## PyTorchVideo
+
+We support and benchmark PyTorchVideo models and datasets in PySlowFast. See [projects/pytorchvideo](projects/pytorchvideo/README.md) for more information about PyTorchVideo Model Zoo.
