@@ -25,6 +25,12 @@ We provided original pretrained models from Caffe2 on heavy models (testing Caff
 | X3D | M | - | 16 x 5 | 75.1 | 76.2 | 3.8 | 4.73 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/x3d_models/x3d_m.pyth) | Kinetics/X3D_M |
 | X3D | L | - | 16 x 5 | 76.9 | 77.5 | 6.2 | 18.37 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/x3d_models/x3d_l.pyth) | Kinetics/X3D_L |
 
+## VTN model (details in projects/vtn)
+
+|  architecture | backbone |  pretrain |  frame length x sample rate | top1 |  top5  |  model | config |
+| :-------------: | :-------------: | :-------------: | :-------------: | :-------------: | :-------------: | ------------- | ------------- |
+| VTN | ViT-B | ImageNet-21K | - | 77.72 | 93.24 | [`link`](https://researchpublic.blob.core.windows.net/vtn/VTN_VIT_B_KINETICS.pyth) | Kinetics/VIT_B_VTN |
+
 ## AVA
 
 | architecture | depth | Pretrain Model |  frame length x sample rate  | MAP | AVA version | model |

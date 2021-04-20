@@ -70,7 +70,7 @@ def get_sequence(center_idx, half_len, sample_rate, num_frames):
     return seq
 
 
-def pack_pathway_output(cfg, frames):
+def pack_pathway_output(cfg, frames, frames_index=None):
     """
     Prepare output as a list of tensors. Each tensor corresponding to a
     unique pathway.
@@ -83,7 +83,9 @@ def pack_pathway_output(cfg, frames):
     """
     if cfg.DATA.REVERSE_INPUT_CHANNEL:
         frames = frames[[2, 1, 0], :, :, :]
-    if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
+    if cfg.MODEL.MODEL_NAME == "VTN":
+        frame_list = [frames, frames_index]
+    elif cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
         frame_list = [frames]
     elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
         fast_pathway = frames
@@ -151,8 +153,8 @@ def spatial_sampling(
             frames, _ = transform.horizontal_flip(0.5, frames)
     else:
         # The testing is deterministic and no jitter should be performed.
-        # min_scale, max_scale, and crop_size are expect to be the same.
-        assert len({min_scale, max_scale, crop_size}) == 1
+        # min_scale and max_scale are expect to be the same.
+        assert min_scale == max_scale
         frames, _ = transform.random_short_side_scale_jitter(
             frames, min_scale, max_scale
         )

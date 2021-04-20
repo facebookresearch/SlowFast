@@ -75,6 +75,12 @@ _C.TRAIN.CHECKPOINT_EPOCH_RESET = False
 # If set, clear all layer names according to the pattern provided.
 _C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
+# If True, will use all video's frames during evaluation
+_C.TRAIN.EVAL_FULL_VIDEO = False
+
+# In case "EVAL_FULL_VIDEO" is True, this will set the number of frames to use for the full video (250 in VTN)
+_C.TRAIN.EVAL_NUM_FRAMES = None
+
 # ---------------------------------------------------------------------------- #
 # Testing options
 # ---------------------------------------------------------------------------- #
@@ -254,6 +260,53 @@ _C.SLOWFAST.FUSION_CONV_CHANNEL_RATIO = 2
 # pathway.
 _C.SLOWFAST.FUSION_KERNEL_SZ = 5
 
+# -----------------------------------------------------------------------------
+# VTN options
+# -----------------------------------------------------------------------------
+_C.VTN = CfgNode()
+
+# ViT: if True, will load pretrained weights for the backbone.
+_C.VTN.PRETRAINED = True
+
+# ViT: stochastic depth decay rule.
+_C.VTN.DROP_PATH_RATE = 0.0
+
+# ViT: dropout ratio.
+_C.VTN.DROP_RATE = 0.0
+
+# Longformer: the size of the embedding, this is the input size of the MLP head,
+# and should match the ViT output dimension.
+_C.VTN.HIDDEN_DIM = 768
+
+# Longformer: the maximum sequence length that this model might ever be used with.
+_C.VTN.MAX_POSITION_EMBEDDINGS = 288
+
+# Longformer: number of attention heads for each attention layer in the Transformer encoder.
+_C.VTN.NUM_ATTENTION_HEADS = 12
+
+# Longformer: number of hidden layers in the Transformer encoder.
+_C.VTN.NUM_HIDDEN_LAYERS = 3
+
+# Longformer: Type of self-attention: LF use 'sliding_chunks' to process with a sliding window
+_C.VTN.ATTENTION_MODE = 'sliding_chunks'
+
+# Longformer: The value used to pad input_ids.
+_C.VTN.PAD_TOKEN_ID = -1
+
+# Longformer: Size of an attention window around each token.
+_C.VTN.ATTENTION_WINDOW = [18, 18, 18]
+
+# Longformer: Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
+_C.VTN.INTERMEDIATE_SIZE = 3072
+
+# Longformer: The dropout ratio for the attention probabilities.
+_C.VTN.ATTENTION_PROBS_DROPOUT_PROB = 0.1
+
+# Longformer: The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
+_C.VTN.HIDDEN_DROPOUT_PROB = 0.1
+
+# MLP Head: the dimension of the MLP head hidden layer.
+_C.VTN.MLP_DIM = 768
 
 # -----------------------------------------------------------------------------
 # Data options
