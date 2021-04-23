@@ -6,6 +6,7 @@ PySlowFast is an open source video understanding codebase from FAIR that provide
 - [Non-local Neural Networks](https://arxiv.org/abs/1711.07971)
 - [A Multigrid Method for Efficiently Training Video Models](https://arxiv.org/abs/1912.00998)
 - [X3D: Progressive Network Expansion for Efficient Video Recognition](https://arxiv.org/abs/2004.04730)
+- [Multiscale Vision Transformers](https://arxiv.org/abs/2104.11227.pdf) To be released in a week
 
 <div align="center">
   <img src="demo/ava_demo.gif" width="600px"/>
@@ -23,7 +24,8 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - X3D
 
 ## Updates
- - We now support [PyTorchvideo] models and datasets. See [`projects/pytorchvideo`](./projects/pytorchvideo/README.md) for more information.
+ - We are supporting [Multiscale Vision Transformers](https://arxiv.org/abs/2104.11227.pdf) in a week. See [`projects/mvit`](./projects/mvit/README.md) for more information.
+ - We now support [PyTorchVideo](https://github.com/facebookresearch/pytorchvideo) models and datasets. See [`projects/pytorchvideo`](./projects/pytorchvideo/README.md) for more information.
  - We now support [X3D Models](https://arxiv.org/abs/2004.04730). See [`projects/x3d`](./projects/x3d/README.md) for more information.
  - We now support [Multigrid Training](https://arxiv.org/abs/1912.00998) for efficiently training video models. See [`projects/multigrid`](./projects/multigrid/README.md) for more information.
  - PySlowFast is released in conjunction with our [ICCV 2019 Tutorial](https://alexander-kirillov.github.io/tutorials/visual-recognition-iccv19/).
