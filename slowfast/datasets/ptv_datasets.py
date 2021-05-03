@@ -18,7 +18,7 @@ from torchvision.transforms._transforms_video import (
 
 import slowfast.utils.logging as logging
 
-from pytorchvideo.data import Charades, SSv2, EncodedVideoDataset, make_clip_sampler
+from pytorchvideo.data import Charades, SSv2, LabeledVideoDataset, make_clip_sampler
 from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 from pytorchvideo.transforms import (
     ApplyTransformToKey,
@@ -256,7 +256,7 @@ def Ptvkinetics(cfg, mode):
         num_videos=num_videos,
         clips_per_video=num_clips,
         crops_per_clip=num_crops,
-        dataset=EncodedVideoDataset(
+        dataset=LabeledVideoDataset(
             labeled_video_paths=labeled_video_paths,
             clip_sampler=clip_sampler,
             video_sampler=video_sampler,
