@@ -99,7 +99,12 @@ class PTVResNet(nn.Module):
         spatial_strides = cfg.RESNET.SPATIAL_STRIDES
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
         stage1_pool = pool_size[0][0] != 1 or len(set(pool_size[0])) > 1
-
+        stage_spatial_stride=(
+            spatial_strides[0][0],
+            spatial_strides[1][0],
+            spatial_strides[2][0],
+            spatial_strides[3][0],
+        )
         if cfg.MODEL.ARCH == "i3d":
             stage_conv_a_kernel_size = (
                 (3, 1, 1),
@@ -155,12 +160,8 @@ class PTVResNet(nn.Module):
                 (1, spatial_dilations[2][0], spatial_dilations[2][0]),
                 (1, spatial_dilations[3][0], spatial_dilations[3][0]),
             ),
-            stage_spatial_stride=(
-                spatial_strides[0][0],
-                spatial_strides[1][0],
-                spatial_strides[2][0],
-                spatial_strides[3][0],
-            ),
+            stage_spatial_h_stride=stage_spatial_stride,
+            stage_spatial_w_stride=stage_spatial_stride,
             stage_temporal_stride=(1, 1, 1, 1),
             bottleneck=create_bottleneck_block,
             # Head configs.
