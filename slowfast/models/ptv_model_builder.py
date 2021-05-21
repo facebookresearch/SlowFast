@@ -22,7 +22,8 @@ from pytorchvideo.models.x3d import (
     create_x3d,
     create_x3d_bottleneck_block,
 )
-
+from pytorchvideo.models.head import create_res_basic_head, create_res_roi_pooling_head
+from detectron2.layers import ROIAlign
 from .build import MODEL_REGISTRY
 
 
@@ -75,10 +76,8 @@ class PTVResNet(nn.Module):
             "slow",
             "i3d",
         ], f"Unsupported MODEL.ARCH type {cfg.MODEL.ARCH} for PTVResNet"
-        assert (
-            cfg.DETECTION.ENABLE is False
-        ), "Detection model is not supported for PTVResNet yet."
 
+        self.detection_mode =  cfg.DETECTION.ENABLE
         self._construct_network(cfg)
 
     def _construct_network(self, cfg):
@@ -118,6 +117,26 @@ class PTVResNet(nn.Module):
                 (temp_kernel[2][0][0], 1, 1),
                 (temp_kernel[3][0][0], 1, 1),
                 (temp_kernel[4][0][0], 1, 1),
+            )
+
+        # Head from config
+        if cfg.DETECTION.ENABLE:
+            self.detection_head = create_res_roi_pooling_head(
+                in_features=cfg.RESNET.WIDTH_PER_GROUP * 2**(4+1),
+                out_features=cfg.MODEL.NUM_CLASSES,
+                pool=nn.AvgPool3d,
+                output_size=(1,1,1),
+                pool_kernel_size= (
+                    cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1,
+                ),
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                activation=None,
+                output_with_global_average=False,
+                pool_spatial=nn.MaxPool2d,
+                resolution=[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2,
+                spatial_scale=1.0/float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
+                sampling_ratio=0,
+                roi=ROIAlign,
             )
 
         self.model = create_resnet(
@@ -165,6 +184,7 @@ class PTVResNet(nn.Module):
             stage_temporal_stride=(1, 1, 1, 1),
             bottleneck=create_bottleneck_block,
             # Head configs.
+            head=create_res_basic_head if not self.detection_mode else None,
             head_pool=nn.AvgPool3d,
             head_pool_kernel_size=(
                 cfg.DATA.NUM_FRAMES // pool_size[0][0],
@@ -180,11 +200,14 @@ class PTVResNet(nn.Module):
     def forward(self, x, bboxes=None):
         x = x[0]
         x = self.model(x)
-        # Performs fully convlutional inference.
-        if not self.training:
+        if self.detection_mode:
+            x = self.detection_head(x, bboxes)
             x = self.post_act(x)
-            x = x.mean([2, 3, 4])
-
+        else:
+            # Performs fully convlutional inference.
+            if not self.training:
+                x = self.post_act(x)
+                x = x.mean([2, 3, 4])
         x = x.view(x.shape[0], -1)
         return x
 
@@ -208,10 +231,8 @@ class PTVSlowFast(nn.Module):
         assert (
             cfg.RESNET.TRANS_FUNC == "bottleneck_transform"
         ), f"Unsupported TRANS_FUNC type {cfg.RESNET.TRANS_FUNC} for PTVSlowFast"
-        assert (
-            cfg.DETECTION.ENABLE is False
-        ), "Detection model is not supported for PTVSlowFast yet."
 
+        self.detection_mode =  cfg.DETECTION.ENABLE
         self._construct_network(cfg)
 
     def _construct_network(self, cfg):
@@ -231,6 +252,54 @@ class PTVSlowFast(nn.Module):
         spatial_dilations = cfg.RESNET.SPATIAL_DILATIONS
         spatial_strides = cfg.RESNET.SPATIAL_STRIDES
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+
+        # Head from config
+        # Number of stages = 4
+        stage_dim_in = cfg.RESNET.WIDTH_PER_GROUP * 2**(4+1)
+        head_in_features = stage_dim_in
+        for reduction_ratio in cfg.SLOWFAST.BETA_INV:
+            head_in_features = head_in_features + stage_dim_in // reduction_ratio
+
+        if cfg.DETECTION.ENABLE:
+            self.detection_head = create_res_roi_pooling_head(
+                in_features=head_in_features,
+                out_features=cfg.MODEL.NUM_CLASSES,
+                pool=None,
+                output_size=(1,1,1),
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                activation=None,
+                output_with_global_average=False,
+                pool_spatial=nn.MaxPool2d,
+                resolution=[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2,
+                spatial_scale=1.0/float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
+                sampling_ratio=0,
+                roi=ROIAlign,
+            )
+            head_pool_kernel_sizes = (
+                (
+                    cfg.DATA.NUM_FRAMES
+                    // cfg.SLOWFAST.ALPHA
+                    // pool_size[0][0],
+                    1,
+                    1,
+                ),
+                (cfg.DATA.NUM_FRAMES // pool_size[1][0], 1, 1),
+            )
+        else:
+            head_pool_kernel_sizes = (
+                (
+                    cfg.DATA.NUM_FRAMES
+                    // cfg.SLOWFAST.ALPHA
+                    // pool_size[0][0],
+                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                ),
+                (
+                    cfg.DATA.NUM_FRAMES // pool_size[1][0],
+                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
+                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
+                ),
+            )
 
         self.model = create_slowfast(
             # SlowFast configs.
@@ -319,21 +388,9 @@ class PTVSlowFast(nn.Module):
             stage_temporal_strides=((1, 1, 1, 1), (1, 1, 1, 1)),
             bottleneck=create_bottleneck_block,
             # Head configs.
+            head=create_res_basic_head if not self.detection_mode else None,
             head_pool=nn.AvgPool3d,
-            head_pool_kernel_sizes=(
-                (
-                    cfg.DATA.NUM_FRAMES
-                    // cfg.SLOWFAST.ALPHA
-                    // pool_size[0][0],
-                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
-                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
-                ),
-                (
-                    cfg.DATA.NUM_FRAMES // pool_size[1][0],
-                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
-                    cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
-                ),
-            ),
+            head_pool_kernel_sizes=head_pool_kernel_sizes,
             head_activation=None,
             head_output_with_global_average=False,
         )
@@ -342,11 +399,14 @@ class PTVSlowFast(nn.Module):
 
     def forward(self, x, bboxes=None):
         x = self.model(x)
-        # Performs fully convlutional inference.
-        if not self.training:
+        if self.detection_mode:
+            x = self.detection_head(x, bboxes)
             x = self.post_act(x)
-            x = x.mean([2, 3, 4])
-
+        else:
+            # Performs fully convlutional inference.
+            if not self.training:
+                x = self.post_act(x)
+                x = x.mean([2, 3, 4])
         x = x.view(x.shape[0], -1)
         return x
 
