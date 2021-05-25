@@ -2,9 +2,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Wrapper to train and test a video classification model."""
+from slowfast.config.defaults import assert_and_infer_cfg
 from slowfast.utils.misc import launch_job
 from slowfast.utils.parser import load_config, parse_args
-from slowfast.config.defaults import assert_and_infer_cfg
 
 from demo_net import demo
 from test_net import test

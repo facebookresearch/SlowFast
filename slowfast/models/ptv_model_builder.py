@@ -98,7 +98,7 @@ class PTVResNet(nn.Module):
         spatial_strides = cfg.RESNET.SPATIAL_STRIDES
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
         stage1_pool = pool_size[0][0] != 1 or len(set(pool_size[0])) > 1
-        stage_spatial_stride=(
+        stage_spatial_stride = (
             spatial_strides[0][0],
             spatial_strides[1][0],
             spatial_strides[2][0],
@@ -243,6 +243,7 @@ class PTVSlowFast(nn.Module):
             cfg (CfgNode): model building configs, details are in the
                 comments of the config file.
         """
+        _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
 
         # Params from configs.
         norm_module = get_norm(cfg)
@@ -252,6 +253,21 @@ class PTVSlowFast(nn.Module):
         spatial_dilations = cfg.RESNET.SPATIAL_DILATIONS
         spatial_strides = cfg.RESNET.SPATIAL_STRIDES
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
+        num_block_temp_kernel = cfg.RESNET.NUM_BLOCK_TEMP_KERNEL
+        stage_depth = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
+
+        stage_conv_a_kernel_sizes = [[], []]
+        for pathway in range(2):
+            for stage in range(4):
+                stage_conv_a_kernel_sizes[pathway].append(
+                    ((temp_kernel[stage + 1][pathway][0], 1, 1),)
+                    * num_block_temp_kernel[stage][pathway]
+                    + ((1, 1, 1),)
+                    * (
+                        stage_depth[stage]
+                        - num_block_temp_kernel[stage][pathway]
+                    )
+                )
 
         # Head from config
         # Number of stages = 4
@@ -335,20 +351,7 @@ class PTVSlowFast(nn.Module):
             stem_pool_kernel_sizes=((1, 3, 3), (1, 3, 3)),
             stem_pool_strides=((1, 2, 2), (1, 2, 2)),
             # Stage configs.
-            stage_conv_a_kernel_sizes=(
-                (
-                    (temp_kernel[1][0][0], 1, 1),
-                    (temp_kernel[2][0][0], 1, 1),
-                    (temp_kernel[3][0][0], 1, 1),
-                    (temp_kernel[4][0][0], 1, 1),
-                ),
-                (
-                    (temp_kernel[1][1][0], 1, 1),
-                    (temp_kernel[2][1][0], 1, 1),
-                    (temp_kernel[3][1][0], 1, 1),
-                    (temp_kernel[4][1][0], 1, 1),
-                ),
-            ),
+            stage_conv_a_kernel_sizes=stage_conv_a_kernel_sizes,
             stage_conv_b_kernel_sizes=(
                 ((1, 3, 3), (1, 3, 3), (1, 3, 3), (1, 3, 3)),
                 ((1, 3, 3), (1, 3, 3), (1, 3, 3), (1, 3, 3)),

@@ -18,7 +18,12 @@ from torchvision.transforms._transforms_video import (
 
 import slowfast.utils.logging as logging
 
-from pytorchvideo.data import Charades, SSv2, LabeledVideoDataset, make_clip_sampler
+from pytorchvideo.data import (
+    Charades,
+    LabeledVideoDataset,
+    SSv2,
+    make_clip_sampler,
+)
 from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 from pytorchvideo.transforms import (
     ApplyTransformToKey,
@@ -503,7 +508,7 @@ def Ptvssv2(cfg, mode):
         )
         clip_sampler = make_clip_sampler(
             "constant_clips_per_video",
-            1, # Put arbitrary duration as ssv2 always needs full video clip.
+            1,  # Put arbitrary duration as ssv2 always needs full video clip.
             num_clips,
             num_crops,
         )
@@ -542,7 +547,7 @@ def Ptvssv2(cfg, mode):
         )
         clip_sampler = make_clip_sampler(
             "constant_clips_per_video",
-            1, # Put arbitrary duration as ssv2 always needs full video clip.
+            1,  # Put arbitrary duration as ssv2 always needs full video clip.
             num_clips,
             num_crops,
         )
@@ -550,12 +555,14 @@ def Ptvssv2(cfg, mode):
             DistributedSampler if cfg.NUM_GPUS > 1 else SequentialSampler
         )
 
-    label_name_file = os.path.join(cfg.DATA.PATH_TO_DATA_DIR, "something-something-v2-labels.json")
+    label_name_file = os.path.join(
+        cfg.DATA.PATH_TO_DATA_DIR, "something-something-v2-labels.json"
+    )
     video_label_file = os.path.join(
         cfg.DATA.PATH_TO_DATA_DIR,
         "something-something-v2-{}.json".format(
             "train" if mode == "train" else "validation"
-        )
+        ),
     )
     data_path = os.path.join(
         cfg.DATA.PATH_TO_DATA_DIR,
