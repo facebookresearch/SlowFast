@@ -462,7 +462,7 @@ class ResNet(nn.Module):
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
         # We put s1 and s2 in a nn.Sequential for activation checkpointing.
-        # Therefore, we don't keep them in self.s1 and self.s2.
+        # We keep them in self.s1 and self.s2 as well for backward state dict compatibility.
         s1 = stem_helper.VideoModelStem(
             dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
             dim_out=[width_per_group],
@@ -471,6 +471,7 @@ class ResNet(nn.Module):
             padding=[[temp_kernel[0][0][0] // 2, 3, 3]],
             norm_module=self.norm_module,
         )
+        self.s1 = s1
 
         s2 = resnet_helper.ResStage(
             dim_in=[width_per_group],
@@ -491,6 +492,7 @@ class ResNet(nn.Module):
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
         )
+        self.s2 = s2
 
         # Based on profiling data of activation size, s1 and s2 have the activation sizes
         # that are 4X larger than the second largest. Therefore, checkpointing them gives
