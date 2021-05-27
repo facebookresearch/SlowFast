@@ -75,6 +75,64 @@ _C.TRAIN.CHECKPOINT_EPOCH_RESET = False
 # If set, clear all layer names according to the pattern provided.
 _C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
+
+# ---------------------------------------------------------------------------- #
+# Augmentation options.
+# ---------------------------------------------------------------------------- #
+_C.AUG = CfgNode()
+
+# Whether to enable randaug.
+_C.AUG.ENABLE = False
+
+# Number of repeated augmentations to used during training.
+# If this is greater than 1, then the actual batch size is
+# TRAIN.BATCH_SIZE * AUG.NUM_SAMPLE.
+_C.AUG.NUM_SAMPLE = 1
+
+# Not used if using randaug.
+_C.AUG.COLOR_JITTER = 0.4
+
+# RandAug parameters.
+_C.AUG.AA_TYPE = "rand-m9-mstd0.5-inc1"
+
+# Interpolation method.
+_C.AUG.INTERPOLATION = "bicubic"
+
+# Probability of random erasing.
+_C.AUG.RE_PROB = 0.25
+
+# Random erasing mode.
+_C.AUG.RE_MODE = "pixel"
+
+# Random erase count.
+_C.AUG.RE_COUNT = 1
+
+# Do not random erase first (clean) augmentation split.
+_C.AUG.RE_SPLIT = False
+
+# ---------------------------------------------------------------------------- #
+# MipUp options.
+# ---------------------------------------------------------------------------- #
+_C.MIXUP = CfgNode()
+
+# Whether to use mixup.
+_C.MIXUP.ENABLE = False
+
+# Mixup alpha.
+_C.MIXUP.ALPHA = 0.8
+
+# Cutmix alpha.
+_C.MIXUP.CUTMIX_ALPHA = 1.0
+
+# Probability of performing mixup or cutmix when either/both is enabled.
+_C.MIXUP.PROB = 1.0
+
+# Probability of switching to cutmix when both mixup and cutmix enabled.
+_C.MIXUP.SWITCH_PROB = 0.5
+
+# Label smoothing.
+_C.MIXUP.LABEL_SMOOTH_VALUE = 0.1
+
 # ---------------------------------------------------------------------------- #
 # Testing options
 # ---------------------------------------------------------------------------- #
@@ -286,6 +344,17 @@ _C.DATA.STD = [0.225, 0.225, 0.225]
 
 # The spatial augmentation jitter scales for training.
 _C.DATA.TRAIN_JITTER_SCALES = [256, 320]
+
+# The relative scale range of Inception-style area based random resizing augmentation.
+# If this is provided, DATA.TRAIN_JITTER_SCALES above is ignored.
+_C.DATA.TRAIN_JITTER_SCALES_RELATIVE = [[]]
+
+# The relative aspect ratio range of Inception-style area based random resizing
+# augmentation.
+_C.DATA.TRAIN_JITTER_ASPECT_RELATIVE = [[]]
+
+# Whether to apply motion shift for augmentation.
+_C.DATA.TRAIN_JITTER_MOTION_SHIFT = False
 
 # The spatial crop size for training.
 _C.DATA.TRAIN_CROP_SIZE = 224

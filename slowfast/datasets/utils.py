@@ -114,6 +114,9 @@ def spatial_sampling(
     crop_size=224,
     random_horizontal_flip=True,
     inverse_uniform_sampling=False,
+    aspect_ratio=None,
+    scale=None,
+    motion_shift=False,
 ):
     """
     Perform spatial sampling on the given video frames. If spatial_idx is
@@ -135,18 +138,35 @@ def spatial_sampling(
             [1 / max_scale, 1 / min_scale] and take a reciprocal to get the
             scale. If False, take a uniform sample from [min_scale,
             max_scale].
+        aspect_ratio (list): Aspect ratio range for resizing.
+        scale (list): Scale range for resizing.
+        motion_shift (bool): Whether to apply motion shift for resizing.
     Returns:
         frames (tensor): spatially sampled frames.
     """
     assert spatial_idx in [-1, 0, 1, 2]
     if spatial_idx == -1:
-        frames, _ = transform.random_short_side_scale_jitter(
-            images=frames,
-            min_size=min_scale,
-            max_size=max_scale,
-            inverse_uniform_sampling=inverse_uniform_sampling,
-        )
-        frames, _ = transform.random_crop(frames, crop_size)
+        if aspect_ratio is None and scale is None:
+            frames, _ = transform.random_short_side_scale_jitter(
+                images=frames,
+                min_size=min_scale,
+                max_size=max_scale,
+                inverse_uniform_sampling=inverse_uniform_sampling,
+            )
+            frames, _ = transform.random_crop(frames, crop_size)
+        else:
+            transform_func = (
+                transform.random_resized_crop_with_shift
+                if motion_shift
+                else transform.random_resized_crop
+            )
+            frames = transform_func(
+                images=frames,
+                target_height=crop_size,
+                target_width=crop_size,
+                scale=scale,
+                ratio=aspect_ratio,
+            )
         if random_horizontal_flip:
             frames, _ = transform.horizontal_flip(0.5, frames)
     else:
