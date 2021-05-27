@@ -46,8 +46,10 @@ def build_model(cfg, gpu_id=None):
         model = model.cuda(device=cur_device)
     # Use multi-process data parallel model in the multi-gpu setting
     if cfg.NUM_GPUS > 1:
-        # Make model replica operate on the current device
+        # Make model replica operate on the current device. `find_unused_parameters` needs to be true
+        # if activation checkpoint is used. Otherwise, DDP throws a runtime error about expected gradients
+        # not being produced. It could be enabled always if the performance impact is measured to be small.
         model = torch.nn.parallel.DistributedDataParallel(
-            module=model, device_ids=[cur_device], output_device=cur_device
+            module=model, device_ids=[cur_device], output_device=cur_device, find_unused_parameters=cfg.MODEL.ENABLE_AC
         )
     return model

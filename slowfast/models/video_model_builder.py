@@ -7,6 +7,8 @@ import math
 import torch
 import torch.nn as nn
 
+from fairscale.nn.checkpoint import checkpoint_wrapper
+
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
 
@@ -459,7 +461,9 @@ class ResNet(nn.Module):
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
-        self.s1 = stem_helper.VideoModelStem(
+        # We put s1 and s2 in a nn.Sequential for activation checkpointing.
+        # Therefore, we don't keep them in self.s1 and self.s2.
+        s1 = stem_helper.VideoModelStem(
             dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
             dim_out=[width_per_group],
             kernel=[temp_kernel[0][0] + [7, 7]],
@@ -468,7 +472,7 @@ class ResNet(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.s2 = resnet_helper.ResStage(
+        s2 = resnet_helper.ResStage(
             dim_in=[width_per_group],
             dim_out=[width_per_group * 4],
             dim_inner=[dim_inner],
@@ -487,6 +491,15 @@ class ResNet(nn.Module):
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
         )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+        if cfg.MODEL.ENABLE_AC:
+            self.s12 = checkpoint_wrapper(nn.Sequential(s1, s2))
+        else:
+            self.s12 = nn.Sequential(s1, s2)
 
         for pathway in range(self.num_pathways):
             pool = nn.MaxPool3d(
@@ -585,8 +598,7 @@ class ResNet(nn.Module):
             )
 
     def forward(self, x, bboxes=None):
-        x = self.s1(x)
-        x = self.s2(x)
+        x = list(self.s12(x))  # self.s12 output could be a tuple, turn it into a list for assignment of x[pathway] below.
         for pathway in range(self.num_pathways):
             pool = getattr(self, "pathway{}_pool".format(pathway))
             x[pathway] = pool(x[pathway])
