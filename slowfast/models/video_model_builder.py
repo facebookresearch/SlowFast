@@ -499,7 +499,7 @@ class ResNet(nn.Module):
         # best memory savings. Further tuning is possible for better memory saving and tradeoffs
         # with recomputing FLOPs.
         if cfg.MODEL.ENABLE_AC:
-            self.s12 = checkpoint_wrapper(nn.Sequential(s1, s2))
+            self.s12 = nn.Sequential(checkpoint_wrapper(s1), checkpoint_wrapper(s2))
         else:
             self.s12 = nn.Sequential(s1, s2)
 
@@ -600,11 +600,12 @@ class ResNet(nn.Module):
             )
 
     def forward(self, x, bboxes=None):
-        x = list(self.s12(x))  # self.s12 output could be a tuple, turn it into a list for assignment of x[pathway] below.
+        x = self.s12(x)
+        y = []  # Don't modify x list in place due to activation checkpoint.
         for pathway in range(self.num_pathways):
             pool = getattr(self, "pathway{}_pool".format(pathway))
-            x[pathway] = pool(x[pathway])
-        x = self.s3(x)
+            y.append(pool(x[pathway]))
+        x = self.s3(y)
         x = self.s4(x)
         x = self.s5(x)
         if self.enable_detection:
