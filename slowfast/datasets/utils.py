@@ -125,7 +125,7 @@ def spatial_sampling(
     with the given spatial_idx.
     Args:
         frames (tensor): frames of images sampled from the video. The
-            dimension is `num frames` x `height` x `width` x `channel`.
+            dimension is `channel` x `num frames` x `height` x `width`.
         spatial_idx (int): if -1, perform random spatial sampling. If 0, 1,
             or 2, perform left, center, right crop if width is larger than
             height, and perform top, center, buttom crop if height is larger
