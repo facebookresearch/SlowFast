@@ -39,6 +39,7 @@ We also provide a comprehensive PyTorchVideo Model Zoo using standard PySlowFast
 | X3D      | XS    | \-       | 4x12                       | 69.12 | 88.63 | 0.91 x 3 x 10     | 3.79       | [link](https://dl.fbaipublicfiles.com/pytorchvideo/pysf_model_zoo/kinetics/X3D_XS.pyth)                     | Kinetics/pytorchvideo/X3D_XS                   |
 | X3D      | S     | \-       | 13x6                       | 73.33 | 91.27 | 2.96 x 3 x 10     | 3.79       | [link](https://dl.fbaipublicfiles.com/pytorchvideo/pysf_model_zoo/kinetics/X3D_S.pyth)                      | Kinetics/pytorchvideo/X3D_S                    |
 | X3D      | M     | \-       | 16x5                       | 75.94 | 92.72 | 6.72 x 3 x 10     | 3.79       | [link](https://dl.fbaipublicfiles.com/pytorchvideo/pysf_model_zoo/kinetics/X3D_M.pyth)                      | Kinetics/pytorchvideo/X3D_M                    |
+| X3D      | L     | \-       | 16x5                       | 77.44 | 93.31 | 26.64 x 3 x 10    | 6.15       | [link](https://dl.fbaipublicfiles.com/pytorchvideo/pysf_model_zoo/kinetics/X3D_L.pyth)                      | Kinetics/pytorchvideo/X3D_L                    |
 
 
 ### Something-Something V2
