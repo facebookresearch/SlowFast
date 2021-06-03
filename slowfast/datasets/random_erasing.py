@@ -31,7 +31,7 @@ def _get_pixels(
         return torch.zeros((patch_size[0], 1, 1), dtype=dtype, device=device)
 
 
-class RandomErasingCube:
+class RandomErasing:
     """Randomly selects a rectangle region in an image and erases its pixels.
         'Random Erasing Data Augmentation' by Zhong et al.
         See https://arxiv.org/pdf/1708.04896.pdf
@@ -62,6 +62,7 @@ class RandomErasingCube:
         max_count=None,
         num_splits=0,
         device="cuda",
+        cube=True,
     ):
         self.probability = probability
         self.min_area = min_area
@@ -74,6 +75,7 @@ class RandomErasingCube:
         mode = mode.lower()
         self.rand_color = False
         self.per_pixel = False
+        self.cube = cube
         if mode == "rand":
             self.rand_color = True  # per block random normal
         elif mode == "pixel":
@@ -162,7 +164,11 @@ class RandomErasingCube:
             batch_start = (
                 batch_size // self.num_splits if self.num_splits > 1 else 0
             )
-            self._erase_cube(
-                input, batch_start, batch_size, chan, img_h, img_w, input.dtype
-            )
+            if self.cube:
+                self._erase_cube(
+                    input, batch_start, batch_size, chan, img_h, img_w, input.dtype
+                )
+            else:
+                for i in range(batch_start, batch_size):
+                    self._erase(input[i], chan, img_h, img_w, input.dtype)
         return input

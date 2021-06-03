@@ -14,7 +14,7 @@ from . import decoder as decoder
 from . import utils as utils
 from . import video_container as container
 from .build import DATASET_REGISTRY
-from .random_erasing import RandomErasingCube
+from .random_erasing import RandomErasing
 from .transform import create_random_augment
 
 logger = logging.get_logger(__name__)
@@ -242,6 +242,7 @@ class Kinetics(torch.utils.data.Dataset):
                 target_fps=self.cfg.DATA.TARGET_FPS,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 max_spatial_scale=min_scale,
+                use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),
@@ -341,16 +342,10 @@ class Kinetics(torch.utils.data.Dataset):
         )
         # T H W C -> C T H W.
         frames = frames.permute(3, 0, 1, 2)
-        scl, asp = (
-            self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
-            self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE,
-        )
-        relative_scales = (
-            None if (self.mode not in ["train"] or len(scl[0]) == 0) else scl[0]
-        )
-        relative_aspect = (
-            None if (self.mode not in ["train"] or len(asp[0]) == 0) else asp[0]
-        )
+        # Perform data augmentation.
+        scl, asp = self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE, self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE
+        relative_scales = None if (self.mode not in ["train"] or len(scl) == 0) else scl
+        relative_aspect = None if (self.mode not in ["train"] or len(asp) == 0) else asp
         frames = utils.spatial_sampling(
             frames,
             spatial_idx=spatial_sample_index,
@@ -367,7 +362,7 @@ class Kinetics(torch.utils.data.Dataset):
         )
 
         if self.rand_erase:
-            erase_transform = RandomErasingCube(
+            erase_transform = RandomErasing(
                 self.cfg.AUG.RE_PROB,
                 mode=self.cfg.AUG.RE_MODE,
                 max_count=self.cfg.AUG.RE_COUNT,

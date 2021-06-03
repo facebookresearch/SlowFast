@@ -8,6 +8,7 @@ import torch.nn as nn
 
 from slowfast.models.nonlocal_helper import Nonlocal
 from slowfast.models.operators import SE, Swish
+from slowfast.models.common import drop_path
 
 
 def get_trans_func(name):
@@ -503,21 +504,10 @@ class ResBlock(nn.Module):
         )
         self.relu = nn.ReLU(self._inplace_relu)
 
-    def _drop_connect(self, x, drop_ratio):
-        """Apply dropconnect to x"""
-        keep_ratio = 1.0 - drop_ratio
-        mask = torch.empty(
-            [x.shape[0], 1, 1, 1, 1], dtype=x.dtype, device=x.device
-        )
-        mask.bernoulli_(keep_ratio)
-        x.div_(keep_ratio)
-        x.mul_(mask)
-        return x
-
     def forward(self, x):
         f_x = self.branch2(x)
         if self.training and self._drop_connect_rate > 0.0:
-            f_x = self._drop_connect(f_x, self._drop_connect_rate)
+            f_x = drop_path(f_x, self._drop_connect_rate)
         if hasattr(self, "branch1"):
             x = self.branch1_bn(self.branch1(x)) + f_x
         else:
