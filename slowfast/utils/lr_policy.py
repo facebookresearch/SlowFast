@@ -38,14 +38,15 @@ def lr_func_cosine(cfg, cur_epoch):
             slowfast/config/defaults.py
         cur_epoch (float): the number of epoch of the current training stage.
     """
+    offset = cfg.SOLVER.WARMUP_EPOCHS if cfg.SOLVER.COSINE_AFTER_WARMUP else 0.0
     assert cfg.SOLVER.COSINE_END_LR < cfg.SOLVER.BASE_LR
     return (
         cfg.SOLVER.COSINE_END_LR
         + (cfg.SOLVER.BASE_LR - cfg.SOLVER.COSINE_END_LR)
-        * (math.cos(math.pi * cur_epoch / cfg.SOLVER.MAX_EPOCH) + 1.0)
+        * (math.cos(
+            math.pi * (cur_epoch  - offset)  / (cfg.SOLVER.MAX_EPOCH - offset )) + 1.0)
         * 0.5
     )
-
 
 def lr_func_steps_with_relative_lrs(cfg, cur_epoch):
     """

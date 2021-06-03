@@ -86,7 +86,7 @@ class Imagenet(torch.utils.data.Dataset):
             im = transform.lighting_jitter(im, 0.1, self.cfg.DATA.TRAIN_PCA_EIGVAL, self.cfg.DATA.TRAIN_PCA_EIGVEC)
         else:
             # For testing use scale and center crop
-            im = transform.uniform_crop(im, test_size, spatial_idx=1, scale_size=train_size)
+            im, _ = transform.uniform_crop(im, test_size, spatial_idx=1, scale_size=train_size)
         # For training and testing use color normalization
         im = transform.color_normalization(im, self.cfg.DATA.MEAN, self.cfg.DATA.STD)
         # Convert HWC/RGB/float to CHW/BGR/float format

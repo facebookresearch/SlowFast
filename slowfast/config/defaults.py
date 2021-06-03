@@ -520,6 +520,12 @@ _C.SOLVER.OPTIMIZING_METHOD = "sgd"
 # Base learning rate is linearly scaled with NUM_SHARDS.
 _C.SOLVER.BASE_LR_SCALE_NUM_SHARDS = False
 
+# If True, start from the peak cosine learning rate after warm up.
+_C.SOLVER.COSINE_AFTER_WARMUP = False
+
+# If True, perform no weight decay on parameter with one dimension (bias term, etc).
+_C.SOLVER.ZERO_WD_1D_PARAM = False
+
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #
