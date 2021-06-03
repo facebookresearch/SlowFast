@@ -285,3 +285,30 @@ class X3DStem(nn.Module):
         x = self.bn(x)
         x = self.relu(x)
         return x
+
+
+class PatchEmbed(nn.Module):
+    """
+    PatchEmbed.
+    """
+    def __init__(
+        self,
+        dim_in=3,
+        dim_out=768,
+        kernel=(1, 16, 16),
+        stride=(1, 4, 4),
+        padding=(1, 7, 7),
+    ):
+        super().__init__()
+        self.proj = nn.Conv2d(
+            dim_in,
+            dim_out,
+            kernel_size=kernel,
+            stride=stride,
+            padding=padding,
+        )
+
+    def forward(self, x):
+        x = self.proj(x)
+        # B C T H W -> B (T H W) C
+        return x.flatten(2).transpose(1, 2)
