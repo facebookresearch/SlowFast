@@ -28,7 +28,7 @@ def temporal_sampling(frames, start_idx, end_idx, num_samples):
     return frames
 
 
-def get_start_end_idx(video_size, clip_size, clip_idx, num_clips):
+def get_start_end_idx(video_size, clip_size, clip_idx, num_clips, use_offset=False):
     """
     Sample a clip of size clip_size from a video of size video_size and
     return the indices of the first and last frame of the clip. If clip_idx is
@@ -53,8 +53,16 @@ def get_start_end_idx(video_size, clip_size, clip_idx, num_clips):
         # Random temporal sampling.
         start_idx = random.uniform(0, delta)
     else:
-        # Uniformly sample the clip with the given index.
-        start_idx = delta * clip_idx / num_clips
+        if use_offset:
+            if num_clips == 1:
+                # Take the center clip if num_clips is 1.
+                start_idx = math.floor(delta / 2)
+            else:
+                # Uniformly sample the clip with the given index.
+                start_idx = clip_idx * math.floor(delta / (num_clips - 1))
+        else:
+            # Uniformly sample the clip with the given index.
+            start_idx = delta * clip_idx / num_clips
     end_idx = start_idx + clip_size - 1
     return start_idx, end_idx
 
@@ -111,6 +119,7 @@ def torchvision_decode(
     target_fps=30,
     modalities=("visual",),
     max_spatial_scale=0,
+    use_offset=False,
 ):
     """
     If video_meta is not empty, perform temporal selective decoding to sample a
@@ -172,7 +181,7 @@ def torchvision_decode(
         decode_all_video = False
         clip_size = sampling_rate * num_frames / target_fps * fps
         start_idx, end_idx = get_start_end_idx(
-            fps * video_meta["video_duration"], clip_size, clip_idx, num_clips
+            fps * video_meta["video_duration"], clip_size, clip_idx, num_clips, use_offset=use_offset
         )
         # Convert frame index to pts.
         pts_per_frame = video_meta["video_denominator"] / fps
@@ -212,7 +221,7 @@ def torchvision_decode(
 
 
 def pyav_decode(
-    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30
+    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30, use_offset=False,
 ):
     """
     Convert the video from its original fps to the target_fps. If the video
@@ -258,6 +267,7 @@ def pyav_decode(
             sampling_rate * num_frames / target_fps * fps,
             clip_idx,
             num_clips,
+            use_offset=use_offset,
         )
         timebase = duration / frames_length
         video_start_pts = int(start_idx * timebase)
@@ -290,6 +300,7 @@ def decode(
     target_fps=30,
     backend="pyav",
     max_spatial_scale=0,
+    use_offset=False,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -327,6 +338,7 @@ def decode(
                 clip_idx,
                 num_clips,
                 target_fps,
+                use_offset=use_offset,
             )
         elif backend == "torchvision":
             frames, fps, decode_all_video = torchvision_decode(
@@ -339,6 +351,7 @@ def decode(
                 target_fps,
                 ("visual",),
                 max_spatial_scale,
+                use_offset=use_offset,
             )
         else:
             raise NotImplementedError(
@@ -358,6 +371,7 @@ def decode(
         clip_sz,
         clip_idx if decode_all_video else 0,
         num_clips if decode_all_video else 1,
+        use_offset=use_offset,
     )
     # Perform temporal sampling from the decoded video.
     frames = temporal_sampling(frames, start_idx, end_idx, num_frames)

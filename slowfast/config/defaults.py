@@ -304,13 +304,16 @@ _C.MVIT.MODE = "conv"
 _C.MVIT.CLS_EMBED_ON = True
 
 # Kernel size for patchtification.
-_C.MVIT.PATCH_KERNEL = (3, 7, 7)
+_C.MVIT.PATCH_KERNEL = [3, 7, 7]
 
 # Stride size for patchtification.
-_C.MVIT.PATCH_STRIDE = (2, 4, 4)
+_C.MVIT.PATCH_STRIDE = [2, 4, 4]
 
 # Padding size for patchtification.
-_C.MVIT.PATCH_PADDING = (2, 4, 4)
+_C.MVIT.PATCH_PADDING = [2, 4, 4]
+
+# If True, use 2d patch, otherwise use 3d patch.
+_C.MVIT.PATCH_2D = False
 
 # Base embedding dimension for the transformer.
 _C.MVIT.EMBED_DIM = 96
@@ -346,6 +349,12 @@ _C.MVIT.POOL_KV_KERNEL = [[]]
 
 # Kernel size for the Pool Q. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
 _C.MVIT.POOL_Q_KERNEL = [[]]
+
+# Stride size for the Pool KV. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_KV_STRIDE = [[]]
+
+# Stride size for the Pool Q. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_Q_STRIDE = [[]]
 
 # If True, perform no decay on positional embedding and cls embedding.
 _C.MVIT.ZERO_DECAY_POS_CLS = True
@@ -435,6 +444,9 @@ _C.DATA.TRAIN_JITTER_SCALES_RELATIVE = []
 # The relative aspect ratio range of Inception-style area based random resizing
 # augmentation.
 _C.DATA.TRAIN_JITTER_ASPECT_RELATIVE = []
+
+# If True, perform stride length uniform temporal sampling.
+_C.DATA.USE_OFFSET_SAMPLING = False
 
 # Whether to apply motion shift for augmentation.
 _C.DATA.TRAIN_JITTER_MOTION_SHIFT = False

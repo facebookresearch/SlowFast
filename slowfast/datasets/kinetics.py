@@ -242,6 +242,7 @@ class Kinetics(torch.utils.data.Dataset):
                 target_fps=self.cfg.DATA.TARGET_FPS,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 max_spatial_scale=min_scale,
+                use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
             )
 
             # If decoding failed (wrong format, video is too short, and etc),

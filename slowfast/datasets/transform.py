@@ -36,7 +36,6 @@ def _pil_interp(method):
     elif method == "hamming":
         return Image.HAMMING
     else:
-        # default bilinear, do we want to allow nearest?
         return Image.BILINEAR
 
 
@@ -643,44 +642,13 @@ def create_random_augment(
     raise NotImplementedError
 
 
-def create_random_augment(
-    input_size,
-    is_training=True,
-    use_prefetcher=False,
-    no_aug=False,
-    scale=None,
-    ratio=None,
-    hflip=0.5,
-    vflip=0.0,
-    color_jitter=0.4,
-    auto_augment=None,
-    interpolation="bilinear",
-):
-    if isinstance(input_size, tuple):
-        img_size = input_size[-2:]
-    else:
-        img_size = input_size
-
-    transform = transforms_slowfast_train(
-        img_size,
-        scale=scale,
-        ratio=ratio,
-        hflip=hflip,
-        vflip=vflip,
-        color_jitter=color_jitter,
-        auto_augment=auto_augment,
-        interpolation=interpolation,
-    )
-    return transform
-
-
 def random_sized_crop_img(im, size, jitter_scale=(0.08, 1.0), jitter_aspect=(3.0 / 4.0, 4.0 / 3.0), max_iter=10):
     """
     Performs Inception-style cropping (used for training).
     """
     assert len(im.shape) == 3, "Currently only support image for random_sized_crop"
     h, w = im.shape[1:3]
-    i, j, h, w = get_param_spatial_crop(
+    i, j, h, w = _get_param_spatial_crop(
         scale=jitter_scale,
         ratio=jitter_aspect,
         height=h,

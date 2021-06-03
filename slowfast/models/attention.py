@@ -4,12 +4,12 @@
 
 import torch
 import torch.nn as nn
-from collections import OrderedDict
+import numpy
 from slowfast.models.common import Permute, Mlp
-from slowfast.models.drop import DropPath
+from slowfast.models.common import DropPath
 
 
-def attention_pool(tensor, pool, thw_shape, has_cls_embed=True):
+def attention_pool(tensor, pool, thw_shape, has_cls_embed=True, norm=None):
     if pool is None:
         return tensor, thw_shape
     tensor_dim = tensor.ndim
@@ -34,6 +34,8 @@ def attention_pool(tensor, pool, thw_shape, has_cls_embed=True):
     tensor = tensor.reshape(B, N, C, L_pooled).transpose(2, 3)
     if has_cls_embed:
         tensor = torch.cat((cls_tok, tensor), dim=2)
+    if norm is not None:
+        tensor = norm(tensor)
     # Assert tensor_dim in [3, 4]
     if tensor_dim == 4:
         pass
@@ -51,6 +53,8 @@ class MultiScaleAttention(nn.Module):
         drop_rate=0.0,
         kernel_q=(1, 1, 1),
         kernel_kv=(1, 1, 1),
+        stride_q=(1, 1, 1),
+        stride_kv=(1, 1, 1),
         norm_layer=nn.LayerNorm,
         has_cls_embed=True,
         # Options include `conv`, `avg`, and `max`.
@@ -62,8 +66,6 @@ class MultiScaleAttention(nn.Module):
         head_dim = dim // num_heads
         self.scale = head_dim ** -0.5
         self.has_cls_embed = has_cls_embed
-        stride_q = [int(q // 2) + 1 for q in kernel_q]
-        stride_kv = [int(kv // 2) + 1 for kv in kernel_kv]
         padding_q = [int(q // 2) for q in kernel_q]
         padding_kv = [int(kv // 2) for kv in kernel_kv]
 
@@ -72,8 +74,11 @@ class MultiScaleAttention(nn.Module):
         if drop_rate > 0.0:
             self.proj_drop = nn.Dropout(drop_rate)
 
-        # self.pool_q = None
-        self.pool_kv = kernel_kv != (1, 1, 1)
+        # Skip pooling with kernel and stride size of (1, 1, 1).
+        if numpy.prod(kernel_q) == 1 and numpy.prod(stride_q) == 1:
+            kernel_q = ()
+        if numpy.prod(kernel_kv) == 1 and numpy.prod(stride_kv) == 1:
+            kernel_kv = ()
 
         if mode == "avg":
             self.pool_q = nn.AvgPool3d(kernel_q, stride_q, padding_q, ceil_mode=False) if len(kernel_q) > 0 else None
@@ -84,48 +89,36 @@ class MultiScaleAttention(nn.Module):
             self.pool_k = nn.MaxPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False) if len(kernel_kv) > 0 else None
             self.pool_v = nn.MaxPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False) if len(kernel_kv) > 0 else None
         elif mode == "conv":
-            self.pool_q = nn.Sequential(OrderedDict({
-                'conv': nn.Conv3d(
-                    head_dim,
-                    head_dim,
-                    kernel_q,
-                    stride=stride_q,
-                    padding=padding_q,
-                    groups=head_dim,
-                    bias=False,
-                ),
-                "permute_a": Permute((0, 2, 3, 4, 1)),  # BCTHW -> BTHWC
-                'norm': norm_layer(head_dim),
-                "permute_b": Permute((0, 4, 1, 2, 3)),  # BTHWC -> BCTHW
-            })) if len(kernel_q) > 0 else None
-            self.pool_k = nn.Sequential(OrderedDict({
-                'conv': nn.Conv3d(
-                    head_dim,
-                    head_dim,
-                    kernel_kv,
-                    stride=stride_kv,
-                    padding=padding_kv,
-                    groups=head_dim,
-                    bias=False,
-                ),
-                "permute_a": Permute((0, 2, 3, 4, 1)),  # BCTHW -> BTHWC
-                'norm': norm_layer(head_dim),
-                "permute_b": Permute((0, 4, 1, 2, 3)),  # BTHWC -> BCTHW
-            })) if len(kernel_kv) > 0 else None
-            self.pool_v = nn.Sequential(OrderedDict({
-                'conv': nn.Conv3d(
-                    head_dim,
-                    head_dim,
-                    kernel_kv,
-                    stride=stride_kv,
-                    padding=padding_kv,
-                    groups=head_dim,
-                    bias=False,
-                ),
-                "permute_a": Permute((0, 2, 3, 4, 1)),  # BCTHW -> BTHWC
-                'norm': norm_layer(head_dim),
-                "permute_b": Permute((0, 4, 1, 2, 3)),  # BTHWC -> BCTHW
-            })) if len(kernel_kv) > 0 else None
+            self.pool_q = nn.Conv3d(
+                head_dim,
+                head_dim,
+                kernel_q,
+                stride=stride_q,
+                padding=padding_q,
+                groups=head_dim,
+                bias=False,
+            ) if len(kernel_q) > 0 else None
+            self.norm_q = norm_layer(head_dim) if len(kernel_q) > 0 else None
+            self.pool_k = nn.Conv3d(
+                head_dim,
+                head_dim,
+                kernel_kv,
+                stride=stride_kv,
+                padding=padding_kv,
+                groups=head_dim,
+                bias=False,
+            ) if len(kernel_kv) > 0 else None
+            self.norm_k = norm_layer(head_dim) if len(kernel_kv) > 0 else None
+            self.pool_v = nn.Conv3d(
+                head_dim,
+                head_dim,
+                kernel_kv,
+                stride=stride_kv,
+                padding=padding_kv,
+                groups=head_dim,
+                bias=False,
+            )  if len(kernel_kv) > 0 else None
+            self.norm_v = norm_layer(head_dim) if len(kernel_kv) > 0 else None
         else:
             raise NotImplementedError(f"Unsupported model {mode}")
 
@@ -139,9 +132,9 @@ class MultiScaleAttention(nn.Module):
         )
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-        q, out_shape = attention_pool(q, self.pool_q, thw_shape, has_cls_embed=self.has_cls_embed)
-        k, _ = attention_pool(k, self.pool_k, thw_shape, has_cls_embed=self.has_cls_embed)
-        v, _ = attention_pool(v, self.pool_v, thw_shape, has_cls_embed=self.has_cls_embed)
+        q, out_shape = attention_pool(q, self.pool_q, thw_shape, has_cls_embed=self.has_cls_embed, norm=self.norm_q if hasattr(self, "norm_q") else None)
+        k, _ = attention_pool(k, self.pool_k, thw_shape, has_cls_embed=self.has_cls_embed, norm=self.norm_k if hasattr(self, "norm_k") else None)
+        v, _ = attention_pool(v, self.pool_v, thw_shape, has_cls_embed=self.has_cls_embed, norm=self.norm_v  if hasattr(self, "norm_v") else None)
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
@@ -170,6 +163,8 @@ class MultiScaleBlock(nn.Module):
         up_rate = None,
         kernel_q = (1, 1, 1),
         kernel_kv = (1, 1, 1),
+        stride_q = (1, 1, 1),
+        stride_kv = (1, 1, 1),
         mode = "conv",
         has_cls_embed = True,
     ):
@@ -177,8 +172,6 @@ class MultiScaleBlock(nn.Module):
         self.dim = dim
         self.dim_out = dim_out
         self.norm1 = norm_layer(dim)
-        self.kernel_q = kernel_q
-        stride_q = [int(q // 2) + 1 for q in kernel_q]
         padding_q = [int(q // 2) for q in kernel_q]
         self.attn = MultiScaleAttention(
             dim,
@@ -187,6 +180,8 @@ class MultiScaleBlock(nn.Module):
             drop_rate=drop_rate,
             kernel_q=kernel_q,
             kernel_kv=kernel_kv,
+            stride_q=stride_q,
+            stride_kv=stride_kv,
             norm_layer=nn.LayerNorm,
             has_cls_embed=has_cls_embed,
             mode=mode,

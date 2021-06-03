@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 
@@ -10,7 +9,6 @@ import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
-# from slowfast.utils.weight_init_helper import trunc_normal_
 from torch.nn.init import trunc_normal_
 from functools import partial
 from slowfast.models.stem_helper import PatchEmbed
@@ -18,6 +16,7 @@ from slowfast.models.attention import MultiScaleBlock
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
+from slowfast.models.utils import round_width
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -642,13 +641,13 @@ class X3D(nn.Module):
         self.dim_c1 = cfg.X3D.DIM_C1
 
         self.dim_res2 = (
-            self._round_width(self.dim_c1, exp_stage, divisor=8)
+            round_width(self.dim_c1, exp_stage, divisor=8)
             if cfg.X3D.SCALE_RES2
             else self.dim_c1
         )
-        self.dim_res3 = self._round_width(self.dim_res2, exp_stage, divisor=8)
-        self.dim_res4 = self._round_width(self.dim_res3, exp_stage, divisor=8)
-        self.dim_res5 = self._round_width(self.dim_res4, exp_stage, divisor=8)
+        self.dim_res3 = round_width(self.dim_res2, exp_stage, divisor=8)
+        self.dim_res4 = round_width(self.dim_res3, exp_stage, divisor=8)
+        self.dim_res5 = round_width(self.dim_res4, exp_stage, divisor=8)
 
         self.block_basis = [
             # blocks, c, stride
@@ -661,20 +660,6 @@ class X3D(nn.Module):
         init_helper.init_weights(
             self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
         )
-
-    def _round_width(self, width, multiplier, min_depth=8, divisor=8):
-        """Round width of filters based on width multiplier."""
-        if not multiplier:
-            return width
-
-        width *= multiplier
-        min_depth = min_depth or divisor
-        new_filters = max(
-            min_depth, int(width + divisor / 2) // divisor * divisor
-        )
-        if new_filters < 0.9 * width:
-            new_filters += divisor
-        return int(new_filters)
 
     def _round_repeats(self, repeats, multiplier):
         """Round number of layers based on depth multiplier."""
@@ -702,7 +687,7 @@ class X3D(nn.Module):
 
         w_mul = cfg.X3D.WIDTH_FACTOR
         d_mul = cfg.X3D.DEPTH_FACTOR
-        dim_res1 = self._round_width(self.dim_c1, w_mul)
+        dim_res1 = round_width(self.dim_c1, w_mul)
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
@@ -719,7 +704,7 @@ class X3D(nn.Module):
         # blob_in = s1
         dim_in = dim_res1
         for stage, block in enumerate(self.block_basis):
-            dim_out = self._round_width(block[1], w_mul)
+            dim_out = round_width(block[1], w_mul)
             dim_inner = int(cfg.X3D.BOTTLENECK_FACTOR * dim_out)
 
             n_rep = self._round_repeats(block[0], d_mul)
@@ -790,6 +775,10 @@ class MViT(nn.Module):
         spatial_size = cfg.DATA.TRAIN_CROP_SIZE
         temporal_size = cfg.DATA.NUM_FRAMES
         in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
+        use_2d_patch = cfg.MVIT.PATCH_2D
+        self.patch_stride = cfg.MVIT.PATCH_STRIDE
+        if use_2d_patch:
+            self.patch_stride = [1] + self.patch_stride
         # Prepare output.
         num_classes = cfg.MODEL.NUM_CLASSES
         embed_dim = cfg.MVIT.EMBED_DIM
@@ -814,11 +803,12 @@ class MViT(nn.Module):
             kernel=cfg.MVIT.PATCH_KERNEL,
             stride=cfg.MVIT.PATCH_STRIDE,
             padding=cfg.MVIT.PATCH_PADDING,
+            conv_2d=use_2d_patch,
         )
         self.input_dims = [temporal_size, spatial_size, spatial_size]
         assert self.input_dims[1] == self.input_dims[2]
         self.patch_dims = \
-            [self.input_dims[i] // cfg.MVIT.PATCH_STRIDE[i] for i in range(len(self.input_dims))]
+            [self.input_dims[i] // self.patch_stride[i] for i in range(len(self.input_dims))]
         num_patches = math.prod(self.patch_dims)
 
         dpr = [
@@ -833,7 +823,7 @@ class MViT(nn.Module):
 
         if self.sep_pos_embed:
             self.pos_embed_spatial = nn.Parameter(
-                torch.zeros(1, self.patch_dims[1] * self.patch_dims[1], embed_dim)
+                torch.zeros(1, self.patch_dims[1] * self.patch_dims[2], embed_dim)
             )
             self.pos_embed_temporal = nn.Parameter(
                 torch.zeros(1, self.patch_dims[0], embed_dim)
@@ -851,13 +841,15 @@ class MViT(nn.Module):
 
         pool_q = cfg.MVIT.POOL_Q_KERNEL
         pool_kv = cfg.MVIT.POOL_KV_KERNEL
+        stride_q = cfg.MVIT.POOL_Q_STRIDE
+        stride_kv = cfg.MVIT.POOL_KV_STRIDE
 
         dim_mul, head_mul = torch.ones(depth+1), torch.ones(depth+1)
 
-        if len(cfg.MVIT.DIM_MUL[0]) > 1:
+        if len(cfg.MVIT.DIM_MUL) > 1:
             for k in cfg.MVIT.DIM_MUL:
                 dim_mul[k[0]] = k[1]
-        if len(cfg.MVIT.HEAD_MUL[0]) > 1:
+        if len(cfg.MVIT.HEAD_MUL) > 1:
             for k in cfg.MVIT.HEAD_MUL:
                 head_mul[k[0]] = k[1]
 
@@ -865,9 +857,9 @@ class MViT(nn.Module):
 
         self.blocks = nn.ModuleList()
         for i in range(depth):
-            num_heads = self._round_width(num_heads, head_mul[i])
-            embed_dim = self._round_width(embed_dim, dim_mul[i], divisor=num_heads)
-            dim_out=self._round_width(embed_dim, dim_mul[i+1], divisor=self._round_width(num_heads, head_mul[i+1]))
+            num_heads = round_width(num_heads, head_mul[i])
+            embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
+            dim_out = round_width(embed_dim, dim_mul[i+1], divisor = round_width(num_heads, head_mul[i+1]))
 
             self.blocks.append(
                 MultiScaleBlock(
@@ -879,8 +871,10 @@ class MViT(nn.Module):
                     drop_rate=self.drop_rate,
                     drop_path=dpr[i],
                     norm_layer=norm_layer,
-                    kernel_q=pool_q[i],
-                    kernel_kv=pool_kv[i],
+                    kernel_q=pool_q[i] if len(pool_q) > i else [],
+                    kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                    stride_q=stride_q[i] if len(stride_q) > i else [],
+                    stride_kv=stride_kv[i] if len(stride_kv) > i else [],
                     mode=mode,
                     has_cls_embed=self.cls_embed_on,
                 )
@@ -907,7 +901,7 @@ class MViT(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=0.02)
+            nn.init.trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -939,34 +933,14 @@ class MViT(nn.Module):
         else:
             return {}
 
-    # TODO: move this to utils
-    def _round_width(self, width, multiplier, min_width=1, divisor=1):
-        if not multiplier:
-            return width
-        width *= multiplier
-        min_width = min_width or divisor
-        print(f"min width {min_width}")
-        print(f"width {width} divisor {divisor}")
-        print(f"other {int(width + divisor / 2) // divisor * divisor}")
-
-        width_out = max(
-            min_width, int(width + divisor / 2) // divisor * divisor
-        )
-        if width_out < 0.9 * width:
-            width_out += divisor
-        return int(width_out)
-
     def forward(self, x):
         x = x[0]
         x = self.patch_embed(x)
 
-        T = self.cfg.DATA.NUM_FRAMES // self.cfg.MVIT.PATCH_STRIDE[0]
-        assert self.cfg.MVIT.PATCH_STRIDE[1] == self.cfg.MVIT.PATCH_STRIDE[2]
-        H = W = self.cfg.DATA.TRAIN_CROP_SIZE // self.cfg.MVIT.PATCH_STRIDE[1]
+        T = self.cfg.DATA.NUM_FRAMES // self.patch_stride[0]
+        H = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
+        W = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
         B, N, C = x.shape
-        thw = [T, H, W]
-        # thw[1] = N
-        # thw[2] = C
 
         if self.cls_embed_on:
             cls_tokens = self.cls_token.expand(
@@ -987,8 +961,11 @@ class MViT(nn.Module):
 
         if self.norm_stem:
             x = self.norm_stem(x)
+
+        thw = [T, H, W]
         for blk in self.blocks:
             x, thw = blk(x, thw)
+
         x = self.norm(x)
         if self.cls_embed_on:
             x = x[:, 0]
@@ -997,9 +974,3 @@ class MViT(nn.Module):
 
         x = self.head(x)
         return x
-
-# fix conv version
-# check augmentation
-# separate POOL_KV_KERNEL from POOL_KV_STRIDE
-# model drop out and backbone dropout
-# NUM_TEMPORAL_CLIPS

@@ -127,17 +127,23 @@ class Imagenet(torch.utils.data.Dataset):
         return im
 
     def __load__(self, index):
-        im_path = self._imdb[index]["im_path"]
-        im = self._prepare_im_tf(im_path)
         try:
             # Load the image
             im_path = self._imdb[index]["im_path"]
             # Prepare the image for training / testing
             if self.cfg.AUG.ENABLE:
-                im = self._prepare_im_tf(im_path)
+                if self.mode == "train" and self.cfg.AUG.NUM_SAMPLE > 1:
+                    im = []
+                    for _ in range(self.cfg.AUG.NUM_SAMPLE):
+                        crop = self._prepare_im_tf(im_path)
+                        im.append(crop)
+                    return im
+                else:
+                    im = self._prepare_im_tf(im_path)
+                    return im
             else:
                 im = self._prepare_im_res(im_path)
-            return im
+                return im
         except Exception:
             return None
 
@@ -152,7 +158,13 @@ class Imagenet(torch.utils.data.Dataset):
                 break
         # Retrieve the label
         label = self._imdb[index]["class"]
-        return [im.unsqueeze(1)], label, torch.Tensor(), {}
+        if isinstance(im, list):
+            label = [label for _ in range(len(im))]
+            dummy = [torch.Tensor() for _ in range(len(im))]
+            return im, label, dummy, {}
+        else:
+            dummy = torch.Tensor()
+            return [im], label, dummy, {}
 
     def __len__(self):
         return len(self._imdb)

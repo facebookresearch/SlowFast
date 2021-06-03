@@ -50,14 +50,15 @@ def construct_optimizer(model, cfg):
     optim_params = [x for x in optim_params if len(x["params"])]
 
     # Check all parameters will be passed into optimizer.
-    assert len(list(model.parameters())) == len(non_bn_parameters) + len(bn_params
+    assert len(list(model.parameters())) == len(non_bn_parameters) + len(bn_parameters
     ) + len(zero_parameters), "parameter size does not match: {} + {} + {} != {}".format(
-        len(non_bn_parameters), len(bn_params), len(zero_parameters), len(list(model.parameters()))
+        len(non_bn_parameters), len(bn_parameters), len(zero_parameters), len(list(model.parameters()))
     )
-    print("bn {}, non bn {}, zero {}".format(
-        len(bn_parameters), len(non_bn_parameters), len(zero_parameters)
+    print(
+        "bn {}, non bn {}, zero {}".format(
+            len(bn_parameters), len(non_bn_parameters), len(zero_parameters)
+        )
     )
-
 
     if cfg.SOLVER.OPTIMIZING_METHOD == "sgd":
         return torch.optim.SGD(
@@ -79,10 +80,8 @@ def construct_optimizer(model, cfg):
         return torch.optim.AdamW(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
-            betas=(0.9, 0.999),
-            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+            weight_decay=0.0,
             eps=1e-08,
-            amsgrad=False,
         )
     else:
         raise NotImplementedError(

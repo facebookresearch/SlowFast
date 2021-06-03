@@ -298,9 +298,14 @@ class PatchEmbed(nn.Module):
         kernel=(1, 16, 16),
         stride=(1, 4, 4),
         padding=(1, 7, 7),
+        conv_2d=False,
     ):
         super().__init__()
-        self.proj = nn.Conv3d(
+        if conv_2d:
+            conv = nn.Conv2d
+        else:
+            conv = nn.Conv3d
+        self.proj = conv(
             dim_in,
             dim_out,
             kernel_size=kernel,
@@ -310,5 +315,5 @@ class PatchEmbed(nn.Module):
 
     def forward(self, x):
         x = self.proj(x)
-        # B C T H W -> B (T H W) C
+        # B C (T) H W -> B (T)HW C
         return x.flatten(2).transpose(1, 2)
