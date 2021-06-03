@@ -27,3 +27,12 @@ class Mlp(nn.Module):
         x = self.fc2(x)
         x = self.drop(x)
         return x
+
+
+class Permute(nn.Module):
+  def __init__(self, dims):
+    super().__init__()
+    self.dims = dims
+
+  def forward(self, x):
+    return x.permute(*self.dims)

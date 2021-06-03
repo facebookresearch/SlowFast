@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+
 """Video models."""
 
 import math
@@ -9,6 +10,10 @@ import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
+from pyslowfast.utils.weight_init_helper import trunc_normal_
+from functools import partial
+from slowfast.models.stem_helper import PatchEmbed
+from slowfast.models.attention import MViTBlock
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
