@@ -274,7 +274,7 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d", "mvit"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
@@ -352,6 +352,12 @@ _C.MVIT.ZERO_DECAY_POS_CLS = True
 
 # If True, use norm after stem.
 _C.MVIT.NORM_STEM = False
+
+# If True, perform separate positional embedding.
+_C.MVIT.SEP_POS_EMBED = False
+
+# Dropout rate for the MViT backbone.
+_C.MVIT.DROPOUT_RATE = 0.0
 
 
 # -----------------------------------------------------------------------------
@@ -924,6 +930,8 @@ def assert_and_infer_cfg(cfg):
     # Execute LR scaling by num_shards.
     if cfg.SOLVER.BASE_LR_SCALE_NUM_SHARDS:
         cfg.SOLVER.BASE_LR *= cfg.NUM_SHARDS
+        cfg.SOLVER.WARMUP_START_LR *= cfg.NUM_SHARDS
+        cfg.SOLVER.COSINE_END_LR *= cfg.NUM_SHARDS
 
     # General assertions.
     assert cfg.SHARD_ID < cfg.NUM_SHARDS

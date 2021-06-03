@@ -10,7 +10,8 @@ import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
-from slowfast.utils.weight_init_helper import trunc_normal_
+# from slowfast.utils.weight_init_helper import trunc_normal_
+from torch.nn.init import trunc_normal_
 from functools import partial
 from slowfast.models.stem_helper import PatchEmbed
 from slowfast.models.attention import MultiScaleBlock
@@ -801,6 +802,7 @@ class MViT(nn.Module):
         drop_path_rate = cfg.MVIT.DROPPATH_RATE
         mode = cfg.MVIT.MODE
         self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
         if cfg.MVIT.NORM == "layernorm":
             norm_layer = partial(nn.LayerNorm, eps=1e-6)
         else:
@@ -813,10 +815,11 @@ class MViT(nn.Module):
             stride=cfg.MVIT.PATCH_STRIDE,
             padding=cfg.MVIT.PATCH_PADDING,
         )
-        input_dims = [temporal_size, spatial_size, spatial_size]
-        num_patches = math.prod(
-            [input_dims[i] // cfg.MVIT.PATCH_STRIDE[i] for i in range(len(input_dims))]
-        )
+        self.input_dims = [temporal_size, spatial_size, spatial_size]
+        assert self.input_dims[1] == self.input_dims[2]
+        self.patch_dims = \
+            [self.input_dims[i] // cfg.MVIT.PATCH_STRIDE[i] for i in range(len(self.input_dims))]
+        num_patches = math.prod(self.patch_dims)
 
         dpr = [
             x.item() for x in torch.linspace(0, drop_path_rate, depth)
@@ -827,9 +830,21 @@ class MViT(nn.Module):
             pos_embed_dim = num_patches + 1
         else:
             pos_embed_dim = num_patches
-        self.pos_embed = nn.Parameter(
-            torch.zeros(1, pos_embed_dim, embed_dim)
-        )
+
+        if self.sep_pos_embed:
+            self.pos_embed_spatial = nn.Parameter(
+                torch.zeros(1, self.patch_dims[1] * self.patch_dims[1], embed_dim)
+            )
+            self.pos_embed_temporal = nn.Parameter(
+                torch.zeros(1, self.patch_dims[0], embed_dim)
+            )
+            self.pos_embed_class = nn.Parameter(
+                torch.zeros(1, 1, embed_dim)
+            )
+        else:
+            self.pos_embed = nn.Parameter(
+                torch.zeros(1, pos_embed_dim, embed_dim)
+            )
 
         if self.drop_rate > 0.0:
             self.pos_drop = nn.Dropout(p=self.drop_rate)
@@ -880,7 +895,12 @@ class MViT(nn.Module):
             dropout_rate=cfg.MODEL.DROPOUT_RATE,
             act_func=cfg.MODEL.HEAD_ACT,
         )
-        trunc_normal_(self.pos_embed, std=0.02)
+        if self.sep_pos_embed:
+            trunc_normal_(self.pos_embed_spatial, std=0.02)
+            trunc_normal_(self.pos_embed_temporal, std=0.02)
+            trunc_normal_(self.pos_embed_class, std=0.02)
+        else:
+            trunc_normal_(self.pos_embed, std=0.02)
         if self.cls_embed_on:
             trunc_normal_(self.cls_token, std=0.02)
         self.apply(self._init_weights)
@@ -897,10 +917,25 @@ class MViT(nn.Module):
     @torch.jit.ignore
     def no_weight_decay(self):
         if self.cfg.MVIT.ZERO_DECAY_POS_CLS:
-            if self.cls_embed_on:
-                return {"pos_embed", "cls_token"}
+            if self.sep_pos_embed:
+                if self.cls_embed_on:
+                    return {
+                        "pos_embed_spatial",
+                        "pos_embed_temporal",
+                        "pos_embed_class",
+                        "cls_token",
+                    }
+                else:
+                    return {
+                        "pos_embed_spatial",
+                        "pos_embed_temporal",
+                        "pos_embed_class",
+                    }
             else:
-                return {"pos_embed"}
+                if self.cls_embed_on:
+                    return {"pos_embed", "cls_token"}
+                else:
+                    return {"pos_embed"}
         else:
             return {}
 
@@ -938,7 +973,15 @@ class MViT(nn.Module):
                 B, -1, -1
             )  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_tokens, x), dim=1)
-        x = x + self.pos_embed
+
+        if self.sep_pos_embed:
+            pos_embed = self.pos_embed_spatial.repeat(1, self.patch_dims[0], 1) + \
+                torch.repeat_interleave(self.pos_embed_temporal, self.patch_dims[1] * self.patch_dims[2], dim=1)
+            pos_embed_cls = torch.cat([self.pos_embed_class, pos_embed], 1)
+            x = x + pos_embed_cls
+        else:
+            x = x + self.pos_embed
+
         if self.drop_rate:
             x = self.pos_drop(x)
 
@@ -954,3 +997,9 @@ class MViT(nn.Module):
 
         x = self.head(x)
         return x
+
+# fix conv version
+# check augmentation
+# separate POOL_KV_KERNEL from POOL_KV_STRIDE
+# model drop out and backbone dropout
+# NUM_TEMPORAL_CLIPS

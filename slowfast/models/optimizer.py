@@ -42,11 +42,6 @@ def construct_optimizer(model, cfg):
             else:
                 non_bn_parameters.append(p)
 
-    # Apply different weight decay to Batchnorm and non-batchnorm parameters.
-    # In Caffe2 classification codebase the weight decay for batchnorm is 0.0.
-    # Having a different weight decay on batchnorm might cause a performance
-    # drop.
-
     optim_params = [
         {"params": bn_parameters, "weight_decay": cfg.BN.WEIGHT_DECAY},
         {"params": non_bn_parameters, "weight_decay": cfg.SOLVER.WEIGHT_DECAY},
@@ -55,9 +50,9 @@ def construct_optimizer(model, cfg):
     optim_params = [x for x in optim_params if len(x["params"])]
 
     # Check all parameters will be passed into optimizer.
-    assert len(list(model.parameters())) == len(non_bn_parameters) + len(zero_parameters
-    ), "parameter size does not match: {} + {} != {}".format(
-        len(non_bn_parameters), len(zero_parameters), len(list(model.parameters()))
+    assert len(list(model.parameters())) == len(non_bn_parameters) + len(bn_params
+    ) + len(zero_parameters), "parameter size does not match: {} + {} + {} != {}".format(
+        len(non_bn_parameters), len(bn_params), len(zero_parameters), len(list(model.parameters()))
     )
     print("bn {}, non bn {}, zero {}".format(
         len(bn_parameters), len(non_bn_parameters), len(zero_parameters)

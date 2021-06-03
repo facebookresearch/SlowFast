@@ -9,8 +9,8 @@ from iopath.common.file_io import g_pathmgr
 import numpy as np
 import slowfast.utils.logging as logging
 import slowfast.datasets.transform as transform
-# from torchvision import transforms as transforms_tv
-# from .transform import create_transform
+from torchvision import transforms as transforms_tv
+from .transform import transforms_imagenet_train
 import torch.utils.data
 import torch
 from .build import DATASET_REGISTRY
@@ -74,7 +74,8 @@ class Imagenet(torch.utils.data.Dataset):
         im = im.permute([2, 0, 1])
         return im
 
-    def _prepare_im(self, im_path):
+    def _prepare_im_res(self, im_path):
+        # Prepare resnet style augmentation.
         im = self.load_image(im_path)
         # Train and test setups differ
         train_size, test_size = self.cfg.DATA.TRAIN_CROP_SIZE, self.cfg.DATA.TEST_CROP_SIZE
@@ -93,48 +94,49 @@ class Imagenet(torch.utils.data.Dataset):
         # im = np.ascontiguousarray(im[:, :, ::-1].transpose([2, 0, 1]))
         return im
 
-    # TODO: Refactor with prepare_im with Bo's diff in a different diff
-    # def _prepare_im_vt(self, im_path):
-    #     with g_pathmgr.open(im_path, 'rb') as f:
-    #         with Image.open(f) as im:
-    #             im = im.convert('RGB')
-    #     # Convert HWC/BGR/int to HWC/RGB/float format for applying transforms
-    #     train_size, test_size = self.cfg.DATA.TRAIN_CROP_SIZE, self.cfg.DATA.TEST_CROP_SIZE
+    def _prepare_im_tf(self, im_path):
+        with g_pathmgr.open(im_path, 'rb') as f:
+            with Image.open(f) as im:
+                im = im.convert('RGB')
+        # Convert HWC/BGR/int to HWC/RGB/float format for applying transforms
+        train_size, test_size = self.cfg.DATA.TRAIN_CROP_SIZE, self.cfg.DATA.TEST_CROP_SIZE
 
-    #     if self.mode == "train":
-    #         aug_transform = create_transform(
-    #             input_size=(train_size, train_size),
-    #             is_training=True,
-    #             color_jitter=self.cfg.AUG.COLOR_JITTER,
-    #             auto_augment=self.cfg.AUG.AA_TYPE,
-    #             interpolation=self.cfg.AUG.INTERPOLATION,
-    #             re_prob=self.cfg.AUG.RE_PROB,
-    #             re_mode=self.cfg.AUG.RE_MODE,
-    #             re_count=self.cfg.AUG.RE_COUNT,
-    #         )
-    #     else:
-    #         t = []
-    #         size = int((256 / 224) * test_size)
-    #         t.append(
-    #             transforms_tv.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
-    #         )
-    #         t.append(transforms_tv.CenterCrop(test_size))
-    #         t.append(transforms_tv.ToTensor())
-    #         t.append(transforms_tv.Normalize(self.cfg.MEAN, self.cfg.STD))
-    #         aug_transform = transforms_tv.Compose(t)
-    #     im = aug_transform(im)
-    #     return [im]
+        if self.mode == "train":
+            aug_transform = transforms_imagenet_train(
+                img_size=(train_size, train_size),
+                color_jitter=self.cfg.AUG.COLOR_JITTER,
+                auto_augment=self.cfg.AUG.AA_TYPE,
+                interpolation=self.cfg.AUG.INTERPOLATION,
+                re_prob=self.cfg.AUG.RE_PROB,
+                re_mode=self.cfg.AUG.RE_MODE,
+                re_count=self.cfg.AUG.RE_COUNT,
+                mean=self.cfg.DATA.MEAN,
+                std=self.cfg.DATA.STD,
+            )
+        else:
+            t = []
+            size = int((256 / 224) * test_size)
+            t.append(
+                transforms_tv.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
+            )
+            t.append(transforms_tv.CenterCrop(test_size))
+            t.append(transforms_tv.ToTensor())
+            t.append(transforms_tv.Normalize(self.cfg.DATA.MEAN, self.cfg.DATA.STD))
+            aug_transform = transforms_tv.Compose(t)
+        im = aug_transform(im)
+        return im
 
     def __load__(self, index):
-        # Load the image
         im_path = self._imdb[index]["im_path"]
-        # Prepare the image for training / testing
-        im = self._prepare_im(im_path)
+        im = self._prepare_im_tf(im_path)
         try:
             # Load the image
             im_path = self._imdb[index]["im_path"]
             # Prepare the image for training / testing
-            im = self._prepare_im(im_path)
+            if self.cfg.AUG.ENABLE:
+                im = self._prepare_im_tf(im_path)
+            else:
+                im = self._prepare_im_res(im_path)
             return im
         except Exception:
             return None

@@ -14,7 +14,7 @@ from . import decoder as decoder
 from . import utils as utils
 from . import video_container as container
 from .build import DATASET_REGISTRY
-from .random_erasing import RandomErasingCube
+from .random_erasing import RandomErasing
 from .transform import create_random_augment
 
 logger = logging.get_logger(__name__)
@@ -361,7 +361,7 @@ class Kinetics(torch.utils.data.Dataset):
         )
 
         if self.rand_erase:
-            erase_transform = RandomErasingCube(
+            erase_transform = RandomErasing(
                 self.cfg.AUG.RE_PROB,
                 mode=self.cfg.AUG.RE_MODE,
                 max_count=self.cfg.AUG.RE_COUNT,
