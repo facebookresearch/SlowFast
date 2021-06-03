@@ -10,10 +10,10 @@ import torch.nn as nn
 
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.batchnorm_helper import get_norm
-from pyslowfast.utils.weight_init_helper import trunc_normal_
+from slowfast.utils.weight_init_helper import trunc_normal_
 from functools import partial
 from slowfast.models.stem_helper import PatchEmbed
-from slowfast.models.attention import MViTBlock
+from slowfast.models.attention import MultiScaleBlock
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
@@ -770,4 +770,187 @@ class X3D(nn.Module):
     def forward(self, x, bboxes=None):
         for module in self.children():
             x = module(x)
+        return x
+
+
+@MODEL_REGISTRY.register()
+class MViT(nn.Module):
+    """
+    Multiscale Vision Transformers
+    Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, Christoph Feichtenhofer
+    https://arxiv.org/abs/2104.11227
+    """
+    def __init__(self, cfg):
+        super().__init__()
+        # Get parameters.
+        assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE
+        self.cfg = cfg
+        # Prepare input.
+        spatial_size = cfg.DATA.TRAIN_CROP_SIZE
+        temporal_size = cfg.DATA.NUM_FRAMES
+        in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
+        # Prepare output.
+        num_classes = cfg.MODEL.NUM_CLASSES
+        embed_dim = cfg.MVIT.EMBED_DIM
+        # Prepare backbone
+        num_heads = cfg.MVIT.NUM_HEADS
+        mlp_ratio = cfg.MVIT.MLP_RATIO
+        qkv_bias = cfg.MVIT.QKV_BIAS
+        self.drop_rate = cfg.MVIT.DROPOUT_RATE
+        depth = cfg.MVIT.DEPTH
+        drop_path_rate = cfg.MVIT.DROPPATH_RATE
+        mode = cfg.MVIT.MODE
+        self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        if cfg.MVIT.NORM == "layernorm":
+            norm_layer = partial(nn.LayerNorm, eps=1e-6)
+        else:
+            raise NotImplementedError("Only supports layernorm.")
+        self.num_classes = num_classes
+        self.patch_embed = stem_helper.PatchEmbed(
+            dim_in=in_chans,
+            dim_out=embed_dim,
+            kernel=cfg.MVIT.PATCH_KERNEL,
+            stride=cfg.MVIT.PATCH_STRIDE,
+            padding=cfg.MVIT.PATCH_PADDING,
+        )
+        input_dims = [temporal_size, spatial_size, spatial_size]
+        num_patches = math.prod(
+            [input_dims[i] // cfg.MVIT.PATCH_STRIDE[i] for i in range(len(input_dims))]
+        )
+
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, depth)
+        ]  # stochastic depth decay rule
+
+        if self.cls_embed_on:
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            pos_embed_dim = num_patches + 1
+        else:
+            pos_embed_dim = num_patches
+        self.pos_embed = nn.Parameter(
+            torch.zeros(1, pos_embed_dim, embed_dim)
+        )
+
+        if self.drop_rate > 0.0:
+            self.pos_drop = nn.Dropout(p=self.drop_rate)
+
+        pool_q = cfg.MVIT.POOL_Q_KERNEL
+        pool_kv = cfg.MVIT.POOL_KV_KERNEL
+
+        dim_mul, head_mul = torch.ones(depth+1), torch.ones(depth+1)
+
+        if len(cfg.MVIT.DIM_MUL[0]) > 1:
+            for k in cfg.MVIT.DIM_MUL:
+                dim_mul[k[0]] = k[1]
+        if len(cfg.MVIT.HEAD_MUL[0]) > 1:
+            for k in cfg.MVIT.HEAD_MUL:
+                head_mul[k[0]] = k[1]
+
+        self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
+
+        self.blocks = nn.ModuleList()
+        for i in range(depth):
+            num_heads = self._round_width(num_heads, head_mul[i])
+            embed_dim = self._round_width(embed_dim, dim_mul[i], divisor=num_heads)
+            dim_out=self._round_width(embed_dim, dim_mul[i+1], divisor=self._round_width(num_heads, head_mul[i+1]))
+
+            self.blocks.append(
+                MultiScaleBlock(
+                    dim=embed_dim,
+                    dim_out=dim_out,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    drop_rate=self.drop_rate,
+                    drop_path=dpr[i],
+                    norm_layer=norm_layer,
+                    kernel_q=pool_q[i],
+                    kernel_kv=pool_kv[i],
+                    mode=mode,
+                    has_cls_embed=self.cls_embed_on,
+                )
+            )
+
+        embed_dim = dim_out
+        self.norm = norm_layer(embed_dim)
+
+        self.head = head_helper.TransformerBasicHead(
+            embed_dim,
+            num_classes,
+            dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            act_func=cfg.MODEL.HEAD_ACT,
+        )
+        trunc_normal_(self.pos_embed, std=0.02)
+        if self.cls_embed_on:
+            trunc_normal_(self.cls_token, std=0.02)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=0.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        if self.cfg.MVIT.ZERO_DECAY_POS_CLS:
+            if self.cls_embed_on:
+                return {"pos_embed", "cls_token"}
+            else:
+                return {"pos_embed"}
+        else:
+            return {}
+
+    # TODO: move this to utils
+    def _round_width(self, width, multiplier, min_width=1, divisor=1):
+        if not multiplier:
+            return width
+        width *= multiplier
+        min_width = min_width or divisor
+        print(f"min width {min_width}")
+        print(f"width {width} divisor {divisor}")
+        print(f"other {int(width + divisor / 2) // divisor * divisor}")
+
+        width_out = max(
+            min_width, int(width + divisor / 2) // divisor * divisor
+        )
+        if width_out < 0.9 * width:
+            width_out += divisor
+        return int(width_out)
+
+    def forward(self, x):
+        x = x[0]
+        x = self.patch_embed(x)
+
+        T = self.cfg.DATA.NUM_FRAMES // self.cfg.MVIT.PATCH_STRIDE[0]
+        assert self.cfg.MVIT.PATCH_STRIDE[1] == self.cfg.MVIT.PATCH_STRIDE[2]
+        H = W = self.cfg.DATA.TRAIN_CROP_SIZE // self.cfg.MVIT.PATCH_STRIDE[1]
+        B, N, C = x.shape
+        thw = [T, H, W]
+        # thw[1] = N
+        # thw[2] = C
+
+        if self.cls_embed_on:
+            cls_tokens = self.cls_token.expand(
+                B, -1, -1
+            )  # stole cls_tokens impl from Phil Wang, thanks
+            x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.pos_embed
+        if self.drop_rate:
+            x = self.pos_drop(x)
+
+        if self.norm_stem:
+            x = self.norm_stem(x)
+        for blk in self.blocks:
+            x, thw = blk(x, thw)
+        x = self.norm(x)
+        if self.cls_embed_on:
+            x = x[:, 0]
+        else:
+            x = x.mean(1)
+
+        x = self.head(x)
         return x

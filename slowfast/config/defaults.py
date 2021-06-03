@@ -293,6 +293,68 @@ _C.MODEL.HEAD_ACT = "softmax"
 
 
 # -----------------------------------------------------------------------------
+# MViT options
+# -----------------------------------------------------------------------------
+_C.MVIT = CfgNode()
+
+# Options include `conv`, `max`.
+_C.MVIT.MODE = "conv"
+
+# If True, use cls embed in the network, otherwise don't use cls_embed in transformer.
+_C.MVIT.CLS_EMBED_ON = True
+
+# Kernel size for patchtification.
+_C.MVIT.PATCH_KERNEL = (3, 7, 7)
+
+# Stride size for patchtification.
+_C.MVIT.PATCH_STRIDE = (2, 4, 4)
+
+# Padding size for patchtification.
+_C.MVIT.PATCH_PADDING = (2, 4, 4)
+
+# Base embedding dimension for the transformer.
+_C.MVIT.EMBED_DIM = 96
+
+# Base num of heads for the transformer.
+_C.MVIT.NUM_HEADS = 1
+
+# Dimension reduction ratio for the MLP layers.
+_C.MVIT.MLP_RATIO = 4.0
+
+# If use, use bias term in attention fc layers.
+_C.MVIT.QKV_BIAS = True
+
+# Drop path rate for the tranfomer.
+_C.MVIT.DROPPATH_RATE = 0.1
+
+# Depth of the transformer.
+_C.MVIT.DEPTH = 16
+
+# Normalization layer for the transformer. Only layernorm is supported now.
+_C.MVIT.NORM = "layernorm"
+
+# Dimension multiplication. If 2.0 is used, then the next block will increase the
+# dimension by 2 times. Format: [depth_i: mul_dim_ratio]
+_C.MVIT.DIM_MUL = []
+
+# Head number multiplication. If 2.0 is used, then the next block will increase the
+# number of heads by 2 times. Format: [depth_i: head_mul_ratio]
+_C.MVIT.HEAD_MUL = []
+
+# Kernel size for the Pool KV. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_KV_KERNEL = [[]]
+
+# Kernel size for the Pool Q. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_Q_KERNEL = [[]]
+
+# If True, perform no decay on positional embedding and cls embedding.
+_C.MVIT.ZERO_DECAY_POS_CLS = True
+
+# If True, use norm after stem.
+_C.MVIT.NORM_STEM = False
+
+
+# -----------------------------------------------------------------------------
 # SlowFast options
 # -----------------------------------------------------------------------------
 _C.SLOWFAST = CfgNode()

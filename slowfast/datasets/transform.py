@@ -200,19 +200,16 @@ def uniform_crop(images, size, spatial_idx, boxes=None, scale_size=None):
             `num boxes` x 4.
     """
     assert spatial_idx in [0, 1, 2]
-    if len(images.shape) == 3:
-        height = images.shape[1]
-        width = images.shape[2]
-    elif len(images.shape) == 4:
-        height = images.shape[2]
-        width = images.shape[3]
-    else:
-        raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
+    ndim = len(images.shape)
+    if ndim == 3:
+        images = images.unsqueeze(0)
+    height = images.shape[2]
+    width = images.shape[3]
 
     if scale_size is not None:
-        if width <= height and width != scale_size:
+        if width <= height:
             width, height = scale_size, int(height / width * scale_size)
-        elif height <= width and height != scale_size:
+        else:
             width, height = int(width / height * scale_size), scale_size
         images = torch.nn.functional.interpolate(
             images,
@@ -234,17 +231,14 @@ def uniform_crop(images, size, spatial_idx, boxes=None, scale_size=None):
             x_offset = 0
         elif spatial_idx == 2:
             x_offset = width - size
-    if len(images.shape) == 3:
-        cropped = images[
-            :, y_offset : y_offset + size, x_offset : x_offset + size
-        ]
-    elif len(images.shape) == 4:
-        cropped = images[
-            :, :, y_offset : y_offset + size, x_offset : x_offset + size
-        ]
+    cropped = images[
+        :, :, y_offset : y_offset + size, x_offset : x_offset + size
+    ]
     cropped_boxes = (
         crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
     )
+    if ndim == 3:
+        cropped = cropped.squeeze(0)
     return cropped, cropped_boxes
 
 

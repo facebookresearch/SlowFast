@@ -130,7 +130,6 @@ class Imagenet(torch.utils.data.Dataset):
         im_path = self._imdb[index]["im_path"]
         # Prepare the image for training / testing
         im = self._prepare_im(im_path)
-
         try:
             # Load the image
             im_path = self._imdb[index]["im_path"]

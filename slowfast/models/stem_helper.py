@@ -300,7 +300,7 @@ class PatchEmbed(nn.Module):
         padding=(1, 7, 7),
     ):
         super().__init__()
-        self.proj = nn.Conv2d(
+        self.proj = nn.Conv3d(
             dim_in,
             dim_out,
             kernel_size=kernel,
