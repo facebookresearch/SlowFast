@@ -5,11 +5,18 @@
 import torch
 import torch.nn as nn
 from collections import OrderedDict
-from slowfast.models.common import Permute
+from slowfast.models.common import Permute, Mlp
+from slowfast.models.drop import DropPath
 
 
 def attention_pool(tensor, pool, thw_shape, has_cls_embed=True):
-    assert tensor.ndim == 4
+    if tensor.ndim == 4:
+        pass
+    elif tensor.ndim == 3:
+        tensor = tensor.unsqueeze(1)
+    else:
+        raise NotImplementedError(f"Unsupported input dimension {tensor.shape}")
+
     if has_cls_embed:
         cls_tok, tensor = tensor[:, :, :1, :], tensor[:, :, 1:, :]
 
@@ -25,6 +32,12 @@ def attention_pool(tensor, pool, thw_shape, has_cls_embed=True):
 
     if has_cls_embed:
         tensor = torch.cat((cls_tok, tensor), dim=2)
+    if tensor.ndim == 4:
+        pass
+    elif tensor.ndim == 3:
+        tensor = tensor.squeeze(1)
+    else:
+        raise NotImplementedError(f"Unsupported input dimension {tensor.shape}")
     return tensor, thw_shape
 
 
@@ -138,3 +151,86 @@ class MultiScaleAttention(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x, out_shape
+
+
+class MultiScaleBlock(nn.Module):
+    def __init__(
+        self,
+        dim,
+        dim_out,
+        num_heads,
+        mlp_ratio = 4.0,
+        qkv_bias = False,
+        qk_scale = None,
+        drop = 0.0,
+        attn_drop = 0.0,
+        drop_path = 0.0,
+        act_layer = nn.GELU,
+        norm_layer = nn.LayerNorm,
+        up_rate = None,
+        kernel_q = (1, 1, 1),
+        kernel_kv = (1, 1, 1),
+        skip = True,
+        mode = "conv",
+        has_cls_embed = True,
+    ):
+        super().__init__()
+        self.skip = skip
+        self.dim = dim
+        self.dim_out = dim_out
+        self.norm1 = norm_layer(dim)
+        self.kernel_q = kernel_q
+        stride_q = [int(q // 2) + 1 for q in kernel_q]
+        padding_q = [int(q // 2) for q in kernel_q]
+        self.attn = MultiScaleAttention(
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            proj_drop=drop,
+            kernel_q=kernel_q,
+            kernel_kv=kernel_kv,
+            norm_layer=nn.LayerNorm,
+            has_cls_embed=has_cls_embed,
+            mode=mode,
+        )
+        self.drop_path = (
+            DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        )
+        self.norm2 = norm_layer(dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.has_cls_embed = has_cls_embed
+        # TODO: check the use case for up_rate, and merge the following lines
+        if up_rate is not None and up_rate > 1:
+            mlp_dim_out = dim*up_rate
+        else:
+            mlp_dim_out = dim_out
+        self.mlp = Mlp(
+            in_features=dim,
+            hidden_features=mlp_hidden_dim,
+            out_features=mlp_dim_out,
+            act_layer=act_layer,
+            drop=drop,
+        )
+        if dim != dim_out:
+            self.proj = nn.Linear(dim, dim_out)
+
+        self.pool_skip = nn.MaxPool3d(kernel_q, stride_q, padding_q, ceil_mode=False)
+
+    def forward(self, x, thw_shape):
+        x_block, thw_shape_new = self.attn(self.norm1(x), thw_shape)
+        if self.skip:
+            x_res, _ = attention_pool(
+                x,
+                self.pool_skip,
+                thw_shape,
+                has_cls_embed=self.has_cls_embed
+            ) if self.kernel_q else x
+            x = x_res + self.drop_path(x_block)
+        else:
+            x = x_block
+        x_norm = self.norm2(x)
+        x_mlp = self.mlp(x_norm)
+        if self.dim != self.dim_out:
+            x = self.proj(x_norm)
+        x = x + self.drop_path(x_mlp)
+        return x, thw_shape
