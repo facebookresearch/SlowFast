@@ -3,12 +3,11 @@
 
 import math
 import numpy as np
-import random
-import torch
-from torchvision import transforms
-
 from PIL import Image
-
+import torch
+# import cv2
+import random
+from torchvision import transforms
 from .rand_augment import rand_augment_transform
 
 _pil_interpolation_to_str = {
@@ -168,14 +167,19 @@ def horizontal_flip(prob, images, boxes=None):
     if np.random.uniform() < prob:
         images = images.flip((-1))
 
-        width = images.shape[3]
+        if len(images.shape) == 3:
+            width = images.shape[2]
+        elif len(images.shape) == 4:
+            width = images.shape[3]
+        else:
+            raise NotImplementedError("Dimension does not supported")
         if boxes is not None:
             flipped_boxes[:, [0, 2]] = width - boxes[:, [2, 0]] - 1
 
     return images, flipped_boxes
 
 
-def uniform_crop(images, size, spatial_idx, boxes=None):
+def uniform_crop(images, size, spatial_idx, boxes=None, scale_size=None):
     """
     Perform uniform spatial sampling on the images and corresponding boxes.
     Args:
@@ -187,6 +191,8 @@ def uniform_crop(images, size, spatial_idx, boxes=None):
             crop if height is larger than width.
         boxes (ndarray or None): optional. Corresponding boxes to images.
             Dimension is `num boxes` x 4.
+        scale_size (int): optinal. If not None, resize the images to scale_size before
+            performing any crop.
     Returns:
         cropped (tensor): images with dimension of
             `num frames` x `channel` x `size` x `size`.
@@ -194,8 +200,26 @@ def uniform_crop(images, size, spatial_idx, boxes=None):
             `num boxes` x 4.
     """
     assert spatial_idx in [0, 1, 2]
-    height = images.shape[2]
-    width = images.shape[3]
+    if len(images.shape) == 3:
+        height = images.shape[1]
+        width = images.shape[2]
+    elif len(images.shape) == 4:
+        height = images.shape[2]
+        width = images.shape[3]
+    else:
+        raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
+
+    if scale_size is not None:
+        if width <= height and width != scale_size:
+            width, height = scale_size, int(height / width * scale_size)
+        elif height <= width and height != scale_size:
+            width, height = int(width / height * scale_size), scale_size
+        images = torch.nn.functional.interpolate(
+            images,
+            size=(height, width),
+            mode="bilinear",
+            align_corners=False,
+        )
 
     y_offset = int(math.ceil((height - size) / 2))
     x_offset = int(math.ceil((width - size) / 2))
@@ -210,14 +234,17 @@ def uniform_crop(images, size, spatial_idx, boxes=None):
             x_offset = 0
         elif spatial_idx == 2:
             x_offset = width - size
-    cropped = images[
-        :, :, y_offset : y_offset + size, x_offset : x_offset + size
-    ]
-
+    if len(images.shape) == 3:
+        cropped = images[
+            :, y_offset : y_offset + size, x_offset : x_offset + size
+        ]
+    elif len(images.shape) == 4:
+        cropped = images[
+            :, :, y_offset : y_offset + size, x_offset : x_offset + size
+        ]
     cropped_boxes = (
         crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
     )
-
     return cropped, cropped_boxes
 
 
@@ -398,8 +425,24 @@ def lighting_jitter(images, alphastd, eigval, eigvec):
         axis=1,
     )
     out_images = torch.zeros_like(images)
-    for idx in range(images.shape[1]):
-        out_images[:, idx] = images[:, idx] + rgb[2 - idx]
+    if len(images.shape) == 3:
+        # C H W
+        channel_dim = 0
+    elif len(images.shape) == 4:
+        # T C H W
+        channel_dim = 1
+    else:
+        raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
+
+    for idx in range(images.shape[channel_dim]):
+        # C H W
+        if len(images.shape) == 3:
+            out_images[idx] = images[idx] + rgb[2 - idx]
+        # T C H W
+        elif len(images.shape) == 4:
+            out_images[:, idx] = images[:, idx] + rgb[2 - idx]
+        else:
+            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
 
     return out_images
 
@@ -417,30 +460,49 @@ def color_normalization(images, mean, stddev):
         out_images (tensor): the noramlized images, the dimension is
             `num frames` x `channel` x `height` x `width`.
     """
-    assert len(mean) == images.shape[1], "channel mean not computed properly"
-    assert (
-        len(stddev) == images.shape[1]
-    ), "channel stddev not computed properly"
+    if len(images.shape) == 3:
+        assert len(mean) == images.shape[0], "channel mean not computed properly"
+        assert (
+            len(stddev) == images.shape[0]
+        ), "channel stddev not computed properly"
+    elif len(images.shape) == 4:
+        assert len(mean) == images.shape[1], "channel mean not computed properly"
+        assert (
+            len(stddev) == images.shape[1]
+        ), "channel stddev not computed properly"
+    else:
+        raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
 
     out_images = torch.zeros_like(images)
     for idx in range(len(mean)):
-        out_images[:, idx] = (images[:, idx] - mean[idx]) / stddev[idx]
-
+        # C H W
+        if len(images.shape) == 3:
+            out_images[idx] = (images[idx] - mean[idx]) / stddev[idx]
+        elif len(images.shape) == 4:
+            out_images[:, idx] = (images[:, idx] - mean[idx]) / stddev[idx]
+        else:
+            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
     return out_images
 
 
-def _get_param_spatial_crop(scale, ratio, height, width):
+def _get_param_spatial_crop(scale, ratio, height, width, num_repeat=10, log_scale=True, switch_hw=False):
     """
     Given scale, ratio, height and width, return sampled coordinates of the videos.
     """
-    for _ in range(10):
+    for _ in range(num_repeat):
         area = height * width
         target_area = random.uniform(*scale) * area
-        log_ratio = (math.log(ratio[0]), math.log(ratio[1]))
-        aspect_ratio = math.exp(random.uniform(*log_ratio))
+        if log_scale:
+            log_ratio = (math.log(ratio[0]), math.log(ratio[1]))
+            aspect_ratio = math.exp(random.uniform(*log_ratio))
+        else:
+            aspect_ratio = random.uniform(*ratio)
 
         w = int(round(math.sqrt(target_area * aspect_ratio)))
         h = int(round(math.sqrt(target_area / aspect_ratio)))
+
+        if np.random.uniform() < 0.5 and switch_hw:
+            w, h = h, w
 
         if 0 < w <= width and 0 < h <= height:
             i = random.randint(0, height - h)
@@ -577,3 +639,58 @@ def create_random_augment(
                 [rand_augment_transform(auto_augment, aa_params)]
             )
     raise NotImplementedError
+
+
+def create_random_augment(
+    input_size,
+    is_training=True,
+    use_prefetcher=False,
+    no_aug=False,
+    scale=None,
+    ratio=None,
+    hflip=0.5,
+    vflip=0.0,
+    color_jitter=0.4,
+    auto_augment=None,
+    interpolation="bilinear",
+):
+    if isinstance(input_size, tuple):
+        img_size = input_size[-2:]
+    else:
+        img_size = input_size
+
+    transform = transforms_slowfast_train(
+        img_size,
+        scale=scale,
+        ratio=ratio,
+        hflip=hflip,
+        vflip=vflip,
+        color_jitter=color_jitter,
+        auto_augment=auto_augment,
+        interpolation=interpolation,
+    )
+    return transform
+
+
+def random_sized_crop_img(im, size, jitter_scale=(0.08, 1.0), jitter_aspect=(3.0 / 4.0, 4.0 / 3.0), max_iter=10):
+    """
+    Performs Inception-style cropping (used for training).
+    """
+    assert len(im.shape) == 3, "Currently only support image for random_sized_crop"
+    h, w = im.shape[1:3]
+    i, j, h, w = get_param_spatial_crop(
+        scale=jitter_scale,
+        ratio=jitter_aspect,
+        height=h,
+        width=w,
+        num_repeat=max_iter,
+        log_scale=False,
+        switch_hw=True,
+    )
+    cropped = im[:, i : i + h, j : j + w]
+    return torch.nn.functional.interpolate(
+        cropped.unsqueeze(0),
+        size=(size, size),
+        mode="bilinear",
+        align_corners=False,
+    ).squeeze(0)

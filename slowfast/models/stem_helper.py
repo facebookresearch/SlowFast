@@ -77,7 +77,14 @@ class VideoModelStem(nn.Module):
                 }
             )
             == 1
-        ), "Input pathway dimensions are not consistent."
+        ), "Input pathway dimensions are not consistent. {} {} {} {} {}".format(
+            len(dim_in),
+            len(dim_out),
+            len(kernel),
+            len(stride),
+            len(padding),
+        )
+
         self.num_pathways = len(dim_in)
         self.kernel = kernel
         self.stride = stride

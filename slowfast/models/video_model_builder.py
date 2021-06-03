@@ -18,6 +18,13 @@ _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
 
 # Basis of temporal kernel sizes for each of the stage.
 _TEMPORAL_KERNEL_BASIS = {
+    "2d": [
+        [[1]],  # conv1 temporal kernel.
+        [[1]],  # res2 temporal kernel.
+        [[1]],  # res3 temporal kernel.
+        [[1]],  # res4 temporal kernel.
+        [[1]],  # res5 temporal kernel.
+    ],
     "c2d": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
@@ -70,6 +77,7 @@ _TEMPORAL_KERNEL_BASIS = {
 }
 
 _POOL1 = {
+    "2d": [[1, 1, 1]],
     "c2d": [[2, 1, 1]],
     "c2d_nopool": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],

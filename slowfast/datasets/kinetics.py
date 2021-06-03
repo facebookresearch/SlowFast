@@ -341,16 +341,10 @@ class Kinetics(torch.utils.data.Dataset):
         )
         # T H W C -> C T H W.
         frames = frames.permute(3, 0, 1, 2)
-        scl, asp = (
-            self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
-            self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE,
-        )
-        relative_scales = (
-            None if (self.mode not in ["train"] or len(scl[0]) == 0) else scl[0]
-        )
-        relative_aspect = (
-            None if (self.mode not in ["train"] or len(asp[0]) == 0) else asp[0]
-        )
+        # Perform data augmentation.
+        scl, asp = self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE, self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE
+        relative_scales = None if (self.mode not in ["train"] or len(scl) == 0) else scl
+        relative_aspect = None if (self.mode not in ["train"] or len(asp) == 0) else asp
         frames = utils.spatial_sampling(
             frames,
             spatial_idx=spatial_sample_index,

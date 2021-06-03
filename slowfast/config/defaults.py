@@ -274,7 +274,7 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow", "x3d"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
@@ -333,6 +333,21 @@ _C.DATA.NUM_FRAMES = 8
 # The video sampling rate of the input clip.
 _C.DATA.SAMPLING_RATE = 8
 
+# Eigenvalues for PCA jittering. Note PCA is RGB based.
+_C.DATA.TRAIN_PCA_EIGVAL = [0.225, 0.224, 0.229]
+
+# Eigenvectors for PCA jittering.
+_C.DATA.TRAIN_PCA_EIGVEC = [
+    [-0.5675, 0.7192, 0.4009],
+    [-0.5808, -0.0045, -0.8140],
+    [-0.5836, -0.6948, 0.4203],
+]
+
+# If a imdb have been dumpped to a local file with the following format:
+# `{"im_path": im_path, "class": cont_id}`
+# then we can skip the construction of imdb and load it from the local file.
+_C.DATA.PATH_TO_PRELOAD_IMDB = ""
+
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
 # List of input frame channel dimensions.
@@ -347,11 +362,11 @@ _C.DATA.TRAIN_JITTER_SCALES = [256, 320]
 
 # The relative scale range of Inception-style area based random resizing augmentation.
 # If this is provided, DATA.TRAIN_JITTER_SCALES above is ignored.
-_C.DATA.TRAIN_JITTER_SCALES_RELATIVE = [[]]
+_C.DATA.TRAIN_JITTER_SCALES_RELATIVE = []
 
 # The relative aspect ratio range of Inception-style area based random resizing
 # augmentation.
-_C.DATA.TRAIN_JITTER_ASPECT_RELATIVE = [[]]
+_C.DATA.TRAIN_JITTER_ASPECT_RELATIVE = []
 
 # Whether to apply motion shift for augmentation.
 _C.DATA.TRAIN_JITTER_MOTION_SHIFT = False
@@ -566,16 +581,6 @@ _C.AVA.TRAIN_USE_COLOR_AUGMENTATION = False
 # Whether to only use PCA jitter augmentation when using color augmentation
 # method (otherwise combine with color jitter method).
 _C.AVA.TRAIN_PCA_JITTER_ONLY = True
-
-# Eigenvalues for PCA jittering. Note PCA is RGB based.
-_C.AVA.TRAIN_PCA_EIGVAL = [0.225, 0.224, 0.229]
-
-# Eigenvectors for PCA jittering.
-_C.AVA.TRAIN_PCA_EIGVEC = [
-    [-0.5675, 0.7192, 0.4009],
-    [-0.5808, -0.0045, -0.8140],
-    [-0.5836, -0.6948, 0.4203],
-]
 
 # Whether to do horizontal flipping during test.
 _C.AVA.TEST_FORCE_FLIP = False
