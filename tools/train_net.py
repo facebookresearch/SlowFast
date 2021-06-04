@@ -103,13 +103,13 @@ def train_epoch(
 
         if cfg.MIXUP.ENABLE:
             _top_max_k_vals, top_max_k_inds = torch.topk(
-                    labels, 2, dim=1, largest=True, sorted=True
-                )
-            idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:,0]
-            idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:,1]
+                labels, 2, dim=1, largest=True, sorted=True
+            )
+            idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
+            idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
             preds[idx_top1] += preds[idx_top2]
             preds[idx_top2] = 0.0
-            labels = top_max_k_inds[:,0]
+            labels = top_max_k_inds[:, 0]
 
         if cfg.DETECTION.ENABLE:
             if cfg.NUM_GPUS > 1:

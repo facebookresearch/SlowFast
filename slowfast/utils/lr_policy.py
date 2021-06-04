@@ -43,10 +43,15 @@ def lr_func_cosine(cfg, cur_epoch):
     return (
         cfg.SOLVER.COSINE_END_LR
         + (cfg.SOLVER.BASE_LR - cfg.SOLVER.COSINE_END_LR)
-        * (math.cos(
-            math.pi * (cur_epoch  - offset)  / (cfg.SOLVER.MAX_EPOCH - offset )) + 1.0)
+        * (
+            math.cos(
+                math.pi * (cur_epoch - offset) / (cfg.SOLVER.MAX_EPOCH - offset)
+            )
+            + 1.0
+        )
         * 0.5
     )
+
 
 def lr_func_steps_with_relative_lrs(cfg, cur_epoch):
     """

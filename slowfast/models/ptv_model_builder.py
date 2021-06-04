@@ -6,11 +6,16 @@
 
 from functools import partial
 import torch.nn as nn
+from detectron2.layers import ROIAlign
 
 from slowfast.models.batchnorm_helper import get_norm
 from slowfast.models.video_model_builder import _POOL1, _TEMPORAL_KERNEL_BASIS
 
 from pytorchvideo.models.csn import create_csn
+from pytorchvideo.models.head import (
+    create_res_basic_head,
+    create_res_roi_pooling_head,
+)
 from pytorchvideo.models.r2plus1d import (
     create_2plus1d_bottleneck_block,
     create_r2plus1d,
@@ -22,8 +27,7 @@ from pytorchvideo.models.x3d import (
     create_x3d,
     create_x3d_bottleneck_block,
 )
-from pytorchvideo.models.head import create_res_basic_head, create_res_roi_pooling_head
-from detectron2.layers import ROIAlign
+
 from .build import MODEL_REGISTRY
 
 
@@ -77,7 +81,7 @@ class PTVResNet(nn.Module):
             "i3d",
         ], f"Unsupported MODEL.ARCH type {cfg.MODEL.ARCH} for PTVResNet"
 
-        self.detection_mode =  cfg.DETECTION.ENABLE
+        self.detection_mode = cfg.DETECTION.ENABLE
         self._construct_network(cfg)
 
     def _construct_network(self, cfg):
@@ -122,19 +126,21 @@ class PTVResNet(nn.Module):
         # Head from config
         if cfg.DETECTION.ENABLE:
             self.detection_head = create_res_roi_pooling_head(
-                in_features=cfg.RESNET.WIDTH_PER_GROUP * 2**(4+1),
+                in_features=cfg.RESNET.WIDTH_PER_GROUP * 2 ** (4 + 1),
                 out_features=cfg.MODEL.NUM_CLASSES,
                 pool=nn.AvgPool3d,
-                output_size=(1,1,1),
-                pool_kernel_size= (
-                    cfg.DATA.NUM_FRAMES // pool_size[0][0], 1, 1,
+                output_size=(1, 1, 1),
+                pool_kernel_size=(
+                    cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                    1,
+                    1,
                 ),
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 activation=None,
                 output_with_global_average=False,
                 pool_spatial=nn.MaxPool2d,
                 resolution=[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2,
-                spatial_scale=1.0/float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
+                spatial_scale=1.0 / float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
                 sampling_ratio=0,
                 roi=ROIAlign,
             )
@@ -232,7 +238,7 @@ class PTVSlowFast(nn.Module):
             cfg.RESNET.TRANS_FUNC == "bottleneck_transform"
         ), f"Unsupported TRANS_FUNC type {cfg.RESNET.TRANS_FUNC} for PTVSlowFast"
 
-        self.detection_mode =  cfg.DETECTION.ENABLE
+        self.detection_mode = cfg.DETECTION.ENABLE
         self._construct_network(cfg)
 
     def _construct_network(self, cfg):
@@ -271,23 +277,25 @@ class PTVSlowFast(nn.Module):
 
         # Head from config
         # Number of stages = 4
-        stage_dim_in = cfg.RESNET.WIDTH_PER_GROUP * 2**(4+1)
+        stage_dim_in = cfg.RESNET.WIDTH_PER_GROUP * 2 ** (4 + 1)
         head_in_features = stage_dim_in
         for reduction_ratio in cfg.SLOWFAST.BETA_INV:
-            head_in_features = head_in_features + stage_dim_in // reduction_ratio
+            head_in_features = (
+                head_in_features + stage_dim_in // reduction_ratio
+            )
 
         if cfg.DETECTION.ENABLE:
             self.detection_head = create_res_roi_pooling_head(
                 in_features=head_in_features,
                 out_features=cfg.MODEL.NUM_CLASSES,
                 pool=None,
-                output_size=(1,1,1),
+                output_size=(1, 1, 1),
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 activation=None,
                 output_with_global_average=False,
                 pool_spatial=nn.MaxPool2d,
                 resolution=[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2,
-                spatial_scale=1.0/float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
+                spatial_scale=1.0 / float(cfg.DETECTION.SPATIAL_SCALE_FACTOR),
                 sampling_ratio=0,
                 roi=ROIAlign,
             )

@@ -27,7 +27,7 @@ def construct_optimizer(model, cfg):
     non_bn_parameters = []
     zero_parameters = []
     skip = {}
-    if hasattr(model, 'no_weight_decay'):
+    if hasattr(model, "no_weight_decay"):
         skip = model.no_weight_decay()
 
     for name, m in model.named_modules():
@@ -37,7 +37,10 @@ def construct_optimizer(model, cfg):
                 continue
             if is_bn:
                 bn_parameters.append(p)
-            elif name in skip or ((len(p.shape) == 1 or name.endswith(".bias")) and cfg.SOLVER.ZERO_WD_1D_PARAM):
+            elif name in skip or (
+                (len(p.shape) == 1 or name.endswith(".bias"))
+                and cfg.SOLVER.ZERO_WD_1D_PARAM
+            ):
                 zero_parameters.append(p)
             else:
                 non_bn_parameters.append(p)
@@ -45,14 +48,20 @@ def construct_optimizer(model, cfg):
     optim_params = [
         {"params": bn_parameters, "weight_decay": cfg.BN.WEIGHT_DECAY},
         {"params": non_bn_parameters, "weight_decay": cfg.SOLVER.WEIGHT_DECAY},
-        {"params": zero_parameters, "weight_decay": 0.},
+        {"params": zero_parameters, "weight_decay": 0.0},
     ]
     optim_params = [x for x in optim_params if len(x["params"])]
 
     # Check all parameters will be passed into optimizer.
-    assert len(list(model.parameters())) == len(non_bn_parameters) + len(bn_parameters
-    ) + len(zero_parameters), "parameter size does not match: {} + {} + {} != {}".format(
-        len(non_bn_parameters), len(bn_parameters), len(zero_parameters), len(list(model.parameters()))
+    assert len(list(model.parameters())) == len(non_bn_parameters) + len(
+        bn_parameters
+    ) + len(
+        zero_parameters
+    ), "parameter size does not match: {} + {} + {} != {}".format(
+        len(non_bn_parameters),
+        len(bn_parameters),
+        len(zero_parameters),
+        len(list(model.parameters())),
     )
     print(
         "bn {}, non bn {}, zero {}".format(
