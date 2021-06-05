@@ -89,8 +89,8 @@ def construct_optimizer(model, cfg):
         return torch.optim.AdamW(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
-            weight_decay=0.0,
             eps=1e-08,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
     else:
         raise NotImplementedError(
@@ -103,7 +103,7 @@ def get_epoch_lr(cur_epoch, cfg):
     Retrieves the lr for the given epoch (as specified by the lr policy).
     Args:
         cfg (config): configs of hyper-parameters of ADAM, includes base
-        learning rate, betas, and weight non_bn_parameters.
+        learning rate, betas, and weight decay.
         cur_epoch (float): the number of epoch of the current training stage.
     """
     return lr_policy.get_lr_at_epoch(cfg, cur_epoch)
