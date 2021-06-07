@@ -350,11 +350,17 @@ _C.MVIT.POOL_KV_KERNEL = [[]]
 # Kernel size for the Pool Q. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
 _C.MVIT.POOL_Q_KERNEL = [[]]
 
+# Kernel size for the Pool Skip. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_SKIP_KERNEL = [[]]
+
 # Stride size for the Pool KV. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
 _C.MVIT.POOL_KV_STRIDE = [[]]
 
 # Stride size for the Pool Q. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
 _C.MVIT.POOL_Q_STRIDE = [[]]
+
+# Stride size for the Pool Skip. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_SKIP_STRIDE = [[]]
 
 # If True, perform no decay on positional embedding and cls embedding.
 _C.MVIT.ZERO_DECAY_POS_CLS = True
