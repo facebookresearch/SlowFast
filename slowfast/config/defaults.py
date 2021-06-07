@@ -75,6 +75,64 @@ _C.TRAIN.CHECKPOINT_EPOCH_RESET = False
 # If set, clear all layer names according to the pattern provided.
 _C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
+
+# ---------------------------------------------------------------------------- #
+# Augmentation options.
+# ---------------------------------------------------------------------------- #
+_C.AUG = CfgNode()
+
+# Whether to enable randaug.
+_C.AUG.ENABLE = False
+
+# Number of repeated augmentations to used during training.
+# If this is greater than 1, then the actual batch size is
+# TRAIN.BATCH_SIZE * AUG.NUM_SAMPLE.
+_C.AUG.NUM_SAMPLE = 1
+
+# Not used if using randaug.
+_C.AUG.COLOR_JITTER = 0.4
+
+# RandAug parameters.
+_C.AUG.AA_TYPE = "rand-m9-mstd0.5-inc1"
+
+# Interpolation method.
+_C.AUG.INTERPOLATION = "bicubic"
+
+# Probability of random erasing.
+_C.AUG.RE_PROB = 0.25
+
+# Random erasing mode.
+_C.AUG.RE_MODE = "pixel"
+
+# Random erase count.
+_C.AUG.RE_COUNT = 1
+
+# Do not random erase first (clean) augmentation split.
+_C.AUG.RE_SPLIT = False
+
+# ---------------------------------------------------------------------------- #
+# MipUp options.
+# ---------------------------------------------------------------------------- #
+_C.MIXUP = CfgNode()
+
+# Whether to use mixup.
+_C.MIXUP.ENABLE = False
+
+# Mixup alpha.
+_C.MIXUP.ALPHA = 0.8
+
+# Cutmix alpha.
+_C.MIXUP.CUTMIX_ALPHA = 1.0
+
+# Probability of performing mixup or cutmix when either/both is enabled.
+_C.MIXUP.PROB = 1.0
+
+# Probability of switching to cutmix when both mixup and cutmix enabled.
+_C.MIXUP.SWITCH_PROB = 0.5
+
+# Label smoothing.
+_C.MIXUP.LABEL_SMOOTH_VALUE = 0.1
+
 # ---------------------------------------------------------------------------- #
 # Testing options
 # ---------------------------------------------------------------------------- #
@@ -216,7 +274,7 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["c2d", "i3d", "slow", "x3d"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d", "mvit"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
@@ -235,6 +293,89 @@ _C.MODEL.HEAD_ACT = "softmax"
 
 # Activation checkpointing enabled or not to save GPU memory.
 _C.MODEL.ACT_CHECKPOINT = False
+
+
+# -----------------------------------------------------------------------------
+# MViT options
+# -----------------------------------------------------------------------------
+_C.MVIT = CfgNode()
+
+# Options include `conv`, `max`.
+_C.MVIT.MODE = "conv"
+
+# If True, use cls embed in the network, otherwise don't use cls_embed in transformer.
+_C.MVIT.CLS_EMBED_ON = True
+
+# Kernel size for patchtification.
+_C.MVIT.PATCH_KERNEL = [3, 7, 7]
+
+# Stride size for patchtification.
+_C.MVIT.PATCH_STRIDE = [2, 4, 4]
+
+# Padding size for patchtification.
+_C.MVIT.PATCH_PADDING = [2, 4, 4]
+
+# If True, use 2d patch, otherwise use 3d patch.
+_C.MVIT.PATCH_2D = False
+
+# Base embedding dimension for the transformer.
+_C.MVIT.EMBED_DIM = 96
+
+# Base num of heads for the transformer.
+_C.MVIT.NUM_HEADS = 1
+
+# Dimension reduction ratio for the MLP layers.
+_C.MVIT.MLP_RATIO = 4.0
+
+# If use, use bias term in attention fc layers.
+_C.MVIT.QKV_BIAS = True
+
+# Drop path rate for the tranfomer.
+_C.MVIT.DROPPATH_RATE = 0.1
+
+# Depth of the transformer.
+_C.MVIT.DEPTH = 16
+
+# Normalization layer for the transformer. Only layernorm is supported now.
+_C.MVIT.NORM = "layernorm"
+
+# Dimension multiplication. If 2.0 is used, then the next block will increase the
+# dimension by 2 times. Format: [depth_i: mul_dim_ratio]
+_C.MVIT.DIM_MUL = []
+
+# Head number multiplication. If 2.0 is used, then the next block will increase the
+# number of heads by 2 times. Format: [depth_i: head_mul_ratio]
+_C.MVIT.HEAD_MUL = []
+
+# Kernel size for the Pool KV. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_KV_KERNEL = [[]]
+
+# Kernel size for the Pool Q. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_Q_KERNEL = [[]]
+
+# Kernel size for the Pool Skip. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_SKIP_KERNEL = [[]]
+
+# Stride size for the Pool KV. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_KV_STRIDE = [[]]
+
+# Stride size for the Pool Q. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_Q_STRIDE = [[]]
+
+# Stride size for the Pool Skip. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_SKIP_STRIDE = [[]]
+
+# If True, perform no decay on positional embedding and cls embedding.
+_C.MVIT.ZERO_DECAY_POS_CLS = True
+
+# If True, use norm after stem.
+_C.MVIT.NORM_STEM = False
+
+# If True, perform separate positional embedding.
+_C.MVIT.SEP_POS_EMBED = False
+
+# Dropout rate for the MViT backbone.
+_C.MVIT.DROPOUT_RATE = 0.0
 
 
 # -----------------------------------------------------------------------------
@@ -278,6 +419,21 @@ _C.DATA.NUM_FRAMES = 8
 # The video sampling rate of the input clip.
 _C.DATA.SAMPLING_RATE = 8
 
+# Eigenvalues for PCA jittering. Note PCA is RGB based.
+_C.DATA.TRAIN_PCA_EIGVAL = [0.225, 0.224, 0.229]
+
+# Eigenvectors for PCA jittering.
+_C.DATA.TRAIN_PCA_EIGVEC = [
+    [-0.5675, 0.7192, 0.4009],
+    [-0.5808, -0.0045, -0.8140],
+    [-0.5836, -0.6948, 0.4203],
+]
+
+# If a imdb have been dumpped to a local file with the following format:
+# `{"im_path": im_path, "class": cont_id}`
+# then we can skip the construction of imdb and load it from the local file.
+_C.DATA.PATH_TO_PRELOAD_IMDB = ""
+
 # The mean value of the video raw pixels across the R G B channels.
 _C.DATA.MEAN = [0.45, 0.45, 0.45]
 # List of input frame channel dimensions.
@@ -289,6 +445,20 @@ _C.DATA.STD = [0.225, 0.225, 0.225]
 
 # The spatial augmentation jitter scales for training.
 _C.DATA.TRAIN_JITTER_SCALES = [256, 320]
+
+# The relative scale range of Inception-style area based random resizing augmentation.
+# If this is provided, DATA.TRAIN_JITTER_SCALES above is ignored.
+_C.DATA.TRAIN_JITTER_SCALES_RELATIVE = []
+
+# The relative aspect ratio range of Inception-style area based random resizing
+# augmentation.
+_C.DATA.TRAIN_JITTER_ASPECT_RELATIVE = []
+
+# If True, perform stride length uniform temporal sampling.
+_C.DATA.USE_OFFSET_SAMPLING = False
+
+# Whether to apply motion shift for augmentation.
+_C.DATA.TRAIN_JITTER_MOTION_SHIFT = False
 
 # The spatial crop size for training.
 _C.DATA.TRAIN_CROP_SIZE = 224
@@ -376,6 +546,12 @@ _C.SOLVER.OPTIMIZING_METHOD = "sgd"
 
 # Base learning rate is linearly scaled with NUM_SHARDS.
 _C.SOLVER.BASE_LR_SCALE_NUM_SHARDS = False
+
+# If True, start from the peak cosine learning rate after warm up.
+_C.SOLVER.COSINE_AFTER_WARMUP = False
+
+# If True, perform no weight decay on parameter with one dimension (bias term, etc).
+_C.SOLVER.ZERO_WD_1D_PARAM = False
 
 # ---------------------------------------------------------------------------- #
 # Misc options
@@ -500,16 +676,6 @@ _C.AVA.TRAIN_USE_COLOR_AUGMENTATION = False
 # Whether to only use PCA jitter augmentation when using color augmentation
 # method (otherwise combine with color jitter method).
 _C.AVA.TRAIN_PCA_JITTER_ONLY = True
-
-# Eigenvalues for PCA jittering. Note PCA is RGB based.
-_C.AVA.TRAIN_PCA_EIGVAL = [0.225, 0.224, 0.229]
-
-# Eigenvectors for PCA jittering.
-_C.AVA.TRAIN_PCA_EIGVEC = [
-    [-0.5675, 0.7192, 0.4009],
-    [-0.5808, -0.0045, -0.8140],
-    [-0.5836, -0.6948, 0.4203],
-]
 
 # Whether to do horizontal flipping during test.
 _C.AVA.TEST_FORCE_FLIP = False
@@ -785,6 +951,8 @@ def assert_and_infer_cfg(cfg):
     # Execute LR scaling by num_shards.
     if cfg.SOLVER.BASE_LR_SCALE_NUM_SHARDS:
         cfg.SOLVER.BASE_LR *= cfg.NUM_SHARDS
+        cfg.SOLVER.WARMUP_START_LR *= cfg.NUM_SHARDS
+        cfg.SOLVER.COSINE_END_LR *= cfg.NUM_SHARDS
 
     # General assertions.
     assert cfg.SHARD_ID < cfg.NUM_SHARDS

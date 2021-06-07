@@ -17,6 +17,7 @@ import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
+from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
 from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
@@ -46,6 +47,16 @@ def train_epoch(
     train_meter.iter_tic()
     data_size = len(train_loader)
 
+    if cfg.MIXUP.ENABLE:
+        mixup_fn = MixUp(
+            mixup_alpha=cfg.MIXUP.ALPHA,
+            cutmix_alpha=cfg.MIXUP.CUTMIX_ALPHA,
+            mix_prob=cfg.MIXUP.PROB,
+            switch_prob=cfg.MIXUP.SWITCH_PROB,
+            label_smoothing=cfg.MIXUP.LABEL_SMOOTH_VALUE,
+            num_classes=cfg.MODEL.NUM_CLASSES,
+        )
+
     for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
@@ -67,6 +78,9 @@ def train_epoch(
         optim.set_lr(optimizer, lr)
 
         train_meter.data_toc()
+        if cfg.MIXUP.ENABLE:
+            samples, labels = mixup_fn(inputs[0], labels)
+            inputs[0] = samples
 
         if cfg.DETECTION.ENABLE:
             preds = model(inputs, meta["boxes"])
@@ -86,6 +100,16 @@ def train_epoch(
         loss.backward()
         # Update the parameters.
         optimizer.step()
+
+        if cfg.MIXUP.ENABLE:
+            _top_max_k_vals, top_max_k_inds = torch.topk(
+                labels, 2, dim=1, largest=True, sorted=True
+            )
+            idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
+            idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
+            preds[idx_top1] += preds[idx_top2]
+            preds[idx_top2] = 0.0
+            labels = top_max_k_inds[:, 0]
 
         if cfg.DETECTION.ENABLE:
             if cfg.NUM_GPUS > 1:

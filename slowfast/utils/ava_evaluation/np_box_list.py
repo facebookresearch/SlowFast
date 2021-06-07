@@ -27,25 +27,25 @@ import numpy as np
 class BoxList(object):
     """Box collection.
 
-  BoxList represents a list of bounding boxes as numpy array, where each
-  bounding box is represented as a row of 4 numbers,
-  [y_min, x_min, y_max, x_max].  It is assumed that all bounding boxes within a
-  given list correspond to a single image.
+    BoxList represents a list of bounding boxes as numpy array, where each
+    bounding box is represented as a row of 4 numbers,
+    [y_min, x_min, y_max, x_max].  It is assumed that all bounding boxes within a
+    given list correspond to a single image.
 
-  Optionally, users can add additional related fields (such as
-  objectness/classification scores).
-  """
+    Optionally, users can add additional related fields (such as
+    objectness/classification scores).
+    """
 
     def __init__(self, data):
         """Constructs box collection.
 
-    Args:
-      data: a numpy array of shape [N, 4] representing box coordinates
+        Args:
+          data: a numpy array of shape [N, 4] representing box coordinates
 
-    Raises:
-      ValueError: if bbox data is not a numpy array
-      ValueError: if invalid dimensions for bbox data
-    """
+        Raises:
+          ValueError: if bbox data is not a numpy array
+          ValueError: if invalid dimensions for bbox data
+        """
         if not isinstance(data, np.ndarray):
             raise ValueError("data must be a numpy array.")
         if len(data.shape) != 2 or data.shape[1] != 4:
@@ -75,14 +75,14 @@ class BoxList(object):
     def add_field(self, field, field_data):
         """Add data to a specified field.
 
-    Args:
-      field: a string parameter used to speficy a related field to be accessed.
-      field_data: a numpy array of [N, ...] representing the data associated
-          with the field.
-    Raises:
-      ValueError: if the field is already exist or the dimension of the field
-          data does not matches the number of boxes.
-    """
+        Args:
+          field: a string parameter used to speficy a related field to be accessed.
+          field_data: a numpy array of [N, ...] representing the data associated
+              with the field.
+        Raises:
+          ValueError: if the field is already exist or the dimension of the field
+              data does not matches the number of boxes.
+        """
         if self.has_field(field):
             raise ValueError("Field " + field + "already exists")
         if len(field_data.shape) < 1 or field_data.shape[0] != self.num_boxes():
@@ -92,23 +92,23 @@ class BoxList(object):
     def get(self):
         """Convenience function for accesssing box coordinates.
 
-    Returns:
-      a numpy array of shape [N, 4] representing box corners
-    """
+        Returns:
+          a numpy array of shape [N, 4] representing box corners
+        """
         return self.get_field("boxes")
 
     def get_field(self, field):
         """Accesses data associated with the specified field in the box collection.
 
-    Args:
-      field: a string parameter used to speficy a related field to be accessed.
+        Args:
+          field: a string parameter used to speficy a related field to be accessed.
 
-    Returns:
-      a numpy 1-d array representing data of an associated field
+        Returns:
+          a numpy 1-d array representing data of an associated field
 
-    Raises:
-      ValueError: if invalid field
-    """
+        Raises:
+          ValueError: if invalid field
+        """
         if not self.has_field(field):
             raise ValueError("field {} does not exist".format(field))
         return self.data[field]
@@ -116,9 +116,9 @@ class BoxList(object):
     def get_coordinates(self):
         """Get corner coordinates of boxes.
 
-    Returns:
-     a list of 4 1-d numpy arrays [y_min, x_min, y_max, x_max]
-    """
+        Returns:
+         a list of 4 1-d numpy arrays [y_min, x_min, y_max, x_max]
+        """
         box_coordinates = self.get()
         y_min = box_coordinates[:, 0]
         x_min = box_coordinates[:, 1]
@@ -129,13 +129,13 @@ class BoxList(object):
     def _is_valid_boxes(self, data):
         """Check whether data fullfills the format of N*[ymin, xmin, ymax, xmin].
 
-    Args:
-      data: a numpy array of shape [N, 4] representing box coordinates
+        Args:
+          data: a numpy array of shape [N, 4] representing box coordinates
 
-    Returns:
-      a boolean indicating whether all ymax of boxes are equal or greater than
-          ymin, and all xmax of boxes are equal or greater than xmin.
-    """
+        Returns:
+          a boolean indicating whether all ymax of boxes are equal or greater than
+              ymin, and all xmax of boxes are equal or greater than xmin.
+        """
         if data.shape[0] > 0:
             for i in range(data.shape[0]):
                 if data[i, 0] > data[i, 2] or data[i, 1] > data[i, 3]:

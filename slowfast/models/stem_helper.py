@@ -77,7 +77,14 @@ class VideoModelStem(nn.Module):
                 }
             )
             == 1
-        ), "Input pathway dimensions are not consistent."
+        ), "Input pathway dimensions are not consistent. {} {} {} {} {}".format(
+            len(dim_in),
+            len(dim_out),
+            len(kernel),
+            len(stride),
+            len(padding),
+        )
+
         self.num_pathways = len(dim_in)
         self.kernel = kernel
         self.stride = stride
@@ -280,3 +287,36 @@ class X3DStem(nn.Module):
         x = self.bn(x)
         x = self.relu(x)
         return x
+
+
+class PatchEmbed(nn.Module):
+    """
+    PatchEmbed.
+    """
+
+    def __init__(
+        self,
+        dim_in=3,
+        dim_out=768,
+        kernel=(1, 16, 16),
+        stride=(1, 4, 4),
+        padding=(1, 7, 7),
+        conv_2d=False,
+    ):
+        super().__init__()
+        if conv_2d:
+            conv = nn.Conv2d
+        else:
+            conv = nn.Conv3d
+        self.proj = conv(
+            dim_in,
+            dim_out,
+            kernel_size=kernel,
+            stride=stride,
+            padding=padding,
+        )
+
+    def forward(self, x):
+        x = self.proj(x)
+        # B C (T) H W -> B (T)HW C
+        return x.flatten(2).transpose(1, 2)

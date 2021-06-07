@@ -38,8 +38,8 @@ class Ava(torch.utils.data.Dataset):
             self._jitter_max_scale = cfg.DATA.TRAIN_JITTER_SCALES[1]
             self._use_color_augmentation = cfg.AVA.TRAIN_USE_COLOR_AUGMENTATION
             self._pca_jitter_only = cfg.AVA.TRAIN_PCA_JITTER_ONLY
-            self._pca_eigval = cfg.AVA.TRAIN_PCA_EIGVAL
-            self._pca_eigvec = cfg.AVA.TRAIN_PCA_EIGVEC
+            self._pca_eigval = cfg.DATA.TRAIN_PCA_EIGVAL
+            self._pca_eigvec = cfg.DATA.TRAIN_PCA_EIGVEC
         else:
             self._crop_size = cfg.DATA.TEST_CROP_SIZE
             self._test_force_flip = cfg.AVA.TEST_FORCE_FLIP
