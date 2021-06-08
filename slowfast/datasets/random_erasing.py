@@ -166,7 +166,13 @@ class RandomErasing:
             )
             if self.cube:
                 self._erase_cube(
-                    input, batch_start, batch_size, chan, img_h, img_w, input.dtype
+                    input,
+                    batch_start,
+                    batch_size,
+                    chan,
+                    img_h,
+                    img_w,
+                    input.dtype,
                 )
             else:
                 for i in range(batch_start, batch_size):

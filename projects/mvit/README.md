@@ -19,7 +19,7 @@ python tools/run_net.py \
   DATA.PATH_TO_DATA_DIR path_to_your_dataset \
 ```
 
-should train and test a MViT-B model on your dataset. The yaml file will be released in a week.
+should train and test a MViT-B model on your dataset.
 
 ## Citing MViT
 If you find MViT useful for your research, please consider citing the paper using the following BibTeX entry.

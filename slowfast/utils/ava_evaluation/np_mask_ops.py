@@ -33,16 +33,16 @@ EPSILON = 1e-7
 def area(masks):
     """Computes area of masks.
 
-  Args:
-    masks: Numpy array with shape [N, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
+    Args:
+      masks: Numpy array with shape [N, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
 
-  Returns:
-    a numpy array with shape [N*1] representing mask areas.
+    Returns:
+      a numpy array with shape [N*1] representing mask areas.
 
-  Raises:
-    ValueError: If masks.dtype is not np.uint8
-  """
+    Raises:
+      ValueError: If masks.dtype is not np.uint8
+    """
     if masks.dtype != np.uint8:
         raise ValueError("Masks type should be np.uint8")
     return np.sum(masks, axis=(1, 2), dtype=np.float32)
@@ -51,18 +51,18 @@ def area(masks):
 def intersection(masks1, masks2):
     """Compute pairwise intersection areas between masks.
 
-  Args:
-    masks1: a numpy array with shape [N, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
-    masks2: a numpy array with shape [M, height, width] holding M masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
+    Args:
+      masks1: a numpy array with shape [N, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
+      masks2: a numpy array with shape [M, height, width] holding M masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
 
-  Returns:
-    a numpy array with shape [N*M] representing pairwise intersection area.
+    Returns:
+      a numpy array with shape [N*M] representing pairwise intersection area.
 
-  Raises:
-    ValueError: If masks1 and masks2 are not of type np.uint8.
-  """
+    Raises:
+      ValueError: If masks1 and masks2 are not of type np.uint8.
+    """
     if masks1.dtype != np.uint8 or masks2.dtype != np.uint8:
         raise ValueError("masks1 and masks2 should be of type np.uint8")
     n = masks1.shape[0]
@@ -79,18 +79,18 @@ def intersection(masks1, masks2):
 def iou(masks1, masks2):
     """Computes pairwise intersection-over-union between mask collections.
 
-  Args:
-    masks1: a numpy array with shape [N, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
-    masks2: a numpy array with shape [M, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
+    Args:
+      masks1: a numpy array with shape [N, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
+      masks2: a numpy array with shape [M, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
 
-  Returns:
-    a numpy array with shape [N, M] representing pairwise iou scores.
+    Returns:
+      a numpy array with shape [N, M] representing pairwise iou scores.
 
-  Raises:
-    ValueError: If masks1 and masks2 are not of type np.uint8.
-  """
+    Raises:
+      ValueError: If masks1 and masks2 are not of type np.uint8.
+    """
     if masks1.dtype != np.uint8 or masks2.dtype != np.uint8:
         raise ValueError("masks1 and masks2 should be of type np.uint8")
     intersect = intersection(masks1, masks2)
@@ -107,22 +107,22 @@ def iou(masks1, masks2):
 def ioa(masks1, masks2):
     """Computes pairwise intersection-over-area between box collections.
 
-  Intersection-over-area (ioa) between two masks, mask1 and mask2 is defined as
-  their intersection area over mask2's area. Note that ioa is not symmetric,
-  that is, IOA(mask1, mask2) != IOA(mask2, mask1).
+    Intersection-over-area (ioa) between two masks, mask1 and mask2 is defined as
+    their intersection area over mask2's area. Note that ioa is not symmetric,
+    that is, IOA(mask1, mask2) != IOA(mask2, mask1).
 
-  Args:
-    masks1: a numpy array with shape [N, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
-    masks2: a numpy array with shape [M, height, width] holding N masks. Masks
-      values are of type np.uint8 and values are in {0,1}.
+    Args:
+      masks1: a numpy array with shape [N, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
+      masks2: a numpy array with shape [M, height, width] holding N masks. Masks
+        values are of type np.uint8 and values are in {0,1}.
 
-  Returns:
-    a numpy array with shape [N, M] representing pairwise ioa scores.
+    Returns:
+      a numpy array with shape [N, M] representing pairwise ioa scores.
 
-  Raises:
-    ValueError: If masks1 and masks2 are not of type np.uint8.
-  """
+    Raises:
+      ValueError: If masks1 and masks2 are not of type np.uint8.
+    """
     if masks1.dtype != np.uint8 or masks2.dtype != np.uint8:
         raise ValueError("masks1 and masks2 should be of type np.uint8")
     intersect = intersection(masks1, masks2)

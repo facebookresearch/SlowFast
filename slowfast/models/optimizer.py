@@ -27,7 +27,7 @@ def construct_optimizer(model, cfg):
     non_bn_parameters = []
     zero_parameters = []
     skip = {}
-    if hasattr(model, 'no_weight_decay'):
+    if hasattr(model, "no_weight_decay"):
         skip = model.no_weight_decay()
 
     for name, m in model.named_modules():
@@ -37,7 +37,10 @@ def construct_optimizer(model, cfg):
                 continue
             if is_bn:
                 bn_parameters.append(p)
-            elif name in skip or ((len(p.shape) == 1 or name.endswith(".bias")) and cfg.SOLVER.ZERO_WD_1D_PARAM):
+            elif name in skip or (
+                (len(p.shape) == 1 or name.endswith(".bias"))
+                and cfg.SOLVER.ZERO_WD_1D_PARAM
+            ):
                 zero_parameters.append(p)
             else:
                 non_bn_parameters.append(p)
@@ -45,14 +48,20 @@ def construct_optimizer(model, cfg):
     optim_params = [
         {"params": bn_parameters, "weight_decay": cfg.BN.WEIGHT_DECAY},
         {"params": non_bn_parameters, "weight_decay": cfg.SOLVER.WEIGHT_DECAY},
-        {"params": zero_parameters, "weight_decay": 0.},
+        {"params": zero_parameters, "weight_decay": 0.0},
     ]
     optim_params = [x for x in optim_params if len(x["params"])]
 
     # Check all parameters will be passed into optimizer.
-    assert len(list(model.parameters())) == len(non_bn_parameters) + len(bn_parameters
-    ) + len(zero_parameters), "parameter size does not match: {} + {} + {} != {}".format(
-        len(non_bn_parameters), len(bn_parameters), len(zero_parameters), len(list(model.parameters()))
+    assert len(list(model.parameters())) == len(non_bn_parameters) + len(
+        bn_parameters
+    ) + len(
+        zero_parameters
+    ), "parameter size does not match: {} + {} + {} != {}".format(
+        len(non_bn_parameters),
+        len(bn_parameters),
+        len(zero_parameters),
+        len(list(model.parameters())),
     )
     print(
         "bn {}, non bn {}, zero {}".format(
@@ -80,8 +89,8 @@ def construct_optimizer(model, cfg):
         return torch.optim.AdamW(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
-            weight_decay=0.0,
             eps=1e-08,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
     else:
         raise NotImplementedError(
@@ -94,7 +103,7 @@ def get_epoch_lr(cur_epoch, cfg):
     Retrieves the lr for the given epoch (as specified by the lr policy).
     Args:
         cfg (config): configs of hyper-parameters of ADAM, includes base
-        learning rate, betas, and weight non_bn_parameters.
+        learning rate, betas, and weight decay.
         cur_epoch (float): the number of epoch of the current training stage.
     """
     return lr_policy.get_lr_at_epoch(cfg, cur_epoch)

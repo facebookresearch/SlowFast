@@ -291,6 +291,7 @@ class PatchEmbed(nn.Module):
     """
     PatchEmbed.
     """
+
     def __init__(
         self,
         dim_in=3,

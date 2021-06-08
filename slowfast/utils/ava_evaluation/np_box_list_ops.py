@@ -33,10 +33,10 @@ from . import np_box_list, np_box_ops
 class SortOrder(object):
     """Enum class for sort order.
 
-  Attributes:
-    ascend: ascend order.
-    descend: descend order.
-  """
+    Attributes:
+      ascend: ascend order.
+      descend: descend order.
+    """
 
     ASCEND = 1
     DESCEND = 2
@@ -45,12 +45,12 @@ class SortOrder(object):
 def area(boxlist):
     """Computes area of boxes.
 
-  Args:
-    boxlist: BoxList holding N boxes
+    Args:
+      boxlist: BoxList holding N boxes
 
-  Returns:
-    a numpy array with shape [N*1] representing box areas
-  """
+    Returns:
+      a numpy array with shape [N*1] representing box areas
+    """
     y_min, x_min, y_max, x_max = boxlist.get_coordinates()
     return (y_max - y_min) * (x_max - x_min)
 
@@ -58,69 +58,69 @@ def area(boxlist):
 def intersection(boxlist1, boxlist2):
     """Compute pairwise intersection areas between boxes.
 
-  Args:
-    boxlist1: BoxList holding N boxes
-    boxlist2: BoxList holding M boxes
+    Args:
+      boxlist1: BoxList holding N boxes
+      boxlist2: BoxList holding M boxes
 
-  Returns:
-    a numpy array with shape [N*M] representing pairwise intersection area
-  """
+    Returns:
+      a numpy array with shape [N*M] representing pairwise intersection area
+    """
     return np_box_ops.intersection(boxlist1.get(), boxlist2.get())
 
 
 def iou(boxlist1, boxlist2):
     """Computes pairwise intersection-over-union between box collections.
 
-  Args:
-    boxlist1: BoxList holding N boxes
-    boxlist2: BoxList holding M boxes
+    Args:
+      boxlist1: BoxList holding N boxes
+      boxlist2: BoxList holding M boxes
 
-  Returns:
-    a numpy array with shape [N, M] representing pairwise iou scores.
-  """
+    Returns:
+      a numpy array with shape [N, M] representing pairwise iou scores.
+    """
     return np_box_ops.iou(boxlist1.get(), boxlist2.get())
 
 
 def ioa(boxlist1, boxlist2):
     """Computes pairwise intersection-over-area between box collections.
 
-  Intersection-over-area (ioa) between two boxes box1 and box2 is defined as
-  their intersection area over box2's area. Note that ioa is not symmetric,
-  that is, IOA(box1, box2) != IOA(box2, box1).
+    Intersection-over-area (ioa) between two boxes box1 and box2 is defined as
+    their intersection area over box2's area. Note that ioa is not symmetric,
+    that is, IOA(box1, box2) != IOA(box2, box1).
 
-  Args:
-    boxlist1: BoxList holding N boxes
-    boxlist2: BoxList holding M boxes
+    Args:
+      boxlist1: BoxList holding N boxes
+      boxlist2: BoxList holding M boxes
 
-  Returns:
-    a numpy array with shape [N, M] representing pairwise ioa scores.
-  """
+    Returns:
+      a numpy array with shape [N, M] representing pairwise ioa scores.
+    """
     return np_box_ops.ioa(boxlist1.get(), boxlist2.get())
 
 
 def gather(boxlist, indices, fields=None):
     """Gather boxes from BoxList according to indices and return new BoxList.
 
-  By default, gather returns boxes corresponding to the input index list, as
-  well as all additional fields stored in the boxlist (indexing into the
-  first dimension).  However one can optionally only gather from a
-  subset of fields.
+    By default, gather returns boxes corresponding to the input index list, as
+    well as all additional fields stored in the boxlist (indexing into the
+    first dimension).  However one can optionally only gather from a
+    subset of fields.
 
-  Args:
-    boxlist: BoxList holding N boxes
-    indices: a 1-d numpy array of type int_
-    fields: (optional) list of fields to also gather from.  If None (default),
-        all fields are gathered from.  Pass an empty fields list to only gather
-        the box coordinates.
+    Args:
+      boxlist: BoxList holding N boxes
+      indices: a 1-d numpy array of type int_
+      fields: (optional) list of fields to also gather from.  If None (default),
+          all fields are gathered from.  Pass an empty fields list to only gather
+          the box coordinates.
 
-  Returns:
-    subboxlist: a BoxList corresponding to the subset of the input BoxList
-        specified by indices
+    Returns:
+      subboxlist: a BoxList corresponding to the subset of the input BoxList
+          specified by indices
 
-  Raises:
-    ValueError: if specified field is not contained in boxlist or if the
-        indices are not of type int_
-  """
+    Raises:
+      ValueError: if specified field is not contained in boxlist or if the
+          indices are not of type int_
+    """
     if indices.size:
         if np.amax(indices) >= boxlist.num_boxes() or np.amin(indices) < 0:
             raise ValueError("indices are out of valid range.")
@@ -136,20 +136,20 @@ def gather(boxlist, indices, fields=None):
 def sort_by_field(boxlist, field, order=SortOrder.DESCEND):
     """Sort boxes and associated fields according to a scalar field.
 
-  A common use case is reordering the boxes according to descending scores.
+    A common use case is reordering the boxes according to descending scores.
 
-  Args:
-    boxlist: BoxList holding N boxes.
-    field: A BoxList field for sorting and reordering the BoxList.
-    order: (Optional) 'descend' or 'ascend'. Default is descend.
+    Args:
+      boxlist: BoxList holding N boxes.
+      field: A BoxList field for sorting and reordering the BoxList.
+      order: (Optional) 'descend' or 'ascend'. Default is descend.
 
-  Returns:
-    sorted_boxlist: A sorted BoxList with the field in the specified order.
+    Returns:
+      sorted_boxlist: A sorted BoxList with the field in the specified order.
 
-  Raises:
-    ValueError: if specified field does not exist or is not of single dimension.
-    ValueError: if the order is not either descend or ascend.
-  """
+    Raises:
+      ValueError: if specified field does not exist or is not of single dimension.
+      ValueError: if the order is not either descend or ascend.
+    """
     if not boxlist.has_field(field):
         raise ValueError("Field " + field + " does not exist")
     if len(boxlist.get_field(field).shape) != 1:
@@ -169,28 +169,28 @@ def non_max_suppression(
 ):
     """Non maximum suppression.
 
-  This op greedily selects a subset of detection bounding boxes, pruning
-  away boxes that have high IOU (intersection over union) overlap (> thresh)
-  with already selected boxes. In each iteration, the detected bounding box with
-  highest score in the available pool is selected.
+    This op greedily selects a subset of detection bounding boxes, pruning
+    away boxes that have high IOU (intersection over union) overlap (> thresh)
+    with already selected boxes. In each iteration, the detected bounding box with
+    highest score in the available pool is selected.
 
-  Args:
-    boxlist: BoxList holding N boxes.  Must contain a 'scores' field
-      representing detection scores. All scores belong to the same class.
-    max_output_size: maximum number of retained boxes
-    iou_threshold: intersection over union threshold.
-    score_threshold: minimum score threshold. Remove the boxes with scores
-                     less than this value. Default value is set to -10. A very
-                     low threshold to pass pretty much all the boxes, unless
-                     the user sets a different score threshold.
+    Args:
+      boxlist: BoxList holding N boxes.  Must contain a 'scores' field
+        representing detection scores. All scores belong to the same class.
+      max_output_size: maximum number of retained boxes
+      iou_threshold: intersection over union threshold.
+      score_threshold: minimum score threshold. Remove the boxes with scores
+                       less than this value. Default value is set to -10. A very
+                       low threshold to pass pretty much all the boxes, unless
+                       the user sets a different score threshold.
 
-  Returns:
-    a BoxList holding M boxes where M <= max_output_size
-  Raises:
-    ValueError: if 'scores' field does not exist
-    ValueError: if threshold is not in [0, 1]
-    ValueError: if max_output_size < 0
-  """
+    Returns:
+      a BoxList holding M boxes where M <= max_output_size
+    Raises:
+      ValueError: if 'scores' field does not exist
+      ValueError: if threshold is not in [0, 1]
+      ValueError: if max_output_size < 0
+    """
     if not boxlist.has_field("scores"):
         raise ValueError("Field scores does not exist")
     if iou_threshold < 0.0 or iou_threshold > 1.0:
@@ -244,34 +244,34 @@ def multi_class_non_max_suppression(
 ):
     """Multi-class version of non maximum suppression.
 
-  This op greedily selects a subset of detection bounding boxes, pruning
-  away boxes that have high IOU (intersection over union) overlap (> thresh)
-  with already selected boxes.  It operates independently for each class for
-  which scores are provided (via the scores field of the input box_list),
-  pruning boxes with score less than a provided threshold prior to
-  applying NMS.
+    This op greedily selects a subset of detection bounding boxes, pruning
+    away boxes that have high IOU (intersection over union) overlap (> thresh)
+    with already selected boxes.  It operates independently for each class for
+    which scores are provided (via the scores field of the input box_list),
+    pruning boxes with score less than a provided threshold prior to
+    applying NMS.
 
-  Args:
-    boxlist: BoxList holding N boxes.  Must contain a 'scores' field
-      representing detection scores.  This scores field is a tensor that can
-      be 1 dimensional (in the case of a single class) or 2-dimensional, which
-      which case we assume that it takes the shape [num_boxes, num_classes].
-      We further assume that this rank is known statically and that
-      scores.shape[1] is also known (i.e., the number of classes is fixed
-      and known at graph construction time).
-    score_thresh: scalar threshold for score (low scoring boxes are removed).
-    iou_thresh: scalar threshold for IOU (boxes that that high IOU overlap
-      with previously selected boxes are removed).
-    max_output_size: maximum number of retained boxes per class.
+    Args:
+      boxlist: BoxList holding N boxes.  Must contain a 'scores' field
+        representing detection scores.  This scores field is a tensor that can
+        be 1 dimensional (in the case of a single class) or 2-dimensional, which
+        which case we assume that it takes the shape [num_boxes, num_classes].
+        We further assume that this rank is known statically and that
+        scores.shape[1] is also known (i.e., the number of classes is fixed
+        and known at graph construction time).
+      score_thresh: scalar threshold for score (low scoring boxes are removed).
+      iou_thresh: scalar threshold for IOU (boxes that that high IOU overlap
+        with previously selected boxes are removed).
+      max_output_size: maximum number of retained boxes per class.
 
-  Returns:
-    a BoxList holding M boxes with a rank-1 scores field representing
-      corresponding scores for each box with scores sorted in decreasing order
-      and a rank-1 classes field representing a class label for each box.
-  Raises:
-    ValueError: if iou_thresh is not in [0, 1] or if input boxlist does not have
-      a valid scores field.
-  """
+    Returns:
+      a BoxList holding M boxes with a rank-1 scores field representing
+        corresponding scores for each box with scores sorted in decreasing order
+        and a rank-1 classes field representing a class label for each box.
+    Raises:
+      ValueError: if iou_thresh is not in [0, 1] or if input boxlist does not have
+        a valid scores field.
+    """
     if not 0 <= iou_thresh <= 1.0:
         raise ValueError("thresh must be between 0 and 1")
     if not isinstance(boxlist, np_box_list.BoxList):
@@ -321,14 +321,14 @@ def multi_class_non_max_suppression(
 def scale(boxlist, y_scale, x_scale):
     """Scale box coordinates in x and y dimensions.
 
-  Args:
-    boxlist: BoxList holding N boxes
-    y_scale: float
-    x_scale: float
+    Args:
+      boxlist: BoxList holding N boxes
+      y_scale: float
+      x_scale: float
 
-  Returns:
-    boxlist: BoxList holding N boxes
-  """
+    Returns:
+      boxlist: BoxList holding N boxes
+    """
     y_min, x_min, y_max, x_max = np.array_split(boxlist.get(), 4, axis=1)
     y_min = y_scale * y_min
     y_max = y_scale * y_max
@@ -349,19 +349,19 @@ def scale(boxlist, y_scale, x_scale):
 def clip_to_window(boxlist, window):
     """Clip bounding boxes to a window.
 
-  This op clips input bounding boxes (represented by bounding box
-  corners) to a window, optionally filtering out boxes that do not
-  overlap at all with the window.
+    This op clips input bounding boxes (represented by bounding box
+    corners) to a window, optionally filtering out boxes that do not
+    overlap at all with the window.
 
-  Args:
-    boxlist: BoxList holding M_in boxes
-    window: a numpy array of shape [4] representing the
-            [y_min, x_min, y_max, x_max] window to which the op
-            should clip boxes.
+    Args:
+      boxlist: BoxList holding M_in boxes
+      window: a numpy array of shape [4] representing the
+              [y_min, x_min, y_max, x_max] window to which the op
+              should clip boxes.
 
-  Returns:
-    a BoxList holding M_out boxes where M_out <= M_in
-  """
+    Returns:
+      a BoxList holding M_out boxes where M_out <= M_in
+    """
     y_min, x_min, y_max, x_max = np.array_split(boxlist.get(), 4, axis=1)
     win_y_min = window[0]
     win_x_min = window[1]
@@ -385,18 +385,18 @@ def clip_to_window(boxlist, window):
 def prune_non_overlapping_boxes(boxlist1, boxlist2, minoverlap=0.0):
     """Prunes the boxes in boxlist1 that overlap less than thresh with boxlist2.
 
-  For each box in boxlist1, we want its IOA to be more than minoverlap with
-  at least one of the boxes in boxlist2. If it does not, we remove it.
+    For each box in boxlist1, we want its IOA to be more than minoverlap with
+    at least one of the boxes in boxlist2. If it does not, we remove it.
 
-  Args:
-    boxlist1: BoxList holding N boxes.
-    boxlist2: BoxList holding M boxes.
-    minoverlap: Minimum required overlap between boxes, to count them as
-                overlapping.
+    Args:
+      boxlist1: BoxList holding N boxes.
+      boxlist2: BoxList holding M boxes.
+      minoverlap: Minimum required overlap between boxes, to count them as
+                  overlapping.
 
-  Returns:
-    A pruned boxlist with size [N', 4].
-  """
+    Returns:
+      A pruned boxlist with size [N', 4].
+    """
     intersection_over_area = ioa(boxlist2, boxlist1)  # [M, N] tensor
     intersection_over_area = np.amax(
         intersection_over_area, axis=0
@@ -410,21 +410,21 @@ def prune_non_overlapping_boxes(boxlist1, boxlist2, minoverlap=0.0):
 def prune_outside_window(boxlist, window):
     """Prunes bounding boxes that fall outside a given window.
 
-  This function prunes bounding boxes that even partially fall outside the given
-  window. See also ClipToWindow which only prunes bounding boxes that fall
-  completely outside the window, and clips any bounding boxes that partially
-  overflow.
+    This function prunes bounding boxes that even partially fall outside the given
+    window. See also ClipToWindow which only prunes bounding boxes that fall
+    completely outside the window, and clips any bounding boxes that partially
+    overflow.
 
-  Args:
-    boxlist: a BoxList holding M_in boxes.
-    window: a numpy array of size 4, representing [ymin, xmin, ymax, xmax]
-            of the window.
+    Args:
+      boxlist: a BoxList holding M_in boxes.
+      window: a numpy array of size 4, representing [ymin, xmin, ymax, xmax]
+              of the window.
 
-  Returns:
-    pruned_corners: a tensor with shape [M_out, 4] where M_out <= M_in.
-    valid_indices: a tensor with shape [M_out] indexing the valid bounding boxes
-     in the input tensor.
-  """
+    Returns:
+      pruned_corners: a tensor with shape [M_out, 4] where M_out <= M_in.
+      valid_indices: a tensor with shape [M_out] indexing the valid bounding boxes
+       in the input tensor.
+    """
 
     y_min, x_min, y_max, x_max = np.array_split(boxlist.get(), 4, axis=1)
     win_y_min = window[0]
@@ -448,24 +448,24 @@ def prune_outside_window(boxlist, window):
 def concatenate(boxlists, fields=None):
     """Concatenate list of BoxLists.
 
-  This op concatenates a list of input BoxLists into a larger BoxList.  It also
-  handles concatenation of BoxList fields as long as the field tensor shapes
-  are equal except for the first dimension.
+    This op concatenates a list of input BoxLists into a larger BoxList.  It also
+    handles concatenation of BoxList fields as long as the field tensor shapes
+    are equal except for the first dimension.
 
-  Args:
-    boxlists: list of BoxList objects
-    fields: optional list of fields to also concatenate.  By default, all
-      fields from the first BoxList in the list are included in the
-      concatenation.
+    Args:
+      boxlists: list of BoxList objects
+      fields: optional list of fields to also concatenate.  By default, all
+        fields from the first BoxList in the list are included in the
+        concatenation.
 
-  Returns:
-    a BoxList with number of boxes equal to
-      sum([boxlist.num_boxes() for boxlist in BoxList])
-  Raises:
-    ValueError: if boxlists is invalid (i.e., is not a list, is empty, or
-      contains non BoxList objects), or if requested fields are not contained in
-      all boxlists
-  """
+    Returns:
+      a BoxList with number of boxes equal to
+        sum([boxlist.num_boxes() for boxlist in BoxList])
+    Raises:
+      ValueError: if boxlists is invalid (i.e., is not a list, is empty, or
+        contains non BoxList objects), or if requested fields are not contained in
+        all boxlists
+    """
     if not isinstance(boxlists, list):
         raise ValueError("boxlists should be a list")
     if not boxlists:
@@ -503,21 +503,21 @@ def concatenate(boxlists, fields=None):
 def filter_scores_greater_than(boxlist, thresh):
     """Filter to keep only boxes with score exceeding a given threshold.
 
-  This op keeps the collection of boxes whose corresponding scores are
-  greater than the input threshold.
+    This op keeps the collection of boxes whose corresponding scores are
+    greater than the input threshold.
 
-  Args:
-    boxlist: BoxList holding N boxes.  Must contain a 'scores' field
-      representing detection scores.
-    thresh: scalar threshold
+    Args:
+      boxlist: BoxList holding N boxes.  Must contain a 'scores' field
+        representing detection scores.
+      thresh: scalar threshold
 
-  Returns:
-    a BoxList holding M boxes where M <= N
+    Returns:
+      a BoxList holding M boxes where M <= N
 
-  Raises:
-    ValueError: if boxlist not a BoxList object or if it does not
-      have a scores field
-  """
+    Raises:
+      ValueError: if boxlist not a BoxList object or if it does not
+        have a scores field
+    """
     if not isinstance(boxlist, np_box_list.BoxList):
         raise ValueError("boxlist must be a BoxList")
     if not boxlist.has_field("scores"):
@@ -539,22 +539,22 @@ def filter_scores_greater_than(boxlist, thresh):
 def change_coordinate_frame(boxlist, window):
     """Change coordinate frame of the boxlist to be relative to window's frame.
 
-  Given a window of the form [ymin, xmin, ymax, xmax],
-  changes bounding box coordinates from boxlist to be relative to this window
-  (e.g., the min corner maps to (0,0) and the max corner maps to (1,1)).
+    Given a window of the form [ymin, xmin, ymax, xmax],
+    changes bounding box coordinates from boxlist to be relative to this window
+    (e.g., the min corner maps to (0,0) and the max corner maps to (1,1)).
 
-  An example use case is data augmentation: where we are given groundtruth
-  boxes (boxlist) and would like to randomly crop the image to some
-  window (window). In this case we need to change the coordinate frame of
-  each groundtruth box to be relative to this new window.
+    An example use case is data augmentation: where we are given groundtruth
+    boxes (boxlist) and would like to randomly crop the image to some
+    window (window). In this case we need to change the coordinate frame of
+    each groundtruth box to be relative to this new window.
 
-  Args:
-    boxlist: A BoxList object holding N boxes.
-    window: a size 4 1-D numpy array.
+    Args:
+      boxlist: A BoxList object holding N boxes.
+      window: a size 4 1-D numpy array.
 
-  Returns:
-    Returns a BoxList object with N boxes.
-  """
+    Returns:
+      Returns a BoxList object with N boxes.
+    """
     win_height = window[2] - window[0]
     win_width = window[3] - window[1]
     boxlist_new = scale(
@@ -572,13 +572,13 @@ def change_coordinate_frame(boxlist, window):
 def _copy_extra_fields(boxlist_to_copy_to, boxlist_to_copy_from):
     """Copies the extra fields of boxlist_to_copy_from to boxlist_to_copy_to.
 
-  Args:
-    boxlist_to_copy_to: BoxList to which extra fields are copied.
-    boxlist_to_copy_from: BoxList from which fields are copied.
+    Args:
+      boxlist_to_copy_to: BoxList to which extra fields are copied.
+      boxlist_to_copy_from: BoxList from which fields are copied.
 
-  Returns:
-    boxlist_to_copy_to with extra fields.
-  """
+    Returns:
+      boxlist_to_copy_to with extra fields.
+    """
     for field in boxlist_to_copy_from.get_extra_fields():
         boxlist_to_copy_to.add_field(
             field, boxlist_to_copy_from.get_field(field)

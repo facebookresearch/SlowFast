@@ -3,17 +3,16 @@
 
 import math
 import numpy as np
-from PIL import Image
-import torch
+
 # import cv2
 import random
-from .random_erasing import RandomErasing
-from torchvision import transforms
-from .rand_augment import rand_augment_transform
+import torch
 import torchvision.transforms.functional as F
-
 from PIL import Image
+from torchvision import transforms
 
+from .rand_augment import rand_augment_transform
+from .random_erasing import RandomErasing
 
 _pil_interpolation_to_str = {
     Image.NEAREST: "PIL.Image.NEAREST",
@@ -443,7 +442,9 @@ def lighting_jitter(images, alphastd, eigval, eigvec):
         elif len(images.shape) == 4:
             out_images[:, idx] = images[:, idx] + rgb[2 - idx]
         else:
-            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
+            raise NotImplementedError(
+                f"Unsupported dimension {len(images.shape)}"
+            )
 
     return out_images
 
@@ -462,12 +463,16 @@ def color_normalization(images, mean, stddev):
             `num frames` x `channel` x `height` x `width`.
     """
     if len(images.shape) == 3:
-        assert len(mean) == images.shape[0], "channel mean not computed properly"
+        assert (
+            len(mean) == images.shape[0]
+        ), "channel mean not computed properly"
         assert (
             len(stddev) == images.shape[0]
         ), "channel stddev not computed properly"
     elif len(images.shape) == 4:
-        assert len(mean) == images.shape[1], "channel mean not computed properly"
+        assert (
+            len(mean) == images.shape[1]
+        ), "channel mean not computed properly"
         assert (
             len(stddev) == images.shape[1]
         ), "channel stddev not computed properly"
@@ -482,11 +487,15 @@ def color_normalization(images, mean, stddev):
         elif len(images.shape) == 4:
             out_images[:, idx] = (images[:, idx] - mean[idx]) / stddev[idx]
         else:
-            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
+            raise NotImplementedError(
+                f"Unsupported dimension {len(images.shape)}"
+            )
     return out_images
 
 
-def _get_param_spatial_crop(scale, ratio, height, width, num_repeat=10, log_scale=True, switch_hw=False):
+def _get_param_spatial_crop(
+    scale, ratio, height, width, num_repeat=10, log_scale=True, switch_hw=False
+):
     """
     Given scale, ratio, height and width, return sampled coordinates of the videos.
     """
@@ -642,11 +651,19 @@ def create_random_augment(
     raise NotImplementedError
 
 
-def random_sized_crop_img(im, size, jitter_scale=(0.08, 1.0), jitter_aspect=(3.0 / 4.0, 4.0 / 3.0), max_iter=10):
+def random_sized_crop_img(
+    im,
+    size,
+    jitter_scale=(0.08, 1.0),
+    jitter_aspect=(3.0 / 4.0, 4.0 / 3.0),
+    max_iter=10,
+):
     """
     Performs Inception-style cropping (used for training).
     """
-    assert len(im.shape) == 3, "Currently only support image for random_sized_crop"
+    assert (
+        len(im.shape) == 3
+    ), "Currently only support image for random_sized_crop"
     h, w = im.shape[1:3]
     i, j, h, w = _get_param_spatial_crop(
         scale=jitter_scale,
@@ -682,8 +699,13 @@ class RandomResizedCropAndInterpolation:
         interpolation: Default: PIL.Image.BILINEAR
     """
 
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.),
-                 interpolation='bilinear'):
+    def __init__(
+        self,
+        size,
+        scale=(0.08, 1.0),
+        ratio=(3.0 / 4.0, 4.0 / 3.0),
+        interpolation="bilinear",
+    ):
         if isinstance(size, tuple):
             self.size = size
         else:
@@ -691,7 +713,7 @@ class RandomResizedCropAndInterpolation:
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             print("range should be of kind (min, max)")
 
-        if interpolation == 'random':
+        if interpolation == "random":
             self.interpolation = _RANDOM_INTERPOLATION
         else:
             self.interpolation = _pil_interp(interpolation)
@@ -755,33 +777,39 @@ class RandomResizedCropAndInterpolation:
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):
-            interpolate_str = ' '.join([_pil_interpolation_to_str[x] for x in self.interpolation])
+            interpolate_str = " ".join(
+                [_pil_interpolation_to_str[x] for x in self.interpolation]
+            )
         else:
             interpolate_str = _pil_interpolation_to_str[self.interpolation]
-        format_string = self.__class__.__name__ + '(size={0}'.format(self.size)
-        format_string += ', scale={0}'.format(tuple(round(s, 4) for s in self.scale))
-        format_string += ', ratio={0}'.format(tuple(round(r, 4) for r in self.ratio))
-        format_string += ', interpolation={0})'.format(interpolate_str)
+        format_string = self.__class__.__name__ + "(size={0}".format(self.size)
+        format_string += ", scale={0}".format(
+            tuple(round(s, 4) for s in self.scale)
+        )
+        format_string += ", ratio={0}".format(
+            tuple(round(r, 4) for r in self.ratio)
+        )
+        format_string += ", interpolation={0})".format(interpolate_str)
         return format_string
 
 
 def transforms_imagenet_train(
-        img_size=224,
-        scale=None,
-        ratio=None,
-        hflip=0.5,
-        vflip=0.,
-        color_jitter=0.4,
-        auto_augment=None,
-        interpolation='random',
-        use_prefetcher=False,
-        mean=(0.485, 0.456, 0.406),
-        std=(0.229, 0.224, 0.225),
-        re_prob=0.,
-        re_mode='const',
-        re_count=1,
-        re_num_splits=0,
-        separate=False,
+    img_size=224,
+    scale=None,
+    ratio=None,
+    hflip=0.5,
+    vflip=0.0,
+    color_jitter=0.4,
+    auto_augment=None,
+    interpolation="random",
+    use_prefetcher=False,
+    mean=(0.485, 0.456, 0.406),
+    std=(0.229, 0.224, 0.225),
+    re_prob=0.0,
+    re_mode="const",
+    re_count=1,
+    re_num_splits=0,
+    separate=False,
 ):
     """
     If separate==True, the transforms are returned as a tuple of 3 separate transforms
@@ -796,12 +824,17 @@ def transforms_imagenet_train(
         img_size = img_size
 
     scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
-    ratio = tuple(ratio or (3./4., 4./3.))  # default imagenet ratio range
+    ratio = tuple(
+        ratio or (3.0 / 4.0, 4.0 / 3.0)
+    )  # default imagenet ratio range
     primary_tfl = [
-        RandomResizedCropAndInterpolation(img_size, scale=scale, ratio=ratio, interpolation=interpolation)]
-    if hflip > 0.:
+        RandomResizedCropAndInterpolation(
+            img_size, scale=scale, ratio=ratio, interpolation=interpolation
+        )
+    ]
+    if hflip > 0.0:
         primary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
-    if vflip > 0.:
+    if vflip > 0.0:
         primary_tfl += [transforms.RandomVerticalFlip(p=vflip)]
 
     secondary_tfl = []
@@ -815,11 +848,11 @@ def transforms_imagenet_train(
             translate_const=int(img_size_min * 0.45),
             img_mean=tuple([min(255, round(255 * x)) for x in mean]),
         )
-        if interpolation and interpolation != 'random':
-            aa_params['interpolation'] = _pil_interp(interpolation)
-        if auto_augment.startswith('rand'):
+        if interpolation and interpolation != "random":
+            aa_params["interpolation"] = _pil_interp(interpolation)
+        if auto_augment.startswith("rand"):
             secondary_tfl += [rand_augment_transform(auto_augment, aa_params)]
-        elif auto_augment.startswith('augmix'):
+        elif auto_augment.startswith("augmix"):
             raise NotImplementedError("Augmix not implemented")
         else:
             raise NotImplementedError("Auto aug not implemented")
@@ -837,15 +870,25 @@ def transforms_imagenet_train(
     final_tfl = []
     final_tfl += [
         transforms.ToTensor(),
-        transforms.Normalize(
-            mean=torch.tensor(mean),
-            std=torch.tensor(std))
+        transforms.Normalize(mean=torch.tensor(mean), std=torch.tensor(std)),
     ]
-    if re_prob > 0.:
+    if re_prob > 0.0:
         final_tfl.append(
-            RandomErasing(re_prob, mode=re_mode, max_count=re_count, num_splits=re_num_splits, device='cpu', cube=False))
+            RandomErasing(
+                re_prob,
+                mode=re_mode,
+                max_count=re_count,
+                num_splits=re_num_splits,
+                device="cpu",
+                cube=False,
+            )
+        )
 
     if separate:
-        return transforms.Compose(primary_tfl), transforms.Compose(secondary_tfl), transforms.Compose(final_tfl)
+        return (
+            transforms.Compose(primary_tfl),
+            transforms.Compose(secondary_tfl),
+            transforms.Compose(final_tfl),
+        )
     else:
         return transforms.Compose(primary_tfl + secondary_tfl + final_tfl)

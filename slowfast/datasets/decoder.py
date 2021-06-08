@@ -28,7 +28,9 @@ def temporal_sampling(frames, start_idx, end_idx, num_samples):
     return frames
 
 
-def get_start_end_idx(video_size, clip_size, clip_idx, num_clips, use_offset=False):
+def get_start_end_idx(
+    video_size, clip_size, clip_idx, num_clips, use_offset=False
+):
     """
     Sample a clip of size clip_size from a video of size video_size and
     return the indices of the first and last frame of the clip. If clip_idx is
@@ -181,7 +183,11 @@ def torchvision_decode(
         decode_all_video = False
         clip_size = sampling_rate * num_frames / target_fps * fps
         start_idx, end_idx = get_start_end_idx(
-            fps * video_meta["video_duration"], clip_size, clip_idx, num_clips, use_offset=use_offset
+            fps * video_meta["video_duration"],
+            clip_size,
+            clip_idx,
+            num_clips,
+            use_offset=use_offset,
         )
         # Convert frame index to pts.
         pts_per_frame = video_meta["video_denominator"] / fps
@@ -221,7 +227,13 @@ def torchvision_decode(
 
 
 def pyav_decode(
-    container, sampling_rate, num_frames, clip_idx, num_clips=10, target_fps=30, use_offset=False,
+    container,
+    sampling_rate,
+    num_frames,
+    clip_idx,
+    num_clips=10,
+    target_fps=30,
+    use_offset=False,
 ):
     """
     Convert the video from its original fps to the target_fps. If the video

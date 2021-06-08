@@ -174,12 +174,7 @@ class MixUp:
                 lam,
                 correct_lam=self.correct_lam,
             )
-            # For images.
-            if x.dim == 4:
-                x[:, :, yl:yh, xl:xh] = x.flip(0)[:, :, yl:yh, xl:xh]
-            # For videos.
-            elif x.dim == 5:
-                x[:, :, :, yl:yh, xl:xh] = x.flip(0)[:, :, :, yl:yh, xl:xh]
+            x[..., yl:yh, xl:xh] = x.flip(0)[..., yl:yh, xl:xh]
         else:
             x_flipped = x.flip(0).mul_(1.0 - lam)
             x.mul_(lam).add_(x_flipped)

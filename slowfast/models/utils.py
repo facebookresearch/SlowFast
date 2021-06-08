@@ -2,8 +2,8 @@
 
 import slowfast.utils.logging as logging
 
-
 logger = logging.get_logger(__name__)
+
 
 def round_width(width, multiplier, min_width=1, divisor=1, verbose=False):
     if not multiplier:
@@ -15,9 +15,7 @@ def round_width(width, multiplier, min_width=1, divisor=1, verbose=False):
         logger.info(f"width {width} divisor {divisor}")
         logger.info(f"other {int(width + divisor / 2) // divisor * divisor}")
 
-    width_out = max(
-        min_width, int(width + divisor / 2) // divisor * divisor
-    )
+    width_out = max(min_width, int(width + divisor / 2) // divisor * divisor)
     if width_out < 0.9 * width:
         width_out += divisor
     return int(width_out)

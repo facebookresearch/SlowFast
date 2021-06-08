@@ -4,19 +4,19 @@
 """Video models."""
 
 import math
+from functools import partial
 import torch
 import torch.nn as nn
+from torch.nn.init import trunc_normal_
 
 import slowfast.utils.weight_init_helper as init_helper
-from slowfast.models.batchnorm_helper import get_norm
-from torch.nn.init import trunc_normal_
-from functools import partial
-from slowfast.models.stem_helper import PatchEmbed
 from slowfast.models.attention import MultiScaleBlock
+from slowfast.models.batchnorm_helper import get_norm
+from slowfast.models.stem_helper import PatchEmbed
+from slowfast.models.utils import round_width
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
-from slowfast.models.utils import round_width
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -766,6 +766,7 @@ class MViT(nn.Module):
     Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, Christoph Feichtenhofer
     https://arxiv.org/abs/2104.11227
     """
+
     def __init__(self, cfg):
         super().__init__()
         # Get parameters.
@@ -807,8 +808,10 @@ class MViT(nn.Module):
         )
         self.input_dims = [temporal_size, spatial_size, spatial_size]
         assert self.input_dims[1] == self.input_dims[2]
-        self.patch_dims = \
-            [self.input_dims[i] // self.patch_stride[i] for i in range(len(self.input_dims))]
+        self.patch_dims = [
+            self.input_dims[i] // self.patch_stride[i]
+            for i in range(len(self.input_dims))
+        ]
         num_patches = math.prod(self.patch_dims)
 
         dpr = [
@@ -823,14 +826,14 @@ class MViT(nn.Module):
 
         if self.sep_pos_embed:
             self.pos_embed_spatial = nn.Parameter(
-                torch.zeros(1, self.patch_dims[1] * self.patch_dims[2], embed_dim)
+                torch.zeros(
+                    1, self.patch_dims[1] * self.patch_dims[2], embed_dim
+                )
             )
             self.pos_embed_temporal = nn.Parameter(
                 torch.zeros(1, self.patch_dims[0], embed_dim)
             )
-            self.pos_embed_class = nn.Parameter(
-                torch.zeros(1, 1, embed_dim)
-            )
+            self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
         else:
             self.pos_embed = nn.Parameter(
                 torch.zeros(1, pos_embed_dim, embed_dim)
@@ -841,10 +844,12 @@ class MViT(nn.Module):
 
         pool_q = cfg.MVIT.POOL_Q_KERNEL
         pool_kv = cfg.MVIT.POOL_KV_KERNEL
+        pool_skip = cfg.MVIT.POOL_SKIP_KERNEL
         stride_q = cfg.MVIT.POOL_Q_STRIDE
         stride_kv = cfg.MVIT.POOL_KV_STRIDE
+        stride_skip = cfg.MVIT.POOL_SKIP_STRIDE
 
-        dim_mul, head_mul = torch.ones(depth+1), torch.ones(depth+1)
+        dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
 
         if len(cfg.MVIT.DIM_MUL) > 1:
             for k in cfg.MVIT.DIM_MUL:
@@ -859,7 +864,11 @@ class MViT(nn.Module):
         for i in range(depth):
             num_heads = round_width(num_heads, head_mul[i])
             embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
-            dim_out = round_width(embed_dim, dim_mul[i+1], divisor = round_width(num_heads, head_mul[i+1]))
+            dim_out = round_width(
+                embed_dim,
+                dim_mul[i + 1],
+                divisor=round_width(num_heads, head_mul[i + 1]),
+            )
 
             self.blocks.append(
                 MultiScaleBlock(
@@ -873,8 +882,10 @@ class MViT(nn.Module):
                     norm_layer=norm_layer,
                     kernel_q=pool_q[i] if len(pool_q) > i else [],
                     kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                    kernel_skip=pool_skip[i] if len(pool_skip) > i else [],
                     stride_q=stride_q[i] if len(stride_q) > i else [],
                     stride_kv=stride_kv[i] if len(stride_kv) > i else [],
+                    stride_skip=stride_skip[i] if len(stride_skip) > i else [],
                     mode=mode,
                     has_cls_embed=self.cls_embed_on,
                 )
@@ -949,8 +960,13 @@ class MViT(nn.Module):
             x = torch.cat((cls_tokens, x), dim=1)
 
         if self.sep_pos_embed:
-            pos_embed = self.pos_embed_spatial.repeat(1, self.patch_dims[0], 1) + \
-                torch.repeat_interleave(self.pos_embed_temporal, self.patch_dims[1] * self.patch_dims[2], dim=1)
+            pos_embed = self.pos_embed_spatial.repeat(
+                1, self.patch_dims[0], 1
+            ) + torch.repeat_interleave(
+                self.pos_embed_temporal,
+                self.patch_dims[1] * self.patch_dims[2],
+                dim=1,
+            )
             pos_embed_cls = torch.cat([self.pos_embed_class, pos_embed], 1)
             x = x + pos_embed_cls
         else:
