@@ -57,7 +57,7 @@ def random_short_side_scale_jitter(
             scale. If False, take a uniform sample from [min_scale, max_scale].
     Returns:
         (tensor): the scaled images with dimension of
-            `num frames` x `channel` x `new height` x `new width`.
+            `channel` x `num frames` x `new height` x `new width`.
         (ndarray or None): the scaled boxes with dimension of
             `num boxes` x 4.
     """
@@ -126,7 +126,7 @@ def random_crop(images, size, boxes=None):
             Dimension is `num boxes` x 4.
     Returns:
         cropped (tensor): cropped images with dimension of
-            `num frames` x `channel` x `size` x `size`.
+            `channel` x `num frames` x `size` x `size`.
         cropped_boxes (ndarray or None): the cropped boxes with dimension of
             `num boxes` x 4.
     """
