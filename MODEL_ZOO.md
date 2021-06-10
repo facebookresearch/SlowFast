@@ -13,8 +13,7 @@ We provided original pretrained models from Caffe2 on heavy models (testing Caff
 | Slow | R50 | - | 8 x 8 | 74.8 | 91.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_8x8_R50.pkl) | Kinetics/c2/SLOW_8x8_R50 |
 | SlowFast | R50 | - | 4 x 16 | 75.6 | 92.0 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_4x16_R50.pkl) | Kinetics/c2/SLOWFAST_4x16_R50 |
 | SlowFast | R50 | - | 8 x 8 | 77.0 | 92.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | Kinetics/c2/SLOWFAST_8x8_R50 |
-| SlowFast | R101 | - | 8 x 8 | 78.0 | 93.3 | [`link`](coming_soon) | Kinetics/c2/SLOWFAST_8x8_R101_101_101|
-| SlowFast | R101 | - | 16 x 8 | 78.9 | 93.5 | [`link`](coming_soon) | Kinetics/c2/SLOWFAST_16x8_R101_50_50 |
+| MViT | B-Conv | - | 16 x 4 | 78.4 | 93.5 | [`link`]() | SlowFast/configs/Kinetics/MVIT_B_16x4_CONV |
 
 ## X3D models (details in projects/x3d)
 
@@ -65,9 +64,10 @@ We provided original pretrained models from Caffe2 on heavy models (testing Caff
 
 We also release the imagenet pretrained model if finetuning from ImageNet is preferred. The reported accuracy is obtained by center crop testing on the validation set.
 
-| architecture | depth |  Top1 |  Top5  |  model  |
+| architecture | depth |  Top1 |  Top5  |  model  | Config |
 | ------------- | ------------- | ------------- | ------------- | ------------- |
-| ResNet | R50 | 23.6 | 6.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) |
+| ResNet | R50 | 23.6 | 6.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) | ImageNet/RES_R50 |
+| MVIT | B-16-Conv | 17.1 | 3.7 | [`link`]() | ImageNet/MVIT_B_16_CONV.yaml | 
 
 
 ## PyTorchVideo
