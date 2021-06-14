@@ -847,14 +847,31 @@ class MViT(nn.Module):
         stride_q = [[] for i in range(cfg.MVIT.DEPTH)]
         stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
 
-        for i in range(len(cfg.MVIT.POOL_Q_KERNEL)):
-            pool_q[cfg.MVIT.POOL_Q_KERNEL[i][0]] = cfg.MVIT.POOL_Q_KERNEL[i][1:]
-        for i in range(len(cfg.MVIT.POOL_KV_KERNEL)):
-            pool_kv[cfg.MVIT.POOL_KV_KERNEL[i][0]] = cfg.MVIT.POOL_KV_KERNEL[i][1:]
         for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
-            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][1:]
+            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
+                1:
+            ]
+            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
+                pool_q[
+                    cfg.MVIT.POOL_Q_STRIDE[i][0]
+                ] = cfg.MVIT.POOL_KVQ_KERNEL
+            else:
+                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = [
+                    s + 1 if s > 1 else s for s in cfg.MVIT.POOL_Q_STRIDE[i][1:]
+                ]
         for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
-            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[i][1:]
+            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
+                i
+            ][1:]
+            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
+                pool_kv[
+                    cfg.MVIT.POOL_KV_STRIDE[i][0]
+                ] = cfg.MVIT.POOL_KVQ_KERNEL
+            else:
+                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
+                    s + 1 if s > 1 else s
+                    for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
+                ]
 
         dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
         for i in range(len(cfg.MVIT.DIM_MUL)):

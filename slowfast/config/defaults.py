@@ -336,25 +336,25 @@ _C.MVIT.DEPTH = 16
 # Normalization layer for the transformer. Only layernorm is supported now.
 _C.MVIT.NORM = "layernorm"
 
-# Dimension multiplication. If 2.0 is used, then the next block will increase the
-# dimension by 2 times. Format: [depth_i: mul_dim_ratio]
+# Dimension multiplication at layer i. If 2.0 is used, then the next block will increase
+# the dimension by 2 times. Format: [depth_i: mul_dim_ratio]
 _C.MVIT.DIM_MUL = []
 
-# Head number multiplication. If 2.0 is used, then the next block will increase the
-# number of heads by 2 times. Format: [depth_i: head_mul_ratio]
+# Head number multiplication at layer i. If 2.0 is used, then the next block will
+# increase the number of heads by 2 times. Format: [depth_i: head_mul_ratio]
 _C.MVIT.HEAD_MUL = []
 
-# Kernel size for the Pool KV. Format: [[i, kernel_t_i, kernel_h_i, kernel_w_i], ...,]
-_C.MVIT.POOL_KV_KERNEL = []
-
-# Kernel size for the Pool Q. Format: [[i, kernel_t_i, kernel_h_i, kernel_w_i], ...,]
-_C.MVIT.POOL_Q_KERNEL = []
-
-# Stride size for the Pool KV. Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
+# Stride size for the Pool KV at layer i.
+# Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
 _C.MVIT.POOL_KV_STRIDE = []
 
-# Stride size for the Pool Q. Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
+# Stride size for the Pool Q at layer i.
+# Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
 _C.MVIT.POOL_Q_STRIDE = []
+
+# If not None, overwrite the KV_KERNEL and Q_KERNEL size with POOL_KVQ_CONV_SIZ.
+# Otherwise the kernel_size is [s + 1 if s > 1 else s for s in stride_size].
+_C.MVIT.POOL_KVQ_KERNEL = None
 
 # If True, perform no decay on positional embedding and cls embedding.
 _C.MVIT.ZERO_DECAY_POS_CLS = True
