@@ -844,10 +844,8 @@ class MViT(nn.Module):
 
         pool_q = cfg.MVIT.POOL_Q_KERNEL
         pool_kv = cfg.MVIT.POOL_KV_KERNEL
-        pool_skip = cfg.MVIT.POOL_SKIP_KERNEL
         stride_q = cfg.MVIT.POOL_Q_STRIDE
         stride_kv = cfg.MVIT.POOL_KV_STRIDE
-        stride_skip = cfg.MVIT.POOL_SKIP_STRIDE
 
         dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
 
@@ -882,10 +880,8 @@ class MViT(nn.Module):
                     norm_layer=norm_layer,
                     kernel_q=pool_q[i] if len(pool_q) > i else [],
                     kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
-                    kernel_skip=pool_skip[i] if len(pool_skip) > i else [],
                     stride_q=stride_q[i] if len(stride_q) > i else [],
                     stride_kv=stride_kv[i] if len(stride_kv) > i else [],
-                    stride_skip=stride_skip[i] if len(stride_skip) > i else [],
                     mode=mode,
                     has_cls_embed=self.cls_embed_on,
                 )
