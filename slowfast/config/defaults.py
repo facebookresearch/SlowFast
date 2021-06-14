@@ -344,17 +344,17 @@ _C.MVIT.DIM_MUL = []
 # number of heads by 2 times. Format: [depth_i: head_mul_ratio]
 _C.MVIT.HEAD_MUL = []
 
-# Kernel size for the Pool KV. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
-_C.MVIT.POOL_KV_KERNEL = [[]]
+# Kernel size for the Pool KV. Format: [[i, kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_KV_KERNEL = []
 
-# Kernel size for the Pool Q. Format: [[kernel_t_i, kernel_h_i, kernel_w_i], ...,]
-_C.MVIT.POOL_Q_KERNEL = [[]]
+# Kernel size for the Pool Q. Format: [[i, kernel_t_i, kernel_h_i, kernel_w_i], ...,]
+_C.MVIT.POOL_Q_KERNEL = []
 
-# Stride size for the Pool KV. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
-_C.MVIT.POOL_KV_STRIDE = [[]]
+# Stride size for the Pool KV. Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_KV_STRIDE = []
 
-# Stride size for the Pool Q. Format: [[stride_t_i, stride_h_i, stride_w_i], ...,]
-_C.MVIT.POOL_Q_STRIDE = [[]]
+# Stride size for the Pool Q. Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
+_C.MVIT.POOL_Q_STRIDE = []
 
 # If True, perform no decay on positional embedding and cls embedding.
 _C.MVIT.ZERO_DECAY_POS_CLS = True
