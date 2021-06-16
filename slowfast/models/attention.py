@@ -219,10 +219,8 @@ class MultiScaleBlock(nn.Module):
         up_rate=None,
         kernel_q=(1, 1, 1),
         kernel_kv=(1, 1, 1),
-        kernel_skip=(1, 1, 1),
         stride_q=(1, 1, 1),
         stride_kv=(1, 1, 1),
-        stride_skip=(1, 1, 1),
         mode="conv",
         has_cls_embed=True,
     ):
@@ -230,6 +228,8 @@ class MultiScaleBlock(nn.Module):
         self.dim = dim
         self.dim_out = dim_out
         self.norm1 = norm_layer(dim)
+        kernel_skip = [s + 1 if s > 1 else s for s in stride_q]
+        stride_skip = stride_q
         padding_skip = [int(skip // 2) for skip in kernel_skip]
         self.attn = MultiScaleAttention(
             dim,

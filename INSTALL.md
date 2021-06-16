@@ -1,9 +1,9 @@
 # Installation
 
 ## Requirements
-- Python >= 3.6
+- Python >= 3.8
 - Numpy
-- PyTorch 1.3
+- PyTorch >= 1.3
 - [fvcore](https://github.com/facebookresearch/fvcore/): `pip install 'git+https://github.com/facebookresearch/fvcore'`
 - [torchvision](https://github.com/pytorch/vision/) that matches the PyTorch installation.
   You can install them together at [pytorch.org](https://pytorch.org) to make sure of this.
