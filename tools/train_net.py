@@ -107,6 +107,7 @@ def train_epoch(
             )
             idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
             idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
+            preds = preds.detach()
             preds[idx_top1] += preds[idx_top2]
             preds[idx_top2] = 0.0
             labels = top_max_k_inds[:, 0]
