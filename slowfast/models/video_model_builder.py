@@ -772,6 +772,7 @@ class MViT(nn.Module):
         # Get parameters.
         assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE
         self.cfg = cfg
+        pool_first = cfg.MVIT.POOL_FIRST
         # Prepare input.
         spatial_size = cfg.DATA.TRAIN_CROP_SIZE
         temporal_size = cfg.DATA.NUM_FRAMES
@@ -833,7 +834,8 @@ class MViT(nn.Module):
             self.pos_embed_temporal = nn.Parameter(
                 torch.zeros(1, self.patch_dims[0], embed_dim)
             )
-            self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            if self.cls_embed_on:
+                self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
         else:
             self.pos_embed = nn.Parameter(
                 torch.zeros(1, pos_embed_dim, embed_dim)
@@ -907,6 +909,7 @@ class MViT(nn.Module):
                     stride_kv=stride_kv[i] if len(stride_kv) > i else [],
                     mode=mode,
                     has_cls_embed=self.cls_embed_on,
+                    pool_first=pool_first,
                 )
             )
 
@@ -922,7 +925,8 @@ class MViT(nn.Module):
         if self.sep_pos_embed:
             trunc_normal_(self.pos_embed_spatial, std=0.02)
             trunc_normal_(self.pos_embed_temporal, std=0.02)
-            trunc_normal_(self.pos_embed_class, std=0.02)
+            if self.cls_embed_on:
+                trunc_normal_(self.pos_embed_class, std=0.02)
         else:
             trunc_normal_(self.pos_embed, std=0.02)
         if self.cls_embed_on:
@@ -986,8 +990,9 @@ class MViT(nn.Module):
                 self.patch_dims[1] * self.patch_dims[2],
                 dim=1,
             )
-            pos_embed_cls = torch.cat([self.pos_embed_class, pos_embed], 1)
-            x = x + pos_embed_cls
+            if self.cls_embed_on:
+                pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
+            x = x + pos_embed
         else:
             x = x + self.pos_embed
 

@@ -300,6 +300,9 @@ _C.MVIT = CfgNode()
 # Options include `conv`, `max`.
 _C.MVIT.MODE = "conv"
 
+# If True, perform pool before projection in attention.
+_C.MVIT.POOL_FIRST = False
+
 # If True, use cls embed in the network, otherwise don't use cls_embed in transformer.
 _C.MVIT.CLS_EMBED_ON = True
 
