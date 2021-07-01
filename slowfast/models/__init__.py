@@ -3,11 +3,15 @@
 
 from .build import MODEL_REGISTRY, build_model  # noqa
 from .custom_video_model_builder import *  # noqa
-from .ptv_model_builder import (
-    PTVCSN,
-    PTVX3D,
-    PTVR2plus1D,
-    PTVResNet,
-    PTVSlowFast,
-)  # noqa
 from .video_model_builder import ResNet, SlowFast  # noqa
+
+try:
+    from .ptv_model_builder import (
+        PTVCSN,
+        PTVX3D,
+        PTVR2plus1D,
+        PTVResNet,
+        PTVSlowFast,
+    )  # noqa
+except Exception:
+    print("Please update your PyTorchVideo to latest master")
