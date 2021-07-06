@@ -168,13 +168,13 @@ class MultiScaleAttention(nn.Module):
     def forward(self, x, thw_shape):
         B, N, C = x.shape
         if self.pool_first:
+            x = x.reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            q = k = v = x
+        else:
             q = k = v = x
             q = self.q(q).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
             k = self.k(k).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
             v = self.v(v).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-        else:
-            x = x.reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-            q = k = v = x
 
         q, q_shape = attention_pool(
             q,
@@ -198,7 +198,7 @@ class MultiScaleAttention(nn.Module):
             norm=self.norm_v if hasattr(self, "norm_v") else None,
         )
 
-        if not self.pool_first:
+        if self.pool_first:
             if self.has_cls_embed:
                 q_N = numpy.prod(q_shape) + 1
                 k_N = numpy.prod(k_shape) + 1
