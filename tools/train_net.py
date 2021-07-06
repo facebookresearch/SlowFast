@@ -98,6 +98,10 @@ def train_epoch(
         # Perform the backward pass.
         optimizer.zero_grad()
         loss.backward()
+        if cfg.SOLVER.CLIP_GRAD_VAL:
+            torch.nn.utils.clip_grad_value_(model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL)
+        elif cfg.SOLVER.CLIP_GRAD_L2NORM:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM)
         # Update the parameters.
         optimizer.step()
 

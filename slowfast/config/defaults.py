@@ -547,6 +547,11 @@ _C.SOLVER.COSINE_AFTER_WARMUP = False
 # If True, perform no weight decay on parameter with one dimension (bias term, etc).
 _C.SOLVER.ZERO_WD_1D_PARAM = False
 
+# Clip gradient at this value before optimizer update
+_C.SOLVER.CLIP_GRAD_VAL = None
+
+# Clip gradient at this norm before optimizer update
+_C.SOLVER.CLIP_GRAD_L2NORM = None
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #
