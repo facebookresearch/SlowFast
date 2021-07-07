@@ -844,6 +844,12 @@ class MViT(nn.Module):
         if self.drop_rate > 0.0:
             self.pos_drop = nn.Dropout(p=self.drop_rate)
 
+        dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
+        for i in range(len(cfg.MVIT.DIM_MUL)):
+            dim_mul[cfg.MVIT.DIM_MUL[i][0]] = cfg.MVIT.DIM_MUL[i][1]
+        for i in range(len(cfg.MVIT.HEAD_MUL)):
+            head_mul[cfg.MVIT.HEAD_MUL[i][0]] = cfg.MVIT.HEAD_MUL[i][1]
+
         pool_q = [[] for i in range(cfg.MVIT.DEPTH)]
         pool_kv = [[] for i in range(cfg.MVIT.DEPTH)]
         stride_q = [[] for i in range(cfg.MVIT.DEPTH)]
@@ -854,13 +860,24 @@ class MViT(nn.Module):
                 1:
             ]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_q[
-                    cfg.MVIT.POOL_Q_STRIDE[i][0]
-                ] = cfg.MVIT.POOL_KVQ_KERNEL
+                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
                 pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = [
                     s + 1 if s > 1 else s for s in cfg.MVIT.POOL_Q_STRIDE[i][1:]
                 ]
+
+        # If POOL_KV_STRIDE_ADAPTIVE is not None, initialize POOL_KV_STRIDE.
+        if cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE is not None:
+            _stride_kv = cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE
+            cfg.MVIT.POOL_KV_STRIDE = []
+            for i in range(cfg.MVIT.DEPTH):
+                if len(stride_q[i]) > 0:
+                    _stride_kv = [
+                        max(_stride_kv[d] // stride_q[i][d], 1)
+                        for d in range(len(_stride_kv))
+                    ]
+                cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
+
         for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
             stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
                 i
@@ -874,12 +891,6 @@ class MViT(nn.Module):
                     s + 1 if s > 1 else s
                     for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
                 ]
-
-        dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
-        for i in range(len(cfg.MVIT.DIM_MUL)):
-            dim_mul[cfg.MVIT.DIM_MUL[i][0]] = cfg.MVIT.DIM_MUL[i][1]
-        for i in range(len(cfg.MVIT.HEAD_MUL)):
-            head_mul[cfg.MVIT.HEAD_MUL[i][0]] = cfg.MVIT.HEAD_MUL[i][1]
 
         self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
 
