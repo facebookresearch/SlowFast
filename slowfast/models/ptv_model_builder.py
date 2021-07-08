@@ -278,11 +278,7 @@ class PTVSlowFast(nn.Module):
         # Head from config
         # Number of stages = 4
         stage_dim_in = cfg.RESNET.WIDTH_PER_GROUP * 2 ** (4 + 1)
-        head_in_features = stage_dim_in
-        for reduction_ratio in cfg.SLOWFAST.BETA_INV:
-            head_in_features = (
-                head_in_features + stage_dim_in // reduction_ratio
-            )
+        head_in_features = stage_dim_in + stage_dim_in // cfg.SLOWFAST.BETA_INV
 
         if cfg.DETECTION.ENABLE:
             self.detection_head = create_res_roi_pooling_head(
