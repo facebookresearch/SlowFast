@@ -87,35 +87,20 @@ class MultiScaleAttention(nn.Module):
         if numpy.prod(kernel_kv) == 1 and numpy.prod(stride_kv) == 1:
             kernel_kv = ()
 
-        if mode == "avg":
+        if mode in ("avg", "max"):
+            pool_op = nn.MaxPool3d if mode == "max" else nn.AvgPool3d
             self.pool_q = (
-                nn.AvgPool3d(kernel_q, stride_q, padding_q, ceil_mode=False)
+                pool_op(kernel_q, stride_q, padding_q, ceil_mode=False)
                 if len(kernel_q) > 0
                 else None
             )
             self.pool_k = (
-                nn.AvgPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
+                pool_op(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
                 if len(kernel_kv) > 0
                 else None
             )
             self.pool_v = (
-                nn.AvgPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
-                if len(kernel_kv) > 0
-                else None
-            )
-        elif mode == "max":
-            self.pool_q = (
-                nn.MaxPool3d(kernel_q, stride_q, padding_q, ceil_mode=False)
-                if len(kernel_q) > 0
-                else None
-            )
-            self.pool_k = (
-                nn.MaxPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
-                if len(kernel_kv) > 0
-                else None
-            )
-            self.pool_v = (
-                nn.MaxPool3d(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
+                pool_op(kernel_kv, stride_kv, padding_kv, ceil_mode=False)
                 if len(kernel_kv) > 0
                 else None
             )
@@ -199,14 +184,9 @@ class MultiScaleAttention(nn.Module):
         )
 
         if self.pool_first:
-            if self.has_cls_embed:
-                q_N = numpy.prod(q_shape) + 1
-                k_N = numpy.prod(k_shape) + 1
-                v_N = numpy.prod(v_shape) + 1
-            else:
-                q_N = numpy.prod(q_shape)
-                k_N = numpy.prod(k_shape)
-                v_N = numpy.prod(v_shape)
+            q_N = numpy.prod(q_shape) + 1 if self.has_cls_embed else numpy.prod(q_shape)
+            k_N = numpy.prod(k_shape) + 1 if self.has_cls_embed else numpy.prod(k_shape)
+            v_N = numpy.prod(v_shape) + 1 if self.has_cls_embed else numpy.prod(v_shape)
 
             q = q.permute(0, 2, 1, 3).reshape(B, q_N, C)
             q = self.q(q).reshape(B, q_N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
