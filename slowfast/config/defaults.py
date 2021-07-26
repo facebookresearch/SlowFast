@@ -75,6 +75,8 @@ _C.TRAIN.CHECKPOINT_EPOCH_RESET = False
 # If set, clear all layer names according to the pattern provided.
 _C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
+# If True, use FP16 for activations
+_C.TRAIN.MIXED_PRECISION = False
 
 # ---------------------------------------------------------------------------- #
 # Augmentation options.

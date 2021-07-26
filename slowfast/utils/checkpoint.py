@@ -104,7 +104,8 @@ def is_checkpoint_epoch(cfg, cur_epoch, multigrid_schedule=None):
     return (cur_epoch + 1) % cfg.TRAIN.CHECKPOINT_PERIOD == 0
 
 
-def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
+def save_checkpoint(path_to_job, model, optimizer, epoch, cfg,
+        scaler=None):
     """
     Save a checkpoint.
     Args:
@@ -112,6 +113,7 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
         optimizer (optim): optimizer to save the historical state.
         epoch (int): current number of epoch of the model.
         cfg (CfgNode): configs to save.
+        scaler (GradScaler): the mixed precision scale.
     """
     # Save checkpoints only from the master process.
     if not du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
@@ -129,6 +131,8 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg):
         "optimizer_state": optimizer.state_dict(),
         "cfg": cfg.dump(),
     }
+    if scaler is not None:
+        checkpoint['scaler_state'] = scaler.state_dict()
     # Write the checkpoint.
     path_to_checkpoint = get_path_to_checkpoint(path_to_job, epoch + 1)
     with g_pathmgr.open(path_to_checkpoint, "wb") as f:
@@ -180,6 +184,7 @@ def load_checkpoint(
     model,
     data_parallel=True,
     optimizer=None,
+    scaler=None,
     inflation=False,
     convert_from_caffe2=False,
     epoch_reset=False,
@@ -194,6 +199,7 @@ def load_checkpoint(
         data_parallel (bool): if true, model is wrapped by
         torch.nn.parallel.DistributedDataParallel.
         optimizer (optim): optimizer to load the historical state.
+        scaler (GradScaler): GradScaler to load the mixed precision scale.
         inflation (bool): if True, inflate the weights from the checkpoint.
         convert_from_caffe2 (bool): if True, load the model from caffe2 and
             convert it to pytorch.
@@ -339,6 +345,8 @@ def load_checkpoint(
             epoch = checkpoint["epoch"]
             if optimizer:
                 optimizer.load_state_dict(checkpoint["optimizer_state"])
+            if scaler:
+                scaler.load_state_dict(checkpoint["scaler_state"])
         else:
             epoch = -1
     return epoch
@@ -484,7 +492,7 @@ def load_test_checkpoint(cfg, model):
         )
 
 
-def load_train_checkpoint(cfg, model, optimizer):
+def load_train_checkpoint(cfg, model, optimizer, scaler=None):
     """
     Loading checkpoint logic for training.
     """
@@ -492,7 +500,7 @@ def load_train_checkpoint(cfg, model, optimizer):
         last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
         logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
         checkpoint_epoch = load_checkpoint(
-            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer
+            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer, scaler=scaler
         )
         start_epoch = checkpoint_epoch + 1
     elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
@@ -502,6 +510,7 @@ def load_train_checkpoint(cfg, model, optimizer):
             model,
             cfg.NUM_GPUS > 1,
             optimizer,
+            scaler=scaler,
             inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
             epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
