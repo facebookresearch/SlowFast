@@ -172,7 +172,7 @@ def spatial_sampling(
     else:
         # The testing is deterministic and no jitter should be performed.
         # min_scale, max_scale, and crop_size are expect to be the same.
-        assert len({min_scale, max_scale, crop_size}) == 1
+        assert len({min_scale, max_scale}) == 1
         frames, _ = transform.random_short_side_scale_jitter(
             frames, min_scale, max_scale
         )
