@@ -71,7 +71,7 @@ MODEL:
   DROPOUT_RATE: 0.0
 TEST:
   ENABLE: False
-  DATASET: imagenetprefetch
+  DATASET: imagenet
   BATCH_SIZE: 256
 DATA_LOADER:
   NUM_WORKERS: 8
