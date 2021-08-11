@@ -1,19 +1,21 @@
 # PySlowFast Model Zoo and Baselines
 
-## Kinetics
+## Kinetics 400 and 600
 
-We provided original pretrained models from Caffe2 on heavy models (testing Caffe2 pretrained model in PyTorch might have a small different in performance):
-
-| architecture | depth |  pretrain |  frame length x sample rate | top1 |  top5  |  model | config |
+| architecture | depth |  crops x clips |  frame length x sample rate | top1 |  top5  |  model | config |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-| C2D | R50 | - | 8 x 8 | 67.2 | 87.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/C2D_NOPOOL_8x8_R50.pkl) | Kinetics/c2/C2D_NOPOOL_8x8_R50 |
-| I3D | R50 | - | 8 x 8 | 73.5 | 90.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/I3D_8x8_R50.pkl) | Kinetics/c2/I3D_8x8_R50 |
-| I3D NLN | R50 | - | 8 x 8 | 74.0 | 91.1 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/I3D_NLN_8x8_R50.pkl) | Kinetics/c2/I3D_NLN_8x8_R50 |
-| Slow | R50 | - | 4 x 16 | 72.7 | 90.3 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_4x16_R50.pkl) | Kinetics/c2/SLOW_4x16_R50 |
-| Slow | R50 | - | 8 x 8 | 74.8 | 91.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_8x8_R50.pkl) | Kinetics/c2/SLOW_8x8_R50 |
-| SlowFast | R50 | - | 4 x 16 | 75.6 | 92.0 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_4x16_R50.pkl) | Kinetics/c2/SLOWFAST_4x16_R50 |
-| SlowFast | R50 | - | 8 x 8 | 77.0 | 92.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | Kinetics/c2/SLOWFAST_8x8_R50 |
-| MViT | B-Conv | - | 16 x 4 | 78.4 | 93.5 | [`link`](https://drive.google.com/file/d/194gJinVejq6A1FmySNKQ8vAN5-FOY-QL/view?usp=sharing) | Kinetics/MVIT_B_16x4_CONV |
+| C2D | R50 | 3 x 10 | 8 x 8 | 67.2 | 87.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/C2D_NOPOOL_8x8_R50.pkl) | Kinetics/c2/C2D_NOPOOL_8x8_R50 |
+| I3D | R50 | 3 x 10 | 8 x 8 | 73.5 | 90.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/I3D_8x8_R50.pkl) | Kinetics/c2/I3D_8x8_R50 |
+| I3D NLN | R50 | 3 x 10 | 8 x 8 | 74.0 | 91.1 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/I3D_NLN_8x8_R50.pkl) | Kinetics/c2/I3D_NLN_8x8_R50 |
+| Slow | R50 | 3 x 10 | 4 x 16 | 72.7 | 90.3 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_4x16_R50.pkl) | Kinetics/c2/SLOW_4x16_R50 |
+| Slow | R50 | 3 x 10 | 8 x 8 | 74.8 | 91.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_8x8_R50.pkl) | Kinetics/c2/SLOW_8x8_R50 |
+| SlowFast | R50 | 3 x 10 | 4 x 16 | 75.6 | 92.0 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_4x16_R50.pkl) | Kinetics/c2/SLOWFAST_4x16_R50 |
+| SlowFast | R50 | 3 x 10 | 8 x 8 | 77.0 | 92.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | Kinetics/c2/SLOWFAST_8x8_R50 |
+| MViT | B, Conv | 1 x 5 | 16 x 4 | 78.4 | 93.5 | [`link`](https://drive.google.com/file/d/194gJinVejq6A1FmySNKQ8vAN5-FOY-QL/view?usp=sharing) | Kinetics/MVIT_B_16x4_CONV |
+| MViT | B, Conv | 1 x 5 | 32 x 3 | 80.4 | 94.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k400.pyth) | Kinetics/MVIT_B_32x3_CONV |
+||
+Kinetics-600
+| MViT | B, Conv | 1 x 5 | 32 x 3 | 83.9 | 96.5 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k600.pyth) | Kinetics/MVIT_B_32x3_CONV_K600 |
 
 ## X3D models (details in projects/x3d)
 
