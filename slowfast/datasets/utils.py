@@ -8,8 +8,9 @@ import time
 from collections import defaultdict
 import cv2
 import torch
-from iopath.common.file_io import g_pathmgr
 from torch.utils.data.distributed import DistributedSampler
+
+from slowfast.utils.env import pathmgr
 
 from . import transform as transform
 
@@ -31,7 +32,7 @@ def retry_load_images(image_paths, retry=10, backend="pytorch"):
     for i in range(retry):
         imgs = []
         for image_path in image_paths:
-            with g_pathmgr.open(image_path, "rb") as f:
+            with pathmgr.open(image_path, "rb") as f:
                 img_str = np.frombuffer(f.read(), np.uint8)
                 img = cv2.imdecode(img_str, flags=cv2.IMREAD_COLOR)
             imgs.append(img)
@@ -244,7 +245,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
     """
     image_paths = defaultdict(list)
     labels = defaultdict(list)
-    with g_pathmgr.open(frame_list_file, "r") as f:
+    with pathmgr.open(frame_list_file, "r") as f:
         assert f.readline().startswith("original_vido_id")
         for line in f:
             row = line.split()

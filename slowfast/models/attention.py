@@ -153,13 +153,27 @@ class MultiScaleAttention(nn.Module):
     def forward(self, x, thw_shape):
         B, N, C = x.shape
         if self.pool_first:
-            x = x.reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            x = x.reshape(B, N, self.num_heads, C // self.num_heads).permute(
+                0, 2, 1, 3
+            )
             q = k = v = x
         else:
             q = k = v = x
-            q = self.q(q).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-            k = self.k(k).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-            v = self.v(v).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            q = (
+                self.q(q)
+                .reshape(B, N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+            k = (
+                self.k(k)
+                .reshape(B, N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+            v = (
+                self.v(v)
+                .reshape(B, N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
 
         q, q_shape = attention_pool(
             q,
@@ -184,18 +198,42 @@ class MultiScaleAttention(nn.Module):
         )
 
         if self.pool_first:
-            q_N = numpy.prod(q_shape) + 1 if self.has_cls_embed else numpy.prod(q_shape)
-            k_N = numpy.prod(k_shape) + 1 if self.has_cls_embed else numpy.prod(k_shape)
-            v_N = numpy.prod(v_shape) + 1 if self.has_cls_embed else numpy.prod(v_shape)
+            q_N = (
+                numpy.prod(q_shape) + 1
+                if self.has_cls_embed
+                else numpy.prod(q_shape)
+            )
+            k_N = (
+                numpy.prod(k_shape) + 1
+                if self.has_cls_embed
+                else numpy.prod(k_shape)
+            )
+            v_N = (
+                numpy.prod(v_shape) + 1
+                if self.has_cls_embed
+                else numpy.prod(v_shape)
+            )
 
             q = q.permute(0, 2, 1, 3).reshape(B, q_N, C)
-            q = self.q(q).reshape(B, q_N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            q = (
+                self.q(q)
+                .reshape(B, q_N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
 
             v = v.permute(0, 2, 1, 3).reshape(B, v_N, C)
-            v = self.v(v).reshape(B, v_N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            v = (
+                self.v(v)
+                .reshape(B, v_N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
 
             k = k.permute(0, 2, 1, 3).reshape(B, k_N, C)
-            k = self.k(k).reshape(B, k_N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            k = (
+                self.k(k)
+                .reshape(B, k_N, self.num_heads, C // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)

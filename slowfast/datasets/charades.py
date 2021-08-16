@@ -6,9 +6,9 @@ import random
 from itertools import chain as chain
 import torch
 import torch.utils.data
-from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.logging as logging
+from slowfast.utils.env import pathmgr
 
 from . import utils as utils
 from .build import DATASET_REGISTRY
@@ -79,7 +79,7 @@ class Charades(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert g_pathmgr.exists(path_to_file), "{} dir not found".format(
+        assert pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
         (self._path_to_videos, self._labels) = utils.load_image_lists(

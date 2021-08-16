@@ -11,7 +11,6 @@ import psutil
 import torch
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
-from iopath.common.file_io import g_pathmgr
 from matplotlib import pyplot as plt
 from torch import nn
 
@@ -19,6 +18,7 @@ import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
 from slowfast.models.batchnorm_helper import SubBatchNorm3d
+from slowfast.utils.env import pathmgr
 
 logger = logging.get_logger(__name__)
 
@@ -331,7 +331,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
             subset file.
     """
     try:
-        with g_pathmgr.open(path, "r") as f:
+        with pathmgr.open(path, "r") as f:
             class2idx = json.load(f)
     except Exception as err:
         print("Fail to load file from {} with error {}".format(path, err))
@@ -346,7 +346,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
     class_parent = None
     if parent_path is not None and parent_path != "":
         try:
-            with g_pathmgr.open(parent_path, "r") as f:
+            with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
             print(
@@ -365,7 +365,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
     subset_ids = None
     if subset_path is not None and subset_path != "":
         try:
-            with g_pathmgr.open(subset_path, "r") as f:
+            with pathmgr.open(subset_path, "r") as f:
                 subset = f.read().split("\n")
                 subset_ids = [
                     class2idx[name]

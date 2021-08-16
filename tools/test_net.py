@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pickle
 import torch
-from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -16,6 +15,7 @@ import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
+from slowfast.utils.env import pathmgr
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
@@ -126,7 +126,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
             if du.is_root_proc():
-                with g_pathmgr.open(save_path, "wb") as f:
+                with pathmgr.open(save_path, "wb") as f:
                     pickle.dump([all_preds, all_labels], f)
 
             logger.info(

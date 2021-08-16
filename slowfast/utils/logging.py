@@ -11,9 +11,9 @@ import logging
 import os
 import sys
 import simplejson
-from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.distributed as du
+from slowfast.utils.env import pathmgr
 
 
 def _suppress_print():
@@ -30,7 +30,7 @@ def _suppress_print():
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
     # Use 1K buffer if writing to cloud storage.
-    io = g_pathmgr.open(
+    io = pathmgr.open(
         filename, "a", buffering=1024 if "://" in filename else -1
     )
     atexit.register(io.close)

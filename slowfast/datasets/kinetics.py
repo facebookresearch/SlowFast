@@ -5,10 +5,10 @@ import os
 import random
 import torch
 import torch.utils.data
-from iopath.common.file_io import g_pathmgr
 from torchvision import transforms
 
 import slowfast.utils.logging as logging
+from slowfast.utils.env import pathmgr
 
 from . import decoder as decoder
 from . import utils as utils
@@ -92,14 +92,14 @@ class Kinetics(torch.utils.data.Dataset):
         path_to_file = os.path.join(
             self.cfg.DATA.PATH_TO_DATA_DIR, "{}.csv".format(self.mode)
         )
-        assert g_pathmgr.exists(path_to_file), "{} dir not found".format(
+        assert pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
 
         self._path_to_videos = []
         self._labels = []
         self._spatial_temporal_idx = []
-        with g_pathmgr.open(path_to_file, "r") as f:
+        with pathmgr.open(path_to_file, "r") as f:
             for clip_idx, path_label in enumerate(f.read().splitlines()):
                 assert (
                     len(path_label.split(self.cfg.DATA.PATH_LABEL_SEPARATOR))

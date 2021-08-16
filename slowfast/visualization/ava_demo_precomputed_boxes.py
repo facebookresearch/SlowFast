@@ -6,7 +6,6 @@ import os
 import cv2
 import torch
 import tqdm
-from iopath.common.file_io import g_pathmgr
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.logging as logging
@@ -15,6 +14,7 @@ from slowfast.datasets.cv2_transform import scale, scale_boxes
 from slowfast.datasets.utils import get_sequence
 from slowfast.models import build_model
 from slowfast.utils import misc
+from slowfast.utils.env import pathmgr
 from slowfast.visualization.utils import process_cv2_inputs
 from slowfast.visualization.video_visualizer import VideoVisualizer
 
@@ -33,9 +33,9 @@ class AVAVisualizerWithPrecomputedBox:
             cfg (CfgNode): configs. Details can be found in
                 slowfast/config/defaults.py
         """
-        self.source = g_pathmgr.get_local_path(path=cfg.DEMO.INPUT_VIDEO)
+        self.source = pathmgr.get_local_path(path=cfg.DEMO.INPUT_VIDEO)
         self.fps = None
-        if g_pathmgr.isdir(self.source):
+        if pathmgr.isdir(self.source):
             self.fps = cfg.DEMO.FPS
             self.video_name = self.source.split("/")[-1]
             self.source = os.path.join(

@@ -3,9 +3,10 @@
 
 """Set up Environment."""
 
-import slowfast.utils.logging as logging
+from iopath.common.file_io import PathManagerFactory
 
 _ENV_SETUP_DONE = False
+pathmgr = PathManagerFactory.get(key="pyslowfast")
 
 
 def setup_environment():

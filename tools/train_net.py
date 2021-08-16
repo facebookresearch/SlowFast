@@ -26,7 +26,14 @@ logger = logging.get_logger(__name__)
 
 
 def train_epoch(
-    train_loader, model, optimizer, scaler, train_meter, cur_epoch, cfg, writer=None
+    train_loader,
+    model,
+    optimizer,
+    scaler,
+    train_meter,
+    cur_epoch,
+    cfg,
+    writer=None,
 ):
     """
     Perform the video training for one epoch.
@@ -88,7 +95,9 @@ def train_epoch(
             else:
                 preds = model(inputs)
             # Explicitly declare reduction to mean.
-            loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+            loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(
+                reduction="mean"
+            )
 
             # Compute the loss.
             loss = loss_fun(preds, labels)
@@ -103,9 +112,13 @@ def train_epoch(
         scaler.unscale_(optimizer)
         # Clip gradients if necessary
         if cfg.SOLVER.CLIP_GRAD_VAL:
-            torch.nn.utils.clip_grad_value_(model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL)
+            torch.nn.utils.clip_grad_value_(
+                model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
+            )
         elif cfg.SOLVER.CLIP_GRAD_L2NORM:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM)
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
+            )
         # Update the parameters.
         scaler.step(optimizer)
         scaler.update()
@@ -422,8 +435,9 @@ def train(cfg):
     scaler = torch.cuda.amp.GradScaler(enabled=cfg.TRAIN.MIXED_PRECISION)
 
     # Load a checkpoint to resume training if applicable.
-    start_epoch = cu.load_train_checkpoint(cfg, model, optimizer,
-        scaler if cfg.TRAIN.MIXED_PRECISION else None)
+    start_epoch = cu.load_train_checkpoint(
+        cfg, model, optimizer, scaler if cfg.TRAIN.MIXED_PRECISION else None
+    )
 
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
@@ -485,7 +499,14 @@ def train(cfg):
         # Train for one epoch.
         epoch_timer.epoch_tic()
         train_epoch(
-            train_loader, model, optimizer, scaler, train_meter, cur_epoch, cfg, writer
+            train_loader,
+            model,
+            optimizer,
+            scaler,
+            train_meter,
+            cur_epoch,
+            cfg,
+            writer,
         )
         epoch_timer.epoch_toc()
         logger.info(
@@ -526,8 +547,14 @@ def train(cfg):
 
         # Save a checkpoint.
         if is_checkp_epoch:
-            cu.save_checkpoint(cfg.OUTPUT_DIR, model, optimizer, cur_epoch, cfg,
-                scaler if cfg.TRAIN.MIXED_PRECISION else None)
+            cu.save_checkpoint(
+                cfg.OUTPUT_DIR,
+                model,
+                optimizer,
+                cur_epoch,
+                cfg,
+                scaler if cfg.TRAIN.MIXED_PRECISION else None,
+            )
         # Evaluate the model on validation set.
         if is_eval_epoch:
             eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer)

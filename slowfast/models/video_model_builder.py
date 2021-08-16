@@ -835,7 +835,9 @@ class MViT(nn.Module):
                 torch.zeros(1, self.patch_dims[0], embed_dim)
             )
             if self.cls_embed_on:
-                self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
+                self.pos_embed_class = nn.Parameter(
+                    torch.zeros(1, 1, embed_dim)
+                )
         else:
             self.pos_embed = nn.Parameter(
                 torch.zeros(1, pos_embed_dim, embed_dim)

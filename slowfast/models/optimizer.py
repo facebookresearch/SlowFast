@@ -56,9 +56,7 @@ def construct_optimizer(model, cfg):
     # Check all parameters will be passed into optimizer.
     assert len(list(model.parameters())) == len(non_bn_parameters) + len(
         bn_parameters
-    ) + len(
-        zero_parameters
-    ) + len(
+    ) + len(zero_parameters) + len(
         no_grad_parameters
     ), "parameter size does not match: {} + {} + {} + {} != {}".format(
         len(non_bn_parameters),
@@ -69,7 +67,10 @@ def construct_optimizer(model, cfg):
     )
     print(
         "bn {}, non bn {}, zero {} no grad {}".format(
-            len(bn_parameters), len(non_bn_parameters), len(zero_parameters), len(no_grad_parameters)
+            len(bn_parameters),
+            len(non_bn_parameters),
+            len(zero_parameters),
+            len(no_grad_parameters),
         )
     )
 

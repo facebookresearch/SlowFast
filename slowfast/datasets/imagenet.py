@@ -7,14 +7,14 @@ import random
 import re
 import torch
 import torch.utils.data
-
-# import cv2
-from iopath.common.file_io import g_pathmgr
 from PIL import Image
 from torchvision import transforms as transforms_tv
 
 import slowfast.datasets.transform as transform
 import slowfast.utils.logging as logging
+
+# import cv2
+from slowfast.utils.env import pathmgr
 
 from .build import DATASET_REGISTRY
 from .transform import transforms_imagenet_train
@@ -46,7 +46,7 @@ class Imagenet(torch.utils.data.Dataset):
         split_path = os.path.join(
             self.cfg.DATA.PATH_TO_PRELOAD_IMDB, f"{self.mode}.json"
         )
-        with g_pathmgr.open(split_path, "r") as f:
+        with pathmgr.open(split_path, "r") as f:
             data = f.read()
         self._imdb = json.loads(data)
 
@@ -56,7 +56,7 @@ class Imagenet(torch.utils.data.Dataset):
         split_path = os.path.join(self.data_path, self.mode)
         logger.info("{} data path: {}".format(self.mode, split_path))
         # Images are stored per class in subdirs (format: n<number>)
-        split_files = g_pathmgr.ls(split_path)
+        split_files = pathmgr.ls(split_path)
         self._class_ids = sorted(
             f for f in split_files if re.match(r"^n[0-9]+$", f)
         )
@@ -67,7 +67,7 @@ class Imagenet(torch.utils.data.Dataset):
         for class_id in self._class_ids:
             cont_id = self._class_id_cont_id[class_id]
             im_dir = os.path.join(split_path, class_id)
-            for im_name in g_pathmgr.ls(im_dir):
+            for im_name in pathmgr.ls(im_dir):
                 im_path = os.path.join(im_dir, im_name)
                 self._imdb.append({"im_path": im_path, "class": cont_id})
         logger.info("Number of images: {}".format(len(self._imdb)))
@@ -75,7 +75,7 @@ class Imagenet(torch.utils.data.Dataset):
 
     def load_image(self, im_path):
         """Prepares the image for network input with format of CHW RGB float"""
-        with g_pathmgr.open(im_path, "rb") as f:
+        with pathmgr.open(im_path, "rb") as f:
             with Image.open(f) as im:
                 im = im.convert("RGB")
         im = torch.from_numpy(np.array(im).astype(np.float32) / 255.0)
@@ -121,7 +121,7 @@ class Imagenet(torch.utils.data.Dataset):
         return im
 
     def _prepare_im_tf(self, im_path):
-        with g_pathmgr.open(im_path, "rb") as f:
+        with pathmgr.open(im_path, "rb") as f:
             with Image.open(f) as im:
                 im = im.convert("RGB")
         # Convert HWC/BGR/int to HWC/RGB/float format for applying transforms
