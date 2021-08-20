@@ -10,9 +10,9 @@ from slowfast.models import head_helper
 # See Table 5 in the ShuffleNet paper
 _MODEL_COMPLEXITY = {
     "shufflenet_v2_x0_5": [[1, 4, 8, 4], [24, 48, 96, 192, 1024]],
-    "shufflenet_v2_x1_0": [[1, 4, 8, 4], [24, 112, 240, 464, 1024]],
+    "shufflenet_v2_x1_0": [[1, 4, 8, 4], [24, 116, 232, 464, 1024]],
     "shufflenet_v2_x1_5": [[1, 4, 8, 4], [24, 176, 352, 704, 1024]],
-    "shufflenet_v2_x2_0": [[1, 4, 8, 4], [24, 240, 488, 976, 2048]],
+    "shufflenet_v2_x2_0": [[1, 4, 8, 4], [24, 244, 488, 976, 2048]],
 }
 
 class ShuffleNetStem(nn.Module):
@@ -22,16 +22,13 @@ class ShuffleNetStem(nn.Module):
         dim_in Input channel dimension.
         dim_out  Output channel dimension.
         kernel: Kernel height, width
-        stride Conv stride
-        padding: Conv padding       
+        stride Stride       
     """
     def __init__(self, dim_in, dim_out, kernel, stride):
         super().__init__()
-        assert isinstance(kernel, list) and len(kernel) == 3, "Must specify a 3 element list for kernel dimension found {}".format(kernel)
-        padding = [ x // 2 for x in kernel]
         self.s =  nn.Sequential(
             nn.Conv3d(dim_in, dim_out, kernel_size=kernel, stride=stride, 
-                padding=padding, bias=False,),
+                padding=1, bias=False,),
             nn.BatchNorm3d(dim_out),
             nn.ReLU(inplace=True),
             nn.MaxPool3d(kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]),
@@ -56,7 +53,6 @@ class SlowFastShuffleNetStem(nn.Module):
             stride (list): the stride sizes of the convolutions in the stem
                 layer. Temporal kernel stride, height kernel size, width kernel
                 size in order.
-            padding (list): Padding for the p stem pathways
             repeat: Number of repeats       
         """
         super().__init__()
@@ -67,15 +63,13 @@ class SlowFastShuffleNetStem(nn.Module):
             len(stride),
         }) == 1, "Inconsistent inputs for shuffleNet pathways"
         assert repeat == 1, "Expect just a single block in Stem"
-        self.num_pathways = len(dim_in)
-        
+
         for pathway in range(len(dim_in)):
             stem = ShuffleNetStem(
                 dim_in[pathway],
                 dim_out[pathway],
                 kernel[pathway],
-                stride[pathway],
-                )
+                stride[pathway])
             self.add_module("pathway{}_stem".format(pathway), stem)
 
     def forward(self, x):
@@ -107,17 +101,13 @@ class InvertedResidual(nn.Module):
         self.stride = stride
 
         branch_features = out // 2
-        assert (self.stride != 1) or (inp == branch_features * 2), "stride {} inp {} != 2 * {} = {}".format(stride, inp, branch_features, branch_features*2)
+        assert (self.stride != 1) or (inp == branch_features * 2)
 
         if self.stride > 1:
             self.branch1 = nn.Sequential(
-                self.depthwise_conv(inp, inp, kernel_size=[temp_kernel, 3, 3], 
-                    stride=[1, self.stride, self.stride,],
-                    padding=[temp_kernel // 2, 1, 1]),
+                self.depthwise_conv(inp, inp, kernel_size=[temp_kernel, 3, 3], stride=self.stride, padding=1),
                 nn.BatchNorm3d(inp),
-                nn.Conv3d(inp, branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, 
-                    padding=[temp_kernel // 2, 0, 0],
-                    bias=False),
+                nn.Conv3d(inp, branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, padding=0, bias=False),
                 nn.BatchNorm3d(branch_features),
                 nn.ReLU(inplace=True),
             )
@@ -126,19 +116,12 @@ class InvertedResidual(nn.Module):
 
         self.branch2 = nn.Sequential(
             nn.Conv3d(inp if (self.stride > 1) else branch_features,
-                      branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, 
-                        padding=[temp_kernel // 2, 0, 0], 
-                        bias=False),
+                      branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, padding=0, bias=False),
             nn.BatchNorm3d(branch_features),
             nn.ReLU(inplace=True),
-            self.depthwise_conv(branch_features, branch_features, 
-                kernel_size=[temp_kernel, 3, 3], 
-                stride=[1, self.stride, self.stride],
-                padding=[temp_kernel // 2, 1, 1]),
+            self.depthwise_conv(branch_features, branch_features, kernel_size=3, stride=self.stride, padding=1),
             nn.BatchNorm3d(branch_features),
-            nn.Conv3d(branch_features, branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, 
-                padding=[temp_kernel // 2, 0, 0],
-                    bias=False),
+            nn.Conv3d(branch_features, branch_features, kernel_size=[temp_kernel, 1, 1], stride=1, padding=0, bias=False),
             nn.BatchNorm3d(branch_features),
             nn.ReLU(inplace=True),
         )
@@ -169,9 +152,7 @@ class InvertedResidual(nn.Module):
             x1, x2 = x.chunk(2, dim=1)
             out = torch.cat((x1, self.branch2(x2)), dim=1)
         else:
-            b1 = self.branch1(x)
-            b2 = self.branch2(x)
-            out = torch.cat((b1, b2), dim=1)
+            out = torch.cat((self.branch1(x), self.branch2(x)), dim=1)
 
         out = self.channel_shuffle(out, 2)
 
@@ -274,23 +255,12 @@ class SlowFastShuffleConv5(nn.Module):
 
         for pathway in range(self.num_pathways):
             conv5 = nn.Sequential(
-                nn.Conv3d(dim_in[pathway], dim_out[pathway], kernel_size=[temp_kernel[pathway][0], 1, 1], stride=1, 
-                    padding=[temp_kernel[pathway][0] // 2, 0, 0],
-                    bias=False),
+                nn.Conv3d(dim_in[pathway], dim_out[pathway], kernel_size=[temp_kernel[pathway][0], 1, 1], stride=1, padding=0, bias=False),
                 nn.BatchNorm3d(dim_out[pathway]),
                 nn.ReLU(inplace=True),
             )
-            self.add_module("conv_5_{}".format(pathway), conv5)
+            self.add_module("conv_5{}".format(pathway), conv5)
 
-    def forward(self, inputs):
-        output = []
-        for pathway in range(self.num_pathways):
-            x = inputs[pathway]
-            m = getattr(self, "conv_5_{}".format(pathway))
-            x = m(x)
-            output.append(x)
-
-        return output
 @MODEL_REGISTRY.register()
 class SlowFastShuffleNetV2(nn.Module):
     """
@@ -314,7 +284,6 @@ class SlowFastShuffleNetV2(nn.Module):
         self.num_pathways = 2
         self.norm_module = get_norm(cfg)
         self._construct_network(cfg)
-        print("Created SlowFastShuffleNetV2 version {}".format(cfg.SHUFFLENET.COMPLEXITY))
 
     def _construct_network(self, cfg):
         """
@@ -418,8 +387,9 @@ class SlowFastShuffleNetV2(nn.Module):
         #     x[pathway] = pool(x[pathway])
         x = self.s3(x)
         x = self.s3_fuse(x)
+        x = self.s4(x)
+        x = self.s4_fuse(x)
 
-        x = self.conv5(x)
 
         x = self.head(x)
         return x

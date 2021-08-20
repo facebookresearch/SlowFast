@@ -36,9 +36,9 @@ def topks_correct(preds, labels, ks):
     # (i, j) = 1 if top i-th prediction for the j-th sample is correct.
     top_max_k_correct = top_max_k_inds.eq(rep_max_k_labels)
     # Compute the number of topk correct predictions for each k.
-    topks_correct = [
-        top_max_k_correct[:k, :].reshape(-1).float().sum() for k in ks
-    ]
+
+    topks_correct = [top_max_k_correct[:k, :].float().sum() for k in ks]
+
     return topks_correct
 
 

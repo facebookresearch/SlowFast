@@ -3,6 +3,7 @@
 
 """Logging."""
 
+import atexit
 import builtins
 import decimal
 import functools
@@ -28,7 +29,9 @@ def _suppress_print():
 
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
-    return PathManager.open(filename, "a")
+    io = PathManager.open(filename, "a", buffering=1024)
+    atexit.register(io.close)
+    return io
 
 
 def setup_logging(output_dir=None):
@@ -42,9 +45,6 @@ def setup_logging(output_dir=None):
     if du.is_master_proc():
         # Enable logging for the master process.
         logging.root.handlers = []
-        logging.basicConfig(
-            level=logging.INFO, format=_FORMAT, stream=sys.stdout
-        )
     else:
         # Suppress logging for non-master processes.
         _suppress_print()
@@ -53,7 +53,7 @@ def setup_logging(output_dir=None):
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
     plain_formatter = logging.Formatter(
-        "[%(asctime)s][%(levelname)s] %(name)s: %(lineno)4d: %(message)s",
+        "[%(asctime)s][%(levelname)s] %(filename)s: %(lineno)3d: %(message)s",
         datefmt="%m/%d %H:%M:%S",
     )
 
@@ -88,7 +88,7 @@ def log_json_stats(stats):
         stats (dict): a dictionary of statistical information to log.
     """
     stats = {
-        k: decimal.Decimal("{:.6f}".format(v)) if isinstance(v, float) else v
+        k: decimal.Decimal("{:.5f}".format(v)) if isinstance(v, float) else v
         for k, v in stats.items()
     }
     json_stats = simplejson.dumps(stats, sort_keys=True, use_decimal=True)

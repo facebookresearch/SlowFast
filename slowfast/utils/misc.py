@@ -33,13 +33,21 @@ def check_nan_losses(loss):
         raise RuntimeError("ERROR: Got NaN losses {}".format(datetime.now()))
 
 
-def params_count(model):
+def params_count(model, ignore_bn=False):
     """
     Compute the number of parameters.
     Args:
         model (model): model to count the number of parameters.
     """
-    return np.sum([p.numel() for p in model.parameters()]).item()
+    if not ignore_bn:
+        return np.sum([p.numel() for p in model.parameters()]).item()
+    else:
+        count = 0
+        for m in model.modules():
+            if not isinstance(m, nn.BatchNorm3d):
+                for p in m.parameters(recurse=False):
+                    count += p.numel()
+    return count
 
 
 def gpu_mem_usage():
@@ -48,8 +56,9 @@ def gpu_mem_usage():
     """
     if torch.cuda.is_available():
         mem_usage_bytes = torch.cuda.max_memory_allocated()
-        return mem_usage_bytes / 1024 ** 3
-    return 0
+    else:
+        mem_usage_bytes = 0
+    return mem_usage_bytes / 1024 ** 3
 
 
 def cpu_mem_usage():
@@ -96,12 +105,15 @@ def _get_model_analysis_input(cfg, use_train_input):
         )
     model_inputs = pack_pathway_output(cfg, input_tensors)
     for i in range(len(model_inputs)):
-        model_inputs[i] = model_inputs[i].unsqueeze(0).cuda(non_blocking=True)
+        model_inputs[i] = model_inputs[i].unsqueeze(0)
+        if cfg.NUM_GPUS:
+            model_inputs[i] = model_inputs[i].cuda(non_blocking=True)
 
     # If detection is enabled, count flops for one proposal.
     if cfg.DETECTION.ENABLE:
         bbox = torch.tensor([[0, 0, 1.0, 0, 1.0]])
-        bbox = bbox.cuda()
+        if cfg.NUM_GPUS:
+            bbox = bbox.cuda()
         inputs = (model_inputs, bbox)
     else:
         inputs = (model_inputs,)
@@ -137,7 +149,7 @@ def get_model_stats(model, cfg, mode, use_train_input):
     model_mode = model.training
     model.eval()
     inputs = _get_model_analysis_input(cfg, use_train_input)
-    count_dict, _ = model_stats_fun(model, inputs)
+    count_dict, *_ = model_stats_fun(model, inputs)
     count = sum(count_dict.values())
     model.train(model_mode)
     return count
@@ -204,6 +216,7 @@ def plot_input(tensor, bboxes=(), texts=(), path="./tmp_vis.png"):
         texts (tuple): a tuple of string to plot.
         path (str): path to the image to save to.
     """
+    tensor = tensor.float()
     tensor = tensor - tensor.min()
     tensor = tensor / tensor.max()
     f, ax = plt.subplots(nrows=1, ncols=tensor.shape[0], figsize=(50, 20))

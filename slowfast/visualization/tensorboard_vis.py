@@ -414,7 +414,12 @@ def add_heatmap(tensor):
         heatmap (tensor): a 3D tensor. Result of applying heatmap to the 2D tensor.
     """
     assert tensor.ndim == 2, "Only support 2D tensors."
-    arr = tensor.cpu().numpy()
+    # Move tensor to cpu if necessary.
+    if tensor.device != torch.device("cpu"):
+        arr = tensor.cpu()
+    else:
+        arr = tensor
+    arr = arr.numpy()
     # Get the color map by name.
     cm = plt.get_cmap("viridis")
     heatmap = cm(arr)

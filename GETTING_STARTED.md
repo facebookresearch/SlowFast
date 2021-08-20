@@ -13,7 +13,7 @@ python tools/run_net.py \
   NUM_GPUS 2 \
   TRAIN.BATCH_SIZE 16 \
 ```
-You may need to pass location of your dataset in the command line by adding `DATA.PATH_TO_DATA_DIR path_to_your_dataset`, or you can simply add 
+You may need to pass location of your dataset in the command line by adding `DATA.PATH_TO_DATA_DIR path_to_your_dataset`, or you can simply add
 
 ```
 DATA:
@@ -57,38 +57,6 @@ python tools/run_net.py \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
 ```
-## Run the Demo on Videos/Camera
-### Classification
-modify a `<pretrained_model_config_file>.yaml` in `configs/Kinetics/c2/` corresponding to the pretrained model you want to use and set the following settings (you can look at `demo/Kinetics/SLOWFAST_8x8_R50.yaml` for reference):
-* `TRAIN.ENABLE: False`
-* `TEST.ENABLE: False`
-* `CHECKPOINT_TYPE: caffe2`
-* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
-* `DEMO.ENABLE: True`
-* `DEMO.LABEL_FILE_PATH`: path to a CSV label file (already in `demo/Kinetics/kinetics_400_labels.csv`)..
-* `DEMO.DATA_SOURCE`: Index to the camera source (if you want to run on a video, put the video path here and set values of `DEMO.DATA_SOURCE` in `slowfast/config/default.py` to `""`)
-* `NUM_GPUS: 1` (only if running on a single CPU)
-* `NUM_SHARDS: 1` (only if running on a single machine)
-  
-Optional:
-* `DISPLAY_WIDTH`: custom display window width
-* `DISPLAY_HEIGHT`: custom display window height
-### Detection
-modify a `<pretrained_model_config_file>.yaml` in `configs/AVA/c2/` corresponding to the pretrained model you want to use and set the following settings (you can look at `demo/AVA/SLOWFAST_32x2_R101_50_50.yaml` for reference):
-* `TRAIN.ENABLE: False`
-* `TEST.ENABLE: False`
-* `DETECTION.ENABLE: True`
-* `CHECKPOINT_TYPE: caffe2`
-* `CHECKPOINT_FILE_PATH: "path/to/the/pre-trained/model.pkl"` (skip this if you decide to place the model in `OUTPUT_DIR` which is default to `./checkpoints/`)
-* `DEMO.ENABLE: True`
-* `DEMO.LABEL_FILE_PATH`: path to a text label file (already in `demo/AVA/ava.names`).
-* `DEMO.DATA_SOURCE`: Index to the camera source (if you want to run on a video, put the video path here and set values of `DEMO.DATA_SOURCE` in `slowfast/config/default.py` to `""`)
-* `NUM_GPUS: 1` (only if running on a single CPU)
-* `NUM_SHARDS: 1` (only if running on a single machine)
-  
-Optional:
-* `DEMO.DISPLAY_WIDTH`: custom display window width
-* `DEMO.DISPLAY_HEIGHT`: custom display window height
 
 ### Run command
 ```

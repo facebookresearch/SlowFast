@@ -40,4 +40,5 @@ def init_weights(model, fc_init_std=0.01, zero_init_final_bn=True):
                 m.bias.data.zero_()
         if isinstance(m, nn.Linear):
             m.weight.data.normal_(mean=0.0, std=fc_init_std)
-            m.bias.data.zero_()
+            if m.bias is not None:
+                m.bias.data.zero_()

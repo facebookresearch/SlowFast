@@ -53,6 +53,8 @@ def get_name_convert_func():
         ],
         # 'res_conv1_bn_' -> 's1.pathway0_stem.bn.'
         [r"^res_conv1_bn_(.*)", r"s1.pathway0_stem.bn.\1"],
+        # 'conv1_xy_w_momentum' -> 's1.pathway0_stem.conv_xy.'
+        [r"^conv1_xy(.*)", r"s1.pathway0_stem.conv_xy\1"],
         # 'conv1_w_momentum' -> 's1.pathway0_stem.conv.'
         [r"^conv1_(.*)", r"s1.pathway0_stem.conv.\1"],
         # 'res4_0_branch1_w' -> 'S4.pathway0_res0.branch1.weight'
@@ -82,6 +84,12 @@ def get_name_convert_func():
         # ------------------------------------------------------------
         # pred_ -> head.projection.
         [r"pred_(.*)", r"head.projection.\1"],
+        # '.b_bn_fc' -> '.se.fc'
+        [r"(.*)b_bn_fc(.*)", r"\1se.fc\2"],
+        # conv_5 -> head.conv_5.
+        [r"conv_5(.*)", r"head.conv_5\1"],
+        # conv_5 -> head.conv_5.
+        [r"lin_5(.*)", r"head.lin_5\1"],
         # '.bn_b' -> '.weight'
         [r"(.*)bn.b\Z", r"\1bn.bias"],
         # '.bn_s' -> '.weight'
