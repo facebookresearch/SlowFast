@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import random
 
@@ -98,21 +99,23 @@ class Ava_asd(torch.utils.data.Dataset):
         fid = row[self.cfg.DATA.FID_COL] - row[self.cfg.DATA.START_FRAME_COL]+1
         fid_start = fid-self.cfg.DATA.NUM_FRAMES
         if fid_start < 0:
-            return None
-        tensorPath = createFullPathTree(self.dataPrefixs[setIdx],  '{}_tr_{}_st_{}_end_{}.pt'.format(
+            return None, None
+        clipName = '{}_tr_{}_st_{}_end_{}.pt'.format(
             row[self.cfg.DATA.CLIP_NAME_COL], row[self.cfg.DATA.TRACK_COL],
-            row[self.cfg.DATA.START_FRAME_COL], row[self.cfg.DATA.END_FRAME_COL]))
+            row[self.cfg.DATA.START_FRAME_COL], row[self.cfg.DATA.END_FRAME_COL])
+        tensorPath = createFullPathTree(self.dataPrefixs[setIdx], clipName)
         if not os.path.exists(tensorPath):
-            return None
+            return None, None
         
         dat = torch.load(tensorPath)
         # Sequence too short?
         if dat.shape[0] < fid:
-            return None
+            return None, None
         
         if dat[fid_start:fid,:,:,:].shape[0] != self.cfg.DATA.NUM_FRAMES:
             print("PATH {} start {} fid {} shape {}".format(tensorPath, fid_start, fid, dat[fid_start:fid,:,:,:].shape))
-        return dat[fid_start:fid,:,:,:]
+
+        return dat[fid_start:fid,:,:,:], clipName
 
     def convertGlobalIndexToDesc(self, index):
         """
@@ -204,7 +207,7 @@ class Ava_asd(torch.utils.data.Dataset):
         for _ in range(self._num_retries):
             setIdx, rowIdx = self.convertGlobalIndexToDesc(index)
             row = self.dataDescs[setIdx].iloc[rowIdx]
-            frames = self.dataAccessFn(row, setIdx)
+            frames, clipId = self.dataAccessFn(row, setIdx)
             # Access failed - try another 
             if frames is None:
                 index = random.randint(0, len(self) - 1)

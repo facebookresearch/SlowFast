@@ -3,7 +3,7 @@ _include: !include azureSubmit_cpu.yaml
 # 
 
 debug: True
-aml_compute_target: gpu-NC6
+aml_compute_target: gpu-NC6-V2
 # aml_compute_target: gpu-NC24
 # docker_image: mcr.microsoft.com/azureml/base-gpu:openmpi3.1.2-cuda10.1-cudnn7-ubuntu18.04
 docker_image: videoclass95802f47.azurecr.io/cuda-unbunti18.04-libgl-1

@@ -9,7 +9,7 @@ import os
 from collections import defaultdict, deque
 import torch
 from fvcore.common.timer import Timer
-from sklearn.metrics import average_precision_score, precision_recall_curve, auc
+from sklearn.metrics import average_precision_score, precision_recall_curve, roc_curve, auc
 
 import slowfast.datasets.ava_helper as ava_helper
 import slowfast.utils.logging as logging
@@ -32,14 +32,25 @@ def atPrec(prec, rec, thresh, atPrec=0.75):
     at_prec = [(p, r, t) for p, r, t in zip(prec, rec, thresh) if p >= atPrec]
     return at_prec[0] if len(at_prec) > 0 else (-1, -1, -1)
 
+def atFpr(fpr, tpr, thresh, atFpr=0.75):
+    at_fpr = [(fp, tp, t) for idx, (fp, tp, t) in enumerate(zip(fpr, tpr, thresh)) if fp >= atFpr]
+    return at_fpr[0] if len(at_fpr) > 0 else (-1, -1, -1)
+
+def atTpr(fpr, tpr, thresh, atTpr=0.75):
+    at_tpr = [(fp, tp, t) for idx, (fp, tp, t) in enumerate(zip(fpr, tpr, thresh)) if tp >= atTpr]
+    return at_tpr[0] if len(at_tpr) > 0 else (-1, -1, -1)   
+
 def calc_binary_stats(preds, labels, stats, cfg):
     if len(preds) == len(labels):
         precision, recall, thresholds = precision_recall_curve(labels, preds)
         stats.update({"auc": auc(recall, precision)})
-
         stats.update({"pr@_{}".format(r): "{:.3f}".format(atRecall(precision, recall, thresholds, atRecall=r)[0]) for r in cfg.METRICS.AT_RECALL})
         stats.update({"rec@_{}".format(p): "{:.3f}".format(atPrec(precision, recall, thresholds, atPrec=p)[1]) for p in cfg.METRICS.AT_PREC})
 
+        fpr, tpr, rocThresholds = roc_curve(labels, preds)
+        stats.update({"roc": auc(recall, precision)})
+        stats.update({"tpr@_{}".format(fp): "{:.3f}".format(atFpr(fpr, tpr, rocThresholds, atFpr=fp)[1]) for fp in cfg.METRICS.AT_FPR})
+        stats.update({"fpr@_{}".format(tp): "{:.3f}".format(atTpr(fpr, tpr, rocThresholds, atTpr=tp)[0]) for tp in cfg.METRICS.AT_TPR})
 
 def get_ava_mini_groundtruth(full_groundtruth):
     """

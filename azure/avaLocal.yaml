@@ -14,8 +14,10 @@ master_addr: '10.3.0.4'
 master_port: '9756'
 NUM_SHARDS: 1
 SHARD_ID: 0
+# operations: ['to_onnx']
+operations: ['train']
 
-LOG_PERIOD: 2
+LOG_PERIOD: 100
 
 DATA_LOADER:
   NUM_WORKERS: 1
@@ -45,25 +47,48 @@ DATA:
   LABEL_FILE_SUFFIXS: ['Old']
   # TRAIN_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
   # VAL_LABEL_FILE_SUFFIXS: ['Labels.pcl', '490.pcl']
-  TRAIN_LABEL_FILE_SUFFIXS: ['490.pcl']
-  VAL_LABEL_FILE_SUFFIXS: [ '490.pcl']
+  TRAIN_LABEL_FILE_SUFFIXS: ['Tmp37Labels.pcl']
+  VAL_LABEL_FILE_SUFFIXS: [ 'Tmp37Labels.pcl']
+  TEST_LABEL_FILE_SUFFIXS: [ '490.pcl']
 
   TRAIN_CROP_SIZE: 96
   CROP_SIZE: 96
-  TRAIN_JITTER_SCALES: [96, 128]
+  # TRAIN_JITTER_SCALES: [96, 128]
+  TRAIN_JITTER_SCALES: [96, 96]
+  RANDOM_FLIP: False
 
 TRAIN:
+  # BATCH_SIZE: 48
   BATCH_SIZE: 48
   DATASET: Ava_asd
   CHECKPOINT_PERIOD: 0
   AUTO_RESUME: False
-  CHECKPOINT_FILE_PATH: checkPoints/checkpoint_epoch_run_444_00030.pyth
+  CHECKPOINT_FILE_PATH: checkPoints/checkpoint_epoch_run_460_00060.pyth
+
+TEST:
+  BATCH_SIZE: 1
+  DATASET: Ava_asd
 
 MODEL:
   NUM_CLASSES: 2
 
 METRICS:
-  AT_RECALL: [0.85, 0.90, 0.92]
-  AT_PREC: [0.85, 0.90, 0.92]
+  AT_RECALL: [0.90, ]
+  AT_PREC: [0.90,]
+  AT_FPR: [0.10]
+  AT_TPR: [0.90]
   PLOT_MAX_LIMITS: {'loss': 1.0}
   PLOT_MIN_LIMITS: {'loss': 0.0}
+
+ONNX:
+  MODEL_NAME: 'run_460_cc7983b0-e3c0-4bae-b654-8256a44e8354.onnx'
+  SAVE_PATH: onnxModels/SlowFast
+  DEVICE: cpu
+  OPSET_VER: 10
+  INPUT_NAMES: ['slowFrames', 'fastFrames']
+  BATCH_SIZE: 1
+  OUTPUT_NAMES: ['asd']
+  DATA_SETS: ['val']
+  SAVE_PREDS_PATH: 'preds/predDF.pcl'
+  PREC_RECALL_PLOT: True
+  ROC_PLOT: True

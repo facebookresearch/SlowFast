@@ -2,7 +2,7 @@
 # 
 
 allow_reuse: False
-aml_compute_target: cpu-12Node-D11
+aml_compute_target: cpu-2Node-DS12
 azure_config_path: Configs/
 azure_package_path: wheels_canary
 config_overwrite: True
@@ -11,7 +11,7 @@ conda_environment: vqm_environment_cpu.yaml
 datastore: plaza
 datastore_fileStorage: videoclass
 dist_dir: dist
-docker_image: mcr.microsoft.com/azureml/base:intelmpi2018.3-ubuntu16.04
+docker_image: videoclass95802f47.azurecr.io/cpu-openmpi3.1.2-ubuntu18.04
 do_canary: False
 exp: tmp
 step_name: tmp
