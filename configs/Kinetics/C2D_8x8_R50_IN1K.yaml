@@ -5,7 +5,7 @@ TRAIN:
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
-  CHECKPOINT_FILE_PATH: /mnt/vol/gfsai-bistro2-east/ai-group/bistro/gpu/haoqifan/pySlowFastModelZoo/imagenet50_pretrain.pyth
+  # CHECKPOINT_FILE_PATH: /path/to/your/directory/imagenet50_pretrain.pyth
   CHECKPOINT_INFLATE: True
 DATA:
   NUM_FRAMES: 8
@@ -14,7 +14,7 @@ DATA:
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: /mnt/vol/gfsai-east/ai-group/users/haoqifan/kinetics/alllist/py_slowfast
+  # PATH_TO_DATA_DIR: /path/to/your/dataset
 RESNET:
   ZERO_INIT_FINAL_BN: True
   WIDTH_PER_GROUP: 64

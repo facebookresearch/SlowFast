@@ -17,15 +17,23 @@ import slowfast.utils.metrics as metrics
 import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
+from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
-from slowfast.utils.meters import AVAMeter, TrainMeter, ValMeter
+from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
 
 
 def train_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None
+    train_loader,
+    model,
+    optimizer,
+    scaler,
+    train_meter,
+    cur_epoch,
+    cfg,
+    writer=None,
 ):
     """
     Perform the video training for one epoch.
@@ -45,6 +53,16 @@ def train_epoch(
     model.train()
     train_meter.iter_tic()
     data_size = len(train_loader)
+
+    if cfg.MIXUP.ENABLE:
+        mixup_fn = MixUp(
+            mixup_alpha=cfg.MIXUP.ALPHA,
+            cutmix_alpha=cfg.MIXUP.CUTMIX_ALPHA,
+            mix_prob=cfg.MIXUP.PROB,
+            switch_prob=cfg.MIXUP.SWITCH_PROB,
+            label_smoothing=cfg.MIXUP.LABEL_SMOOTH_VALUE,
+            num_classes=cfg.MODEL.NUM_CLASSES,
+        )
 
     for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
@@ -67,25 +85,54 @@ def train_epoch(
         optim.set_lr(optimizer, lr)
 
         train_meter.data_toc()
+        if cfg.MIXUP.ENABLE:
+            samples, labels = mixup_fn(inputs[0], labels)
+            inputs[0] = samples
 
-        if cfg.DETECTION.ENABLE:
-            preds = model(inputs, meta["boxes"])
-        else:
-            preds = model(inputs)
-        # Explicitly declare reduction to mean.
-        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+        with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
+            if cfg.DETECTION.ENABLE:
+                preds = model(inputs, meta["boxes"])
+            else:
+                preds = model(inputs)
+            # Explicitly declare reduction to mean.
+            loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(
+                reduction="mean"
+            )
 
-        # Compute the loss.
-        loss = loss_fun(preds, labels)
+            # Compute the loss.
+            loss = loss_fun(preds, labels)
 
         # check Nan Loss.
         misc.check_nan_losses(loss)
 
         # Perform the backward pass.
         optimizer.zero_grad()
-        loss.backward()
+        scaler.scale(loss).backward()
+        # Unscales the gradients of optimizer's assigned params in-place
+        scaler.unscale_(optimizer)
+        # Clip gradients if necessary
+        if cfg.SOLVER.CLIP_GRAD_VAL:
+            torch.nn.utils.clip_grad_value_(
+                model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
+            )
+        elif cfg.SOLVER.CLIP_GRAD_L2NORM:
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
+            )
         # Update the parameters.
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
+
+        if cfg.MIXUP.ENABLE:
+            _top_max_k_vals, top_max_k_inds = torch.topk(
+                labels, 2, dim=1, largest=True, sorted=True
+            )
+            idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
+            idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
+            preds = preds.detach()
+            preds[idx_top1] += preds[idx_top2]
+            preds[idx_top2] = 0.0
+            labels = top_max_k_inds[:, 0]
 
         if cfg.DETECTION.ENABLE:
             if cfg.NUM_GPUS > 1:
@@ -384,9 +431,13 @@ def train(cfg):
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
+    # Create a GradScaler for mixed precision training
+    scaler = torch.cuda.amp.GradScaler(enabled=cfg.TRAIN.MIXED_PRECISION)
 
     # Load a checkpoint to resume training if applicable.
-    start_epoch = cu.load_train_checkpoint(cfg, model, optimizer)
+    start_epoch = cu.load_train_checkpoint(
+        cfg, model, optimizer, scaler if cfg.TRAIN.MIXED_PRECISION else None
+    )
 
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
@@ -416,6 +467,7 @@ def train(cfg):
     # Perform the training loop.
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
+    epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
         if cfg.MULTIGRID.LONG_CYCLE:
             cfg, changed = multigrid.update_long_cycle(cfg, cur_epoch)
@@ -445,8 +497,29 @@ def train(cfg):
         loader.shuffle_dataset(train_loader, cur_epoch)
 
         # Train for one epoch.
+        epoch_timer.epoch_tic()
         train_epoch(
-            train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer
+            train_loader,
+            model,
+            optimizer,
+            scaler,
+            train_meter,
+            cur_epoch,
+            cfg,
+            writer,
+        )
+        epoch_timer.epoch_toc()
+        logger.info(
+            f"Epoch {cur_epoch} takes {epoch_timer.last_epoch_time():.2f}s. Epochs "
+            f"from {start_epoch} to {cur_epoch} take "
+            f"{epoch_timer.avg_epoch_time():.2f}s in average and "
+            f"{epoch_timer.median_epoch_time():.2f}s in median."
+        )
+        logger.info(
+            f"For epoch {cur_epoch}, each iteraction takes "
+            f"{epoch_timer.last_epoch_time()/len(train_loader):.2f}s in average. "
+            f"From epoch {start_epoch} to {cur_epoch}, each iteraction takes "
+            f"{epoch_timer.avg_epoch_time()/len(train_loader):.2f}s in average."
         )
 
         is_checkp_epoch = cu.is_checkpoint_epoch(
@@ -474,7 +547,14 @@ def train(cfg):
 
         # Save a checkpoint.
         if is_checkp_epoch:
-            cu.save_checkpoint(cfg.OUTPUT_DIR, model, optimizer, cur_epoch, cfg)
+            cu.save_checkpoint(
+                cfg.OUTPUT_DIR,
+                model,
+                optimizer,
+                cur_epoch,
+                cfg,
+                scaler if cfg.TRAIN.MIXED_PRECISION else None,
+            )
         # Evaluate the model on validation set.
         if is_eval_epoch:
             eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer)

@@ -8,9 +8,9 @@ import random
 from itertools import chain as chain
 import torch
 import torch.utils.data
-from fvcore.common.file_io import PathManager
 
 import slowfast.utils.logging as logging
+from slowfast.utils.env import pathmgr
 
 from . import utils as utils
 from .build import DATASET_REGISTRY
@@ -75,7 +75,7 @@ class Ssv2(torch.utils.data.Dataset):
         Construct the video loader.
         """
         # Loading label names.
-        with PathManager.open(
+        with pathmgr.open(
             os.path.join(
                 self.cfg.DATA.PATH_TO_DATA_DIR,
                 "something-something-v2-labels.json",
@@ -91,7 +91,7 @@ class Ssv2(torch.utils.data.Dataset):
                 "train" if self.mode == "train" else "validation"
             ),
         )
-        with PathManager.open(label_file, "r") as f:
+        with pathmgr.open(label_file, "r") as f:
             label_json = json.load(f)
 
         self._video_names = []
@@ -109,7 +109,7 @@ class Ssv2(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert PathManager.exists(path_to_file), "{} dir not found".format(
+        assert pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
 
@@ -155,6 +155,29 @@ class Ssv2(torch.utils.data.Dataset):
                 len(self._path_to_videos), path_to_file
             )
         )
+
+    def get_seq_frames(self, index):
+        """
+        Given the video index, return the list of sampled frame indexes.
+        Args:
+            index (int): the video index.
+        Returns:
+            seq (list): the indexes of frames of sampled from the video.
+        """
+        num_frames = self.cfg.DATA.NUM_FRAMES
+        video_length = len(self._path_to_videos[index])
+
+        seg_size = float(video_length - 1) / num_frames
+        seq = []
+        for i in range(num_frames):
+            start = int(np.round(seg_size * i))
+            end = int(np.round(seg_size * (i + 1)))
+            if self.mode == "train":
+                seq.append(random.randint(start, end))
+            else:
+                seq.append((start + end) // 2)
+
+        return seq
 
     def __getitem__(self, index):
         """
@@ -215,18 +238,7 @@ class Ssv2(torch.utils.data.Dataset):
 
         label = self._labels[index]
 
-        num_frames = self.cfg.DATA.NUM_FRAMES
-        video_length = len(self._path_to_videos[index])
-
-        seg_size = float(video_length - 1) / num_frames
-        seq = []
-        for i in range(num_frames):
-            start = int(np.round(seg_size * i))
-            end = int(np.round(seg_size * (i + 1)))
-            if self.mode == "train":
-                seq.append(random.randint(start, end))
-            else:
-                seq.append((start + end) // 2)
+        seq = self.get_seq_frames(index)
 
         frames = torch.as_tensor(
             utils.retry_load_images(
@@ -256,6 +268,14 @@ class Ssv2(torch.utils.data.Dataset):
         return frames, label, index, {}
 
     def __len__(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
+        return self.num_videos
+
+    @property
+    def num_videos(self):
         """
         Returns:
             (int): the number of videos in the dataset.

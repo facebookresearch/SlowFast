@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pickle
 import torch
-from fvcore.common.file_io import PathManager
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -16,6 +15,7 @@ import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.models import build_model
+from slowfast.utils.env import pathmgr
 from slowfast.utils.meters import AVAMeter, TestMeter
 
 logger = logging.get_logger(__name__)
@@ -125,8 +125,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if cfg.TEST.SAVE_RESULTS_PATH != "":
             save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
-            with PathManager.open(save_path, "wb") as f:
-                pickle.dump([all_labels, all_labels], f)
+            if du.is_root_proc():
+                with pathmgr.open(save_path, "wb") as f:
+                    pickle.dump([all_preds, all_labels], f)
 
             logger.info(
                 "Successfully saved prediction results to {}".format(save_path)
@@ -172,13 +173,13 @@ def test(cfg):
         test_meter = AVAMeter(len(test_loader), cfg, mode="test")
     else:
         assert (
-            len(test_loader.dataset)
+            test_loader.dataset.num_videos
             % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
             == 0
         )
         # Create meters for multi-view testing.
         test_meter = TestMeter(
-            len(test_loader.dataset)
+            test_loader.dataset.num_videos
             // (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS),
             cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
             cfg.MODEL.NUM_CLASSES,
