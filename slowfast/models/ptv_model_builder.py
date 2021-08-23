@@ -27,6 +27,7 @@ from pytorchvideo.models.x3d import (
     create_x3d,
     create_x3d_bottleneck_block,
 )
+from pytorchvideo.models.vision_transformers import create_multiscale_vision_transformers
 
 from .build import MODEL_REGISTRY
 
@@ -694,4 +695,81 @@ class PTVR2plus1D(nn.Module):
             x = x.mean([2, 3, 4])
 
         x = x.view(x.shape[0], -1)
+        return x
+
+
+@MODEL_REGISTRY.register()
+class PTVMViT(nn.Module):
+    """
+    MViT models using PyTorchVideo model builder.
+    """
+
+    def __init__(self, cfg):
+        """
+        The `__init__` method of any subclass should also contain these
+            arguments.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        super(PTVMViT, self).__init__()
+
+        assert (
+            cfg.DETECTION.ENABLE is False
+        ), "Detection model is not supported for PTVMViT yet."
+
+        self._construct_network(cfg)
+
+    def _construct_network(self, cfg):
+        """
+        Builds a MViT model.
+
+        Args:
+            cfg (CfgNode): model building configs, details are in the
+                comments of the config file.
+        """
+        self.model = create_multiscale_vision_transformers(
+            spatial_size=cfg.DATA.TRAIN_CROP_SIZE,
+            temporal_size=cfg.DATA.NUM_FRAMES,
+            cls_embed_on=cfg.MVIT.CLS_EMBED_ON,
+            sep_pos_embed=cfg.MVIT.SEP_POS_EMBED,
+            depth=cfg.MVIT.DEPTH,
+            norm=cfg.MVIT.NORM,
+            # Patch embed config.
+            input_channels = cfg.DATA.INPUT_CHANNEL_NUM[0],
+            patch_embed_dim = cfg.MVIT.EMBED_DIM,
+            conv_patch_embed_kernel = cfg.MVIT.PATCH_KERNEL,
+            conv_patch_embed_stride = cfg.MVIT.PATCH_STRIDE,
+            conv_patch_embed_padding = cfg.MVIT.PATCH_PADDING,
+            enable_patch_embed_norm = cfg.MVIT.NORM_STEM,
+            use_2d_patch=cfg.MVIT.PATCH_2D,
+            # Attention block config.
+            num_heads = cfg.MVIT.NUM_HEADS,
+            mlp_ratio = cfg.MVIT.MLP_RATIO,
+            qkv_bias = cfg.MVIT.QKV_BIAS,
+            dropout_rate_block = cfg.MVIT.DROPOUT_RATE,
+            droppath_rate_block = cfg.MVIT.DROPPATH_RATE,
+            pooling_mode = cfg.MVIT.MODE,
+            pool_first = cfg.MVIT.POOL_FIRST,
+            embed_dim_mul = cfg.MVIT.DIM_MUL,
+            atten_head_mul = cfg.MVIT.HEAD_MUL,
+            pool_q_stride_size = cfg.MVIT.POOL_Q_STRIDE,
+            pool_kv_stride_size = cfg.MVIT.POOL_KV_STRIDE,
+            pool_kv_stride_adaptive = cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE,
+            pool_kvq_kernel = cfg.MVIT.POOL_KVQ_KERNEL,
+            # Head config.
+            head_dropout_rate = cfg.MODEL.DROPOUT_RATE,
+            head_num_classes = cfg.MODEL.NUM_CLASSES,
+        )
+
+        self.post_act = get_head_act(cfg.MODEL.HEAD_ACT)
+
+    def forward(self, x, bboxes=None):
+        x = x[0]
+        x = self.model(x)
+
+        if not self.training:
+            x = self.post_act(x)
+
         return x
