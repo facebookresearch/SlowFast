@@ -28,8 +28,13 @@ def construct_optimizer(model, cfg):
     zero_parameters = []
     no_grad_parameters = []
     skip = {}
-    if hasattr(model, "no_weight_decay"):
-        skip = model.no_weight_decay()
+    if cfg.NUM_GPUS > 1:
+        if hasattr(model.module, "no_weight_decay"):
+            skip = model.module.no_weight_decay()
+            skip = {"module." + v for v in skip}
+    else:
+        if hasattr(model, "no_weight_decay"):
+            skip = model.no_weight_decay()
 
     for name, m in model.named_modules():
         is_bn = isinstance(m, torch.nn.modules.batchnorm._NormBase)
@@ -38,10 +43,10 @@ def construct_optimizer(model, cfg):
                 no_grad_parameters.append(p)
             elif is_bn:
                 bn_parameters.append(p)
-            elif name in skip or (
-                (len(p.shape) == 1 or name.endswith(".bias"))
-                and cfg.SOLVER.ZERO_WD_1D_PARAM
-            ):
+            elif name in skip:
+                zero_parameters.append(p)
+            elif cfg.SOLVER.ZERO_WD_1D_PARAM and \
+                (len(p.shape) == 1 or name.endswith(".bias")):
                 zero_parameters.append(p)
             else:
                 non_bn_parameters.append(p)
