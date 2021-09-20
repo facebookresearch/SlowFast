@@ -116,10 +116,12 @@ class VideoModelStem(nn.Module):
         assert (
             len(x) == self.num_pathways
         ), "Input tensor does not contain {} pathway".format(self.num_pathways)
+        # use a new list, don't modify in-place the x list, which is bad for activation checkpointing.
+        y = []
         for pathway in range(len(x)):
             m = getattr(self, "pathway{}_stem".format(pathway))
-            x[pathway] = m(x[pathway])
-        return x
+            y.append(m(x[pathway]))
+        return y
 
 
 class ResNetBasicStem(nn.Module):

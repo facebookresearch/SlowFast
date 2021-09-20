@@ -293,6 +293,9 @@ _C.MODEL.FC_INIT_STD = 0.01
 # Activation layer for the output head.
 _C.MODEL.HEAD_ACT = "softmax"
 
+# Activation checkpointing enabled or not to save GPU memory.
+_C.MODEL.ACT_CHECKPOINT = False
+
 
 # -----------------------------------------------------------------------------
 # MViT options
