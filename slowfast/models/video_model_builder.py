@@ -9,19 +9,20 @@ import torch
 import torch.nn as nn
 from torch.nn.init import trunc_normal_
 
+import slowfast.utils.weight_init_helper as init_helper
+from slowfast.models.attention import MultiScaleBlock
+from slowfast.models.batchnorm_helper import get_norm
+from slowfast.models.stem_helper import PatchEmbed
+from slowfast.models.utils import round_width, validate_checkpoint_wrapper_import
+
+from . import head_helper, resnet_helper, stem_helper
+from .build import MODEL_REGISTRY
+
 try:
     from fairscale.nn.checkpoint import checkpoint_wrapper
 except ImportError:
     checkpoint_wrapper = None
 
-import slowfast.utils.weight_init_helper as init_helper
-from slowfast.models.attention import MultiScaleBlock
-from slowfast.models.batchnorm_helper import get_norm
-from slowfast.models.stem_helper import PatchEmbed
-from slowfast.models.utils import round_width
-
-from . import head_helper, resnet_helper, stem_helper
-from .build import MODEL_REGISTRY
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -511,8 +512,7 @@ class ResNet(nn.Module):
         # best memory savings. Further tuning is possible for better memory saving and tradeoffs
         # with recomputing FLOPs.
         if cfg.MODEL.ACT_CHECKPOINT:
-            if checkpoint_wrapper is None:
-                raise ImportError("Please install fairscale.")
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
             self.s1 = checkpoint_wrapper(s1)
             self.s2 = checkpoint_wrapper(s2)
         else:
@@ -916,6 +916,10 @@ class MViT(nn.Module):
         self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
 
         self.blocks = nn.ModuleList()
+
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+
         for i in range(depth):
             num_heads = round_width(num_heads, head_mul[i])
             embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
@@ -924,26 +928,26 @@ class MViT(nn.Module):
                 dim_mul[i + 1],
                 divisor=round_width(num_heads, head_mul[i + 1]),
             )
-
-            self.blocks.append(
-                MultiScaleBlock(
-                    dim=embed_dim,
-                    dim_out=dim_out,
-                    num_heads=num_heads,
-                    mlp_ratio=mlp_ratio,
-                    qkv_bias=qkv_bias,
-                    drop_rate=self.drop_rate,
-                    drop_path=dpr[i],
-                    norm_layer=norm_layer,
-                    kernel_q=pool_q[i] if len(pool_q) > i else [],
-                    kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
-                    stride_q=stride_q[i] if len(stride_q) > i else [],
-                    stride_kv=stride_kv[i] if len(stride_kv) > i else [],
-                    mode=mode,
-                    has_cls_embed=self.cls_embed_on,
-                    pool_first=pool_first,
-                )
+            attention_block = MultiScaleBlock(
+                dim=embed_dim,
+                dim_out=dim_out,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                drop_rate=self.drop_rate,
+                drop_path=dpr[i],
+                norm_layer=norm_layer,
+                kernel_q=pool_q[i] if len(pool_q) > i else [],
+                kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                stride_q=stride_q[i] if len(stride_q) > i else [],
+                stride_kv=stride_kv[i] if len(stride_kv) > i else [],
+                mode=mode,
+                has_cls_embed=self.cls_embed_on,
+                pool_first=pool_first,
             )
+            if cfg.MODEL.ACT_CHECKPOINT:
+                attention_block = checkpoint_wrapper(attention_block)
+            self.blocks.append(attention_block)
 
         embed_dim = dim_out
         self.norm = norm_layer(embed_dim)

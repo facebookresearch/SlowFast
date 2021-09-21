@@ -19,3 +19,11 @@ def round_width(width, multiplier, min_width=1, divisor=1, verbose=False):
     if width_out < 0.9 * width:
         width_out += divisor
     return int(width_out)
+
+
+def validate_checkpoint_wrapper_import(checkpoint_wrapper):
+    """
+    Check if checkpoint_wrapper is imported.
+    """
+    if checkpoint_wrapper is None:
+        raise ImportError("Please install fairscale.")
