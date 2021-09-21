@@ -510,7 +510,9 @@ class ResNet(nn.Module):
         # that are 4X larger than the second largest. Therefore, checkpointing them gives
         # best memory savings. Further tuning is possible for better memory saving and tradeoffs
         # with recomputing FLOPs.
-        if cfg.MODEL.ACT_CHECKPOINT and checkpoint_wrapper is not None:
+        if cfg.MODEL.ACT_CHECKPOINT:
+            if checkpoint_wrapper is None:
+                raise ImportError("Please install fairscale.")
             self.s1 = checkpoint_wrapper(s1)
             self.s2 = checkpoint_wrapper(s2)
         else:
