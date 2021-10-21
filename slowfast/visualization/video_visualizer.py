@@ -468,6 +468,9 @@ class VideoVisualizer:
         font_size = min(
             max(np.sqrt(frame.shape[0] * frame.shape[1]) // 35, 5), 9
         )
+
+        font_size = 30
+
         top_corner = not ground_truth
         if bboxes is not None:
             assert len(preds) == len(

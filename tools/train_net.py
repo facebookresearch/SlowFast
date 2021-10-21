@@ -51,6 +51,11 @@ def train_epoch(
     """
     # Enable train mode.
     model.train()
+    if cfg.TRAIN.FREEZING:
+        logger.info('freezing all children except last one')
+        for child in list(model.children())[:-1]:
+            for param in child.parameters():
+                param.requires_grad = False
     train_meter.iter_tic()
     data_size = len(train_loader)
 
@@ -421,8 +426,8 @@ def train(cfg):
         if cfg.MULTIGRID.LONG_CYCLE:
             cfg, _ = multigrid.update_long_cycle(cfg, cur_epoch=0)
     # Print config.
-    logger.info("Train with config:")
-    logger.info(pprint.pformat(cfg))
+    # logger.info("Train with config:")
+    # logger.info(pprint.pformat(cfg))
 
     # Build the video model and print model statistics.
     model = build_model(cfg)
