@@ -9,8 +9,8 @@ from slowfast.utils.env import pathmgr
 
 logger = logging.getLogger(__name__)
 
-FPS = 30
-AVA_VALID_FRAMES = range(902, 1799)
+FPS = 20
+AVA_VALID_FRAMES = range(300)
 
 
 def load_image_lists(cfg, is_train):
@@ -134,7 +134,7 @@ def get_keyframe_data(boxes_and_labels):
         0: 900
         30: 901
         """
-        return (sec - 900) * FPS
+        return sec * FPS
 
     keyframe_indices = []
     keyframe_boxes_and_labels = []
@@ -212,7 +212,7 @@ def parse_bboxes_file(
                 # Box with format [x1, y1, x2, y2] with a range of [0, 1] as float.
                 box_key = ",".join(row[2:6])
                 box = list(map(float, row[2:6]))
-                label = -1 if row[6] == "" else int(row[6])
+                label = -1 if row[6] == "" else int(float(row[6]))
 
                 if video_name not in all_boxes:
                     all_boxes[video_name] = {}

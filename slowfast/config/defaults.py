@@ -45,6 +45,9 @@ _C.TRAIN = CfgNode()
 # If True Train the model, else skip training.
 _C.TRAIN.ENABLE = True
 
+# If True, freeze all children except last one
+_C.TRAIN.FREEZING = False
+
 # Dataset.
 _C.TRAIN.DATASET = "kinetics"
 

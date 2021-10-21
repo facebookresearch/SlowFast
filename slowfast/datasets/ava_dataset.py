@@ -417,7 +417,7 @@ class Ava(torch.utils.data.Dataset):
                 label_arrs[i][label - 1] = 1
 
         imgs = utils.pack_pathway_output(self.cfg, imgs)
-        metadata = [[video_idx, sec]] * len(boxes)
+        metadata = [video_idx, sec] * len(boxes)
 
         extra_data = {
             "boxes": boxes,
