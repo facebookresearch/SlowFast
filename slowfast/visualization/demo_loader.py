@@ -90,7 +90,7 @@ class VideoManager:
             was_read, frame = self.cap.read()
             frames.append(frame)
         if was_read and self.buffer_size != 0:
-            self.buffer = frames[-self.buffer_size :]
+            self.buffer = frames[-self.buffer_size:]
 
         task.add_frames(self.id, frames)
         task.num_buffer_frames = 0 if self.id == 0 else self.buffer_size
