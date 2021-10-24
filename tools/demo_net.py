@@ -34,8 +34,8 @@ def run_demo(cfg, frame_provider):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
     # Print config.
-    logger.info("Run demo with config:")
-    logger.info(cfg)
+    # logger.info("Run demo with config:")
+    # logger.info(cfg)
     common_classes = (
         cfg.DEMO.COMMON_CLASS_NAMES
         if len(cfg.DEMO.LABEL_FILE_PATH) != 0
