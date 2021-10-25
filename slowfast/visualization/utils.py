@@ -373,3 +373,9 @@ class TaskInfo:
         Add the corresponding action predictions.
         """
         self.action_preds = preds
+
+    def add_detectron_scores(self, preds):
+        """
+        Add the corresponding detectron predictions.
+        """
+        self.detectron_scores = preds

@@ -203,5 +203,5 @@ class Detectron2Predictor:
         mask = outputs["instances"].pred_classes == 0
         pred_boxes = outputs["instances"].pred_boxes.tensor[mask]
         task.add_bboxes(pred_boxes)
-
+        task.add_detectron_scores(outputs['instances'].scores)
         return task
