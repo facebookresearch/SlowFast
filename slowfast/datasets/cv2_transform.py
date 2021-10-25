@@ -103,7 +103,7 @@ def scale(size, image):
     return img.astype(np.float32)
 
 
-def scale_boxes(size, boxes, height, width):
+def scale_boxes(size, boxes, height, width, reverse=False):
     """
     Scale the short side of the box to size.
     Args:
@@ -120,14 +120,18 @@ def scale_boxes(size, boxes, height, width):
     ):
         return boxes
 
-    new_width = size
-    new_height = size
     if width < height:
         new_height = int(math.floor((float(height) / width) * size))
-        boxes *= float(new_height) / height
+        if reverse:
+            boxes /= float(new_height) / height
+        else:
+            boxes *= float(new_height) / height
     else:
         new_width = int(math.floor((float(width) / height) * size))
-        boxes *= float(new_width) / width
+        if reverse:
+            boxes /= float(new_width) / width
+        else:
+            boxes *= float(new_width) / width
     return boxes
 
 
