@@ -469,7 +469,7 @@ class VideoVisualizer:
             max(np.sqrt(frame.shape[0] * frame.shape[1]) // 35, 5), 9
         )
 
-        font_size = 15
+        font_size = 10
 
         top_corner = not ground_truth
         if bboxes is not None:
