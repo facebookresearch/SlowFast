@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+from clearml import Task
+
+
 """Wrapper to train and test a video classification model."""
 import sys
 import os
@@ -16,12 +19,17 @@ from visualization import visualize
 
 
 def main():
+
+    
+
     """
     Main function to spawn the train and test process.
     """
     args = parse_args()
     cfg = load_config(args)
     cfg = assert_and_infer_cfg(cfg)
+
+    task = Task.init(project_name='SlowFast', task_name=cfg.TRAIN.EXPERIMENT_NAME)
 
     # Perform training.
     if cfg.TRAIN.ENABLE:
