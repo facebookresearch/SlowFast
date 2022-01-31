@@ -20,8 +20,6 @@ from visualization import visualize
 
 def main():
 
-    
-
     """
     Main function to spawn the train and test process.
     """
