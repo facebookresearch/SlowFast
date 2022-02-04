@@ -62,7 +62,7 @@
 
 ## ImageNet
 
-We also release the imagenet pretrained model if finetuning from ImageNet is preferred. The reported accuracy is obtained by center crop testing on the validation set.
+We also release the imagenet pretrained model if finetuning from ImageNet is preferred. The reported accuracy is obtained by center crop testing on the validation set. To load the pretrained ImageNet model for MViT, it is better to revert to an older commit version of this [repository](https://github.com/facebookresearch/SlowFast/tree/e04fba5b7aab16031220dc17699a796331f6e902). 
 
 | architecture | depth |  Top1 |  Top5  |  model  | Config |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
