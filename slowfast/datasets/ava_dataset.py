@@ -359,10 +359,18 @@ class Ava(torch.utils.data.Dataset):
             frames (tensor): the frames of sampled from the video. The dimension
                 is `channel` x `num frames` x `height` x `width`.
             label (ndarray): the label for correspond boxes for the current video.
+            time index (zero): The time index is currently not supported for AVA.
             idx (int): the video index provided by the pytorch sampler.
             extra_data (dict): a dict containing extra data fields, like "boxes",
                 "ori_boxes" and "metadata".
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(idx, tuple):
+            idx, self._num_yielded = idx
+            if self.cfg.MULTIGRID.SHORT_CYCLE:
+                idx, short_cycle_idx = idx
+
         video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
         # Get the frame idxs for current clip.
         seq = utils.get_sequence(
@@ -425,4 +433,4 @@ class Ava(torch.utils.data.Dataset):
             "metadata": metadata,
         }
 
-        return imgs, label_arrs, idx, extra_data
+        return imgs, label_arrs, idx, torch.zeros(1), extra_data

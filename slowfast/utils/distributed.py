@@ -12,6 +12,23 @@ import torch.distributed as dist
 _LOCAL_PROCESS_GROUP = None
 
 
+def cat_all_gather(tensors, local=False):
+    """Performs the concatenated all_reduce operation on the provided tensors."""
+    if local:
+        gather_sz = get_local_size()
+    else:
+        gather_sz = torch.distributed.get_world_size()
+    tensors_gather = [torch.ones_like(tensors) for _ in range(gather_sz)]
+    torch.distributed.all_gather(
+        tensors_gather,
+        tensors,
+        async_op=False,
+        group=_LOCAL_PROCESS_GROUP if local else None,
+    )
+    output = torch.cat(tensors_gather, dim=0)
+    return output
+
+
 def all_gather(tensors):
     """
     All gathers the provided tensors from all processes across machines.
@@ -307,3 +324,48 @@ def get_local_rank() -> int:
         return 0
     assert _LOCAL_PROCESS_GROUP is not None
     return dist.get_rank(group=_LOCAL_PROCESS_GROUP)
+
+
+class GatherLayer(torch.autograd.Function):
+    """Gather tensors from all process, supporting backward propagation."""
+
+    @staticmethod
+    def forward(ctx, input):
+        ctx.save_for_backward(input)
+        output = [torch.zeros_like(input) for _ in range(dist.get_world_size())]
+        dist.all_gather(output, input)
+        return tuple(output)
+
+    @staticmethod
+    def backward(ctx, *grads):
+        (input,) = ctx.saved_tensors
+        grad_out = torch.zeros_like(input)
+        grad_out[:] = grads[dist.get_rank()]
+        return grad_out
+
+
+class AllGatherWithGradient(torch.autograd.Function):
+    """AllGatherWithGradient"""
+
+    @staticmethod
+    def forward(ctx, input):
+        world_size = dist.get_world_size()
+        x_gather = [torch.ones_like(input) for _ in range(world_size)]
+        torch.distributed.all_gather(x_gather, input, async_op=False)
+        x_gather = torch.cat(x_gather, dim=0)
+        return x_gather
+
+    @staticmethod
+    def backward(ctx, grad_output):
+
+        reduction = torch.distributed.all_reduce(grad_output, async_op=True)
+        reduction.wait()
+
+        world_size = dist.get_world_size()
+        N = grad_output.size(0)
+        mini_batchsize = N // world_size
+        cur_gpu = torch.distributed.get_rank()
+        grad_output = grad_output[
+            cur_gpu * mini_batchsize : (cur_gpu + 1) * mini_batchsize
+        ]
+        return grad_output

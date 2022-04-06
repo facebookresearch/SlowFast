@@ -20,7 +20,7 @@ def get_norm(cfg):
     Returns:
         nn.Module: the normalization layer.
     """
-    if cfg.BN.NORM_TYPE == "batchnorm":
+    if cfg.BN.NORM_TYPE in {"batchnorm", "sync_batchnorm_apex"}:
         return nn.BatchNorm3d
     elif cfg.BN.NORM_TYPE == "sub_batchnorm":
         return partial(SubBatchNorm3d, num_splits=cfg.BN.NUM_SPLITS)
@@ -215,4 +215,51 @@ class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
         bias = self.bias - mean * scale
         scale = scale.reshape(1, -1, 1, 1, 1)
         bias = bias.reshape(1, -1, 1, 1, 1)
+        return input * scale + bias
+
+
+class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
+    def __init__(self, num_sync_devices, **args):
+        """
+        Naive version of Synchronized 1D BatchNorm.
+        Args:
+            num_sync_devices (int): number of device to sync.
+            args (list): other arguments.
+        """
+        self.num_sync_devices = num_sync_devices
+        if self.num_sync_devices > 0:
+            assert du.get_local_size() % self.num_sync_devices == 0, (
+                du.get_local_size(),
+                self.num_sync_devices,
+            )
+            self.num_groups = du.get_local_size() // self.num_sync_devices
+        else:
+            self.num_sync_devices = du.get_local_size()
+            self.num_groups = 1
+        super(NaiveSyncBatchNorm1d, self).__init__(**args)
+
+    def forward(self, input):
+        if du.get_local_size() == 1 or not self.training:
+            return super().forward(input)
+
+        assert input.shape[0] > 0, "SyncBatchNorm does not support empty inputs"
+        C = input.shape[1]
+        mean = torch.mean(input, dim=[0])
+        meansqr = torch.mean(input * input, dim=[0])
+
+        vec = torch.cat([mean, meansqr], dim=0)
+        vec = GroupGather.apply(vec, self.num_sync_devices, self.num_groups) * (
+            1.0 / self.num_sync_devices
+        )
+
+        mean, meansqr = torch.split(vec, C)
+        var = meansqr - mean * mean
+        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
+        self.running_var += self.momentum * (var.detach() - self.running_var)
+
+        invstd = torch.rsqrt(var + self.eps)
+        scale = self.weight * invstd
+        bias = self.bias - mean * scale
+        scale = scale.reshape(1, -1)
+        bias = bias.reshape(1, -1)
         return input * scale + bias

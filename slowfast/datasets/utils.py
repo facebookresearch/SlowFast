@@ -273,7 +273,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
     return dict(image_paths), dict(labels)
 
 
-def tensor_normalize(tensor, mean, std):
+def tensor_normalize(tensor, mean, std, func=None):
     """
     Normalize a given tensor by subtracting the mean and dividing the std.
     Args:
@@ -288,6 +288,8 @@ def tensor_normalize(tensor, mean, std):
         mean = torch.tensor(mean)
     if type(std) == list:
         std = torch.tensor(std)
+    if func is not None:
+        tensor = func(tensor)
     tensor = tensor - mean
     tensor = tensor / std
     return tensor

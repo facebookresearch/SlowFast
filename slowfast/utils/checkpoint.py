@@ -43,18 +43,21 @@ def get_checkpoint_dir(path_to_job):
     return os.path.join(path_to_job, "checkpoints")
 
 
-def get_path_to_checkpoint(path_to_job, epoch):
+def get_path_to_checkpoint(path_to_job, epoch, task=""):
     """
     Get the full path to a checkpoint file.
     Args:
         path_to_job (string): the path to the folder of the current job.
         epoch (int): the number of epoch for the checkpoint.
     """
-    name = "checkpoint_epoch_{:05d}.pyth".format(epoch)
+    if task != "":
+        name = "{}_checkpoint_epoch_{:05d}.pyth".format(task, epoch)
+    else:
+        name = "checkpoint_epoch_{:05d}.pyth".format(epoch)
     return os.path.join(get_checkpoint_dir(path_to_job), name)
 
 
-def get_last_checkpoint(path_to_job):
+def get_last_checkpoint(path_to_job, task):
     """
     Get the last checkpoint from the checkpointing folder.
     Args:
@@ -63,8 +66,12 @@ def get_last_checkpoint(path_to_job):
 
     d = get_checkpoint_dir(path_to_job)
     names = pathmgr.ls(d) if pathmgr.exists(d) else []
-    names = [f for f in names if "checkpoint" in f]
-    assert len(names), "No checkpoints found in '{}'.".format(d)
+    if task != "":
+        names = [f for f in names if "{}_checkpoint".format(task) in f]
+    else:
+        names = [f for f in names if f.startswith("checkpoint")]
+    if len(names) == 0:
+        return None
     # Sort the checkpoints by epoch.
     name = sorted(names)[-1]
     return os.path.join(d, name)
@@ -133,7 +140,9 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg, scaler=None):
     if scaler is not None:
         checkpoint["scaler_state"] = scaler.state_dict()
     # Write the checkpoint.
-    path_to_checkpoint = get_path_to_checkpoint(path_to_job, epoch + 1)
+    path_to_checkpoint = get_path_to_checkpoint(
+        path_to_job, epoch + 1, cfg.TASK
+    )
     with pathmgr.open(path_to_checkpoint, "wb") as f:
         torch.save(checkpoint, f)
     return path_to_checkpoint
@@ -208,9 +217,6 @@ def load_checkpoint(
     Returns:
         (int): the number of training epoch of the checkpoint.
     """
-    assert pathmgr.exists(
-        path_to_checkpoint
-    ), "Checkpoint '{}' not found".format(path_to_checkpoint)
     logger.info("Loading network weights from {}.".format(path_to_checkpoint))
 
     # Account for the DDP wrapper in the multi-gpu setting.
@@ -306,7 +312,9 @@ def load_checkpoint(
                     model_state_dict_new = OrderedDict()
                     for k in checkpoint["model_state"]:
                         if item in k:
-                            k_re = k.replace(item, "")
+                            k_re = k.replace(
+                                item, "", 1
+                            )  # only repace first occurence of pattern
                             model_state_dict_new[k_re] = checkpoint[
                                 "model_state"
                             ][k]
@@ -471,7 +479,7 @@ def load_test_checkpoint(cfg, model):
             convert_from_caffe2=cfg.TEST.CHECKPOINT_TYPE == "caffe2",
         )
     elif has_checkpoint(cfg.OUTPUT_DIR):
-        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
+        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR, cfg.TASK)
         load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1)
     elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
         # If no checkpoint found in TEST.CHECKPOINT_FILE_PATH or in the current
@@ -496,10 +504,15 @@ def load_train_checkpoint(cfg, model, optimizer, scaler=None):
     Loading checkpoint logic for training.
     """
     if cfg.TRAIN.AUTO_RESUME and has_checkpoint(cfg.OUTPUT_DIR):
-        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR)
+        last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR, cfg.TASK)
         logger.info("Load from last checkpoint, {}.".format(last_checkpoint))
         checkpoint_epoch = load_checkpoint(
-            last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer, scaler=scaler
+            last_checkpoint,
+            model,
+            cfg.NUM_GPUS > 1,
+            optimizer,
+            scaler=scaler,
+            clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
         )
         start_epoch = checkpoint_epoch + 1
     elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":

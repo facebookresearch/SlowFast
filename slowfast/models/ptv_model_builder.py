@@ -22,12 +22,14 @@ from pytorchvideo.models.r2plus1d import (
 )
 from pytorchvideo.models.resnet import create_bottleneck_block, create_resnet
 from pytorchvideo.models.slowfast import create_slowfast
+from pytorchvideo.models.vision_transformers import (
+    create_multiscale_vision_transformers,
+)
 from pytorchvideo.models.x3d import (
     Swish,
     create_x3d,
     create_x3d_bottleneck_block,
 )
-from pytorchvideo.models.vision_transformers import create_multiscale_vision_transformers
 
 from .build import MODEL_REGISTRY
 
@@ -737,30 +739,30 @@ class PTVMViT(nn.Module):
             depth=cfg.MVIT.DEPTH,
             norm=cfg.MVIT.NORM,
             # Patch embed config.
-            input_channels = cfg.DATA.INPUT_CHANNEL_NUM[0],
-            patch_embed_dim = cfg.MVIT.EMBED_DIM,
-            conv_patch_embed_kernel = cfg.MVIT.PATCH_KERNEL,
-            conv_patch_embed_stride = cfg.MVIT.PATCH_STRIDE,
-            conv_patch_embed_padding = cfg.MVIT.PATCH_PADDING,
-            enable_patch_embed_norm = cfg.MVIT.NORM_STEM,
+            input_channels=cfg.DATA.INPUT_CHANNEL_NUM[0],
+            patch_embed_dim=cfg.MVIT.EMBED_DIM,
+            conv_patch_embed_kernel=cfg.MVIT.PATCH_KERNEL,
+            conv_patch_embed_stride=cfg.MVIT.PATCH_STRIDE,
+            conv_patch_embed_padding=cfg.MVIT.PATCH_PADDING,
+            enable_patch_embed_norm=cfg.MVIT.NORM_STEM,
             use_2d_patch=cfg.MVIT.PATCH_2D,
             # Attention block config.
-            num_heads = cfg.MVIT.NUM_HEADS,
-            mlp_ratio = cfg.MVIT.MLP_RATIO,
-            qkv_bias = cfg.MVIT.QKV_BIAS,
-            dropout_rate_block = cfg.MVIT.DROPOUT_RATE,
-            droppath_rate_block = cfg.MVIT.DROPPATH_RATE,
-            pooling_mode = cfg.MVIT.MODE,
-            pool_first = cfg.MVIT.POOL_FIRST,
-            embed_dim_mul = cfg.MVIT.DIM_MUL,
-            atten_head_mul = cfg.MVIT.HEAD_MUL,
-            pool_q_stride_size = cfg.MVIT.POOL_Q_STRIDE,
-            pool_kv_stride_size = cfg.MVIT.POOL_KV_STRIDE,
-            pool_kv_stride_adaptive = cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE,
-            pool_kvq_kernel = cfg.MVIT.POOL_KVQ_KERNEL,
+            num_heads=cfg.MVIT.NUM_HEADS,
+            mlp_ratio=cfg.MVIT.MLP_RATIO,
+            qkv_bias=cfg.MVIT.QKV_BIAS,
+            dropout_rate_block=cfg.MVIT.DROPOUT_RATE,
+            droppath_rate_block=cfg.MVIT.DROPPATH_RATE,
+            pooling_mode=cfg.MVIT.MODE,
+            pool_first=cfg.MVIT.POOL_FIRST,
+            embed_dim_mul=cfg.MVIT.DIM_MUL,
+            atten_head_mul=cfg.MVIT.HEAD_MUL,
+            pool_q_stride_size=cfg.MVIT.POOL_Q_STRIDE,
+            pool_kv_stride_size=cfg.MVIT.POOL_KV_STRIDE,
+            pool_kv_stride_adaptive=cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE,
+            pool_kvq_kernel=cfg.MVIT.POOL_KVQ_KERNEL,
             # Head config.
-            head_dropout_rate = cfg.MODEL.DROPOUT_RATE,
-            head_num_classes = cfg.MODEL.NUM_CLASSES,
+            head_dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            head_num_classes=cfg.MODEL.NUM_CLASSES,
         )
 
         self.post_act = get_head_act(cfg.MODEL.HEAD_ACT)

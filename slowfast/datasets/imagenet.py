@@ -194,10 +194,10 @@ class Imagenet(torch.utils.data.Dataset):
         if isinstance(im, list):
             label = [label for _ in range(len(im))]
             dummy = [torch.Tensor() for _ in range(len(im))]
-            return im, label, dummy, {}
+            return im, label, dummy, dummy, {}
         else:
             dummy = torch.Tensor()
-            return [im], label, dummy, {}
+            return [im], label, dummy, dummy, {}
 
     def __len__(self):
         return len(self._imdb)

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+import logging
 import math
 import numpy as np
 
 # import cv2
 import random
 import torch
+import torchvision as tv
 import torchvision.transforms.functional as F
-from PIL import Image
+from PIL import Image, ImageFilter
+from scipy.ndimage import gaussian_filter
 from torchvision import transforms
 
 from .rand_augment import rand_augment_transform
@@ -36,6 +39,9 @@ def _pil_interp(method):
         return Image.HAMMING
     else:
         return Image.BILINEAR
+
+
+logger = logging.getLogger(__name__)
 
 
 def random_short_side_scale_jitter(
@@ -130,7 +136,7 @@ def random_crop(images, size, boxes=None):
             `num boxes` x 4.
     """
     if images.shape[2] == size and images.shape[3] == size:
-        return images
+        return images, boxes
     height = images.shape[2]
     width = images.shape[3]
     y_offset = 0
@@ -892,3 +898,135 @@ def transforms_imagenet_train(
         )
     else:
         return transforms.Compose(primary_tfl + secondary_tfl + final_tfl)
+
+
+def temporal_difference(
+    frames,
+    use_grayscale=False,
+    absolute=False,
+):
+    if use_grayscale:
+        gray_channel = (
+            0.299 * frames[2, :] + 0.587 * frames[1, :] + 0.114 * frames[0, :]
+        )
+        frames[0, :] = gray_channel
+        frames[1, :] = gray_channel
+        frames[2, :] = gray_channel
+
+    out_images = torch.zeros_like(frames)
+    t = frames.shape[1]
+
+    dt = frames[:, 0 : t - 1, :, :] - frames[:, 1:t, :, :]
+    if absolute:
+        dt = dt.abs()
+    out_images[:, 0 : t - 1, :, :] = dt
+    if t <= 1:
+        return out_images
+    out_images[:, -1, :, :] = dt[:, -1, :, :]
+    return out_images
+
+
+def color_jitter_video_ssl(
+    frames,
+    bri_con_sat=[0.4] * 3,
+    hue=0.1,
+    p_convert_gray=0.0,
+    moco_v2_aug=False,
+    gaussan_sigma_min=[0.0, 0.1],
+    gaussan_sigma_max=[0.0, 2.0],
+):
+    # T H W C -> C T H W.
+    frames = frames.permute(3, 0, 1, 2)
+
+    if moco_v2_aug:
+        color_jitter = tv.transforms.Compose(
+            [
+                tv.transforms.ToPILImage(),
+                tv.transforms.RandomApply(
+                    [
+                        tv.transforms.ColorJitter(
+                            bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue
+                        )
+                    ],
+                    p=0.8,
+                ),
+                tv.transforms.RandomGrayscale(p=p_convert_gray),
+                tv.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
+                tv.transforms.ToTensor(),
+            ]
+        )
+    else:
+        color_jitter = tv.transforms.Compose(
+            [
+                tv.transforms.ToPILImage(),
+                tv.transforms.RandomGrayscale(p=p_convert_gray),
+                tv.transforms.ColorJitter(
+                    bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue
+                ),
+                tv.transforms.ToTensor(),
+            ]
+        )
+
+    c, t, h, w = frames.shape
+    frames = frames.view(c, t * h, w)
+    frames = color_jitter(frames)
+    frames = frames.view(c, t, h, w)
+    # C T H W ->  T H W C.
+    frames = frames.permute(1, 2, 3, 0)
+
+    return frames
+
+
+def augment_raw_frames(frames, time_diff_prob=0.0, gaussian_prob=0.0):
+    frames = frames.float()
+    if gaussian_prob > 0.0:
+        blur_trans = tv.transforms.RandomApply(
+            [GaussianBlurVideo()], p=gaussian_prob
+        )
+        frames = blur_trans(frames)
+
+    time_diff_out = False
+    if time_diff_prob > 0.0 and random.random() < time_diff_prob:
+        # T H W C -> C T H W.
+        frames = frames.permute(3, 0, 1, 2)
+        frames = temporal_difference(
+            frames, use_grayscale=True, absolute=False
+        )
+        # end_idx -= 1
+        frames += 255.0
+        frames /= 2.0
+        # C T H W -> T H W C
+        frames = frames.permute(1, 2, 3, 0)
+        time_diff_out = True
+
+    return frames, time_diff_out
+
+
+class GaussianBlur(object):
+    """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
+
+    def __init__(self, sigma=[0.1, 2.0]):
+        self.sigma = sigma
+
+    def __call__(self, x):
+        if len(self.sigma) == 2:
+            sigma = random.uniform(self.sigma[0], self.sigma[1])
+        elif len(self.sigma) == 1:
+            sigma = self.sigma[0]
+        x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return x
+
+
+class GaussianBlurVideo(object):
+    def __init__(
+        self, sigma_min=[0.0, 0.1], sigma_max=[0.0, 2.0], use_PIL=False
+    ):
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+
+    def __call__(self, frames):
+        sigma_y = sigma_x = random.uniform(self.sigma_min[1], self.sigma_max[1])
+        sigma_t = random.uniform(self.sigma_min[0], self.sigma_max[0])
+        frames = gaussian_filter(frames, sigma=(0.0, sigma_t, sigma_y, sigma_x))
+        frames = torch.from_numpy(frames)
+        return frames

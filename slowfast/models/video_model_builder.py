@@ -13,7 +13,10 @@ import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
 from slowfast.models.stem_helper import PatchEmbed
-from slowfast.models.utils import round_width, validate_checkpoint_wrapper_import
+from slowfast.models.utils import (
+    round_width,
+    validate_checkpoint_wrapper_import,
+)
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
@@ -25,7 +28,7 @@ except ImportError:
 
 
 # Number of blocks for different stages given the model depth.
-_MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
+_MODEL_STAGE_DEPTH = {18: (2, 2, 2, 2), 50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
 
 # Basis of temporal kernel sizes for each of the stage.
 _TEMPORAL_KERNEL_BASIS = {
@@ -43,7 +46,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[1]],  # res4 temporal kernel.
         [[1]],  # res5 temporal kernel.
     ],
-    "c2d_nopool": [
+    "slow_c2d": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
         [[1]],  # res3 temporal kernel.
@@ -57,7 +60,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[3, 1]],  # res4 temporal kernel.
         [[1, 3]],  # res5 temporal kernel.
     ],
-    "i3d_nopool": [
+    "slow_i3d": [
         [[5]],  # conv1 temporal kernel.
         [[3]],  # res2 temporal kernel.
         [[3, 1]],  # res3 temporal kernel.
@@ -90,9 +93,9 @@ _TEMPORAL_KERNEL_BASIS = {
 _POOL1 = {
     "2d": [[1, 1, 1]],
     "c2d": [[2, 1, 1]],
-    "c2d_nopool": [[1, 1, 1]],
+    "slow_c2d": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],
-    "i3d_nopool": [[1, 1, 1]],
+    "slow_i3d": [[1, 1, 1]],
     "slow": [[1, 1, 1]],
     "slowfast": [[1, 1, 1], [1, 1, 1]],
     "x3d": [[1, 1, 1]],
@@ -179,11 +182,15 @@ class SlowFast(nn.Module):
         """
         super(SlowFast, self).__init__()
         self.norm_module = get_norm(cfg)
+        self.cfg = cfg
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -376,6 +383,7 @@ class SlowFast(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
@@ -386,6 +394,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[None, None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES
@@ -402,9 +411,12 @@ class SlowFast(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
 
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s1_fuse(x)
         x = self.s2(x)
@@ -454,7 +466,10 @@ class ResNet(nn.Module):
         self.num_pathways = 1
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -469,6 +484,7 @@ class ResNet(nn.Module):
         pool_size = _POOL1[cfg.MODEL.ARCH]
         assert len({len(pool_size), self.num_pathways}) == 1
         assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
 
         (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
 
@@ -597,13 +613,15 @@ class ResNet(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[width_per_group * 32],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[None, None]
+                pool_size=[None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES // pool_size[0][0],
@@ -613,9 +631,11 @@ class ResNet(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
-
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s2(x)
         y = []  # Don't modify x list in place due to activation checkpoint.
@@ -957,6 +977,7 @@ class MViT(nn.Module):
             num_classes,
             dropout_rate=cfg.MODEL.DROPOUT_RATE,
             act_func=cfg.MODEL.HEAD_ACT,
+            cfg=cfg,
         )
         if self.sep_pos_embed:
             trunc_normal_(self.pos_embed_spatial, std=0.02)

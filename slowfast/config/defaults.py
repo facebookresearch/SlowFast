@@ -2,6 +2,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Configs."""
+import math
+
 from fvcore.common.config import CfgNode
 
 from . import custom_config
@@ -10,6 +12,82 @@ from . import custom_config
 # Config definition
 # -----------------------------------------------------------------------------
 _C = CfgNode()
+
+# -----------------------------------------------------------------------------
+# Contrastive Model (for MoCo, SimCLR, SwAV, BYOL)
+# -----------------------------------------------------------------------------
+
+_C.CONTRASTIVE = CfgNode()
+
+# temperature used for contrastive losses
+_C.CONTRASTIVE.T = 0.07
+
+# output dimension for the loss
+_C.CONTRASTIVE.DIM = 128
+
+# number of training samples (for kNN bank)
+_C.CONTRASTIVE.LENGTH = 239975
+
+# the length of MoCo's and MemBanks' queues
+_C.CONTRASTIVE.QUEUE_LEN = 65536
+
+# momentum for momentum encoder updates
+_C.CONTRASTIVE.MOMENTUM = 0.5
+
+# wether to anneal momentum to value above with cosine schedule
+_C.CONTRASTIVE.MOMENTUM_ANNEALING = False
+
+# either memorybank, moco, simclr, byol, swav
+_C.CONTRASTIVE.TYPE = "mem"
+
+# wether to interpolate memorybank in time
+_C.CONTRASTIVE.INTERP_MEMORY = False
+
+# 1d or 2d (+temporal) memory
+_C.CONTRASTIVE.MEM_TYPE = "1d"
+
+# number of classes for online kNN evaluation
+_C.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM = 400
+
+# use an MLP projection with these num layers
+_C.CONTRASTIVE.NUM_MLP_LAYERS = 1
+
+# dimension of projection and predictor MLPs
+_C.CONTRASTIVE.MLP_DIM = 2048
+
+# use BN in projection/prediction MLP
+_C.CONTRASTIVE.BN_MLP = False
+
+# use synchronized BN in projection/prediction MLP
+_C.CONTRASTIVE.BN_SYNC_MLP = False
+
+# shuffle BN only locally vs. across machines
+_C.CONTRASTIVE.LOCAL_SHUFFLE_BN = True
+
+# Wether to fill multiple clips (or just the first) into queue
+_C.CONTRASTIVE.MOCO_MULTI_VIEW_QUEUE = False
+
+# if sampling multiple clips per vid they need to be at least min frames apart
+_C.CONTRASTIVE.DELTA_CLIPS_MIN = -math.inf
+
+# if sampling multiple clips per vid they can be max frames apart
+_C.CONTRASTIVE.DELTA_CLIPS_MAX = math.inf
+
+# if non empty, use predictors with depth specified
+_C.CONTRASTIVE.PREDICTOR_DEPTHS = []
+
+# Wether to sequentially process multiple clips (=lower mem usage) or batch them
+_C.CONTRASTIVE.SEQUENTIAL = False
+
+# Wether to perform SimCLR loss across machines (or only locally)
+_C.CONTRASTIVE.SIMCLR_DIST_ON = True
+
+# Length of queue used in SwAV
+_C.CONTRASTIVE.SWAV_QEUE_LEN = 0
+
+# Wether to run online kNN evaluation during training
+_C.CONTRASTIVE.KNN_ON = True
+
 
 # ---------------------------------------------------------------------------- #
 # Batch norm options
@@ -187,6 +265,9 @@ _C.RESNET.STRIDE_1X1 = False
 #  If true, initialize the gamma of the final BN of each block to zero.
 _C.RESNET.ZERO_INIT_FINAL_BN = False
 
+#  If true, initialize the final conv layer of each block to zero.
+_C.RESNET.ZERO_INIT_FINAL_CONV = False
+
 # Number of weight layers.
 _C.RESNET.DEPTH = 50
 
@@ -276,7 +357,14 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d", "mvit"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = [
+    "2d",
+    "c2d",
+    "i3d",
+    "slow",
+    "x3d",
+    "mvit",
+]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
@@ -295,6 +383,16 @@ _C.MODEL.HEAD_ACT = "softmax"
 
 # Activation checkpointing enabled or not to save GPU memory.
 _C.MODEL.ACT_CHECKPOINT = False
+
+# If True, detach the final fc layer from the network, by doing so, only the
+# final fc layer will be trained.
+_C.MODEL.DETACH_FINAL_FC = False
+
+# If True, frozen batch norm stats during training.
+_C.MODEL.FROZEN_BN = False
+
+# If True, AllReduce gradients are compressed to fp16
+_C.MODEL.FP16_ALLREDUCE = False
 
 
 # -----------------------------------------------------------------------------
@@ -473,8 +571,11 @@ _C.DATA.TEST_CROP_SIZE = 256
 # frame sampling.
 _C.DATA.TARGET_FPS = 30
 
+# JITTER TARGET_FPS by +- this number randomly
+_C.DATA.TRAIN_JITTER_FPS = 0.0
+
 # Decoding backend, options include `pyav` or `torchvision`
-_C.DATA.DECODING_BACKEND = "pyav"
+_C.DATA.DECODING_BACKEND = "torchvision"
 
 # if True, sample uniformly in [1 / max_scale, 1 / min_scale] and take a
 # reciprocal to get the scale. If False, take a uniform sample from
@@ -492,6 +593,51 @@ _C.DATA.ENSEMBLE_METHOD = "sum"
 
 # If True, revert the default input channel (RBG <-> BGR).
 _C.DATA.REVERSE_INPUT_CHANNEL = False
+
+# how many samples (=clips) to decode from a single video
+_C.DATA.TRAIN_CROP_NUM_TEMPORAL = 1
+
+# how many spatial samples to crop from a single clip
+_C.DATA.TRAIN_CROP_NUM_SPATIAL = 1
+
+# color random percentage for grayscale conversion
+_C.DATA.COLOR_RND_GRAYSCALE = 0.0
+
+# loader can read .csv file in chunks of this chunk size
+_C.DATA.LOADER_CHUNK_SIZE = 0
+
+# if LOADER_CHUNK_SIZE > 0, define overall length of .csv file
+_C.DATA.LOADER_CHUNK_OVERALL_SIZE = 0
+
+# for chunked reading, dataloader can skip rows in (large)
+# training csv file
+_C.DATA.SKIP_ROWS = 0
+
+# The separator used between path and label.
+_C.DATA.PATH_LABEL_SEPARATOR = " "
+
+# augmentation probability to convert raw decoded video to
+# grayscale temporal difference
+_C.DATA.TIME_DIFF_PROB = 0.0
+
+# Apply SSL-based SimCLR / MoCo v1/v2 color augmentations,
+#  with params below
+_C.DATA.SSL_COLOR_JITTER = False
+
+# color jitter percentage for brightness, contrast, saturation
+_C.DATA.SSL_COLOR_BRI_CON_SAT = [0.4, 0.4, 0.4]
+
+# color jitter percentage for hue
+_C.DATA.SSL_COLOR_HUE = 0.1
+
+# SimCLR / MoCo v2 augmentations on/off
+_C.DATA.SSL_MOCOV2_AUG = False
+
+# SimCLR / MoCo v2 blur augmentation minimum gaussian sigma
+_C.DATA.SSL_BLUR_SIGMA_MIN = [0.0, 0.1]
+
+# SimCLR / MoCo v2 blur augmentation maximum gaussian sigma
+_C.DATA.SSL_BLUR_SIGMA_MAX = [0.0, 2.0]
 
 
 # ---------------------------------------------------------------------------- #
@@ -561,9 +707,16 @@ _C.SOLVER.CLIP_GRAD_VAL = None
 
 # Clip gradient at this norm before optimizer update
 _C.SOLVER.CLIP_GRAD_L2NORM = None
+
+# LARS optimizer
+_C.SOLVER.LARS_ON = False
+
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #
+
+# The name of the current task; e.g. "ssl"/"sl" for (self)supervised learning
+_C.TASK = ""
 
 # Number of GPUs to use (applies to both training and testing).
 _C.NUM_GPUS = 1
@@ -575,7 +728,7 @@ _C.NUM_SHARDS = 1
 _C.SHARD_ID = 0
 
 # Output basedir.
-_C.OUTPUT_DIR = "./tmp"
+_C.OUTPUT_DIR = "."
 
 # Note that non-determinism may still be present due to non-deterministic
 # operator implementations in GPU operator libraries.

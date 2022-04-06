@@ -162,11 +162,15 @@ class Charades(torch.utils.data.Dataset):
                 is `channel` x `num frames` x `height` x `width`.
             label (int): the label of the current video.
             index (int): the index of the video.
+            time index (zero): The time index is currently not supported.
+            {} extra data, currently not supported
         """
         short_cycle_idx = None
         # When short cycle is used, input index is a tupple.
         if isinstance(index, tuple):
-            index, short_cycle_idx = index
+            index, self._num_yielded = index
+            if self.cfg.MULTIGRID.SHORT_CYCLE:
+                index, short_cycle_idx = index
 
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
@@ -240,7 +244,7 @@ class Charades(torch.utils.data.Dataset):
             inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
         )
         frames = utils.pack_pathway_output(self.cfg, frames)
-        return frames, label, index, {}
+        return frames, label, index, 0, {}
 
     def __len__(self):
         """

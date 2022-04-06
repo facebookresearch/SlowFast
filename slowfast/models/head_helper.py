@@ -7,6 +7,11 @@ import torch
 import torch.nn as nn
 from detectron2.layers import ROIAlign
 
+from slowfast.models.batchnorm_helper import (
+    NaiveSyncBatchNorm1d as NaiveSyncBatchNorm1d,
+)
+from slowfast.models.nonlocal_helper import Nonlocal
+
 
 class ResNetRoIHead(nn.Module):
     """
@@ -23,6 +28,7 @@ class ResNetRoIHead(nn.Module):
         dropout_rate=0.0,
         act_func="softmax",
         aligned=True,
+        detach_final_fc=False,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -46,6 +52,9 @@ class ResNetRoIHead(nn.Module):
                 softmax on the output. 'sigmoid': applies sigmoid on the output.
             aligned (bool): if False, use the legacy implementation. If True,
                 align the results more perfectly.
+            detach_final_fc (bool): if True, detach the final fc layer from the
+                gradient graph. By doing so, only the final fc layer will be
+                trained.
         Note:
             Given a continuous coordinate c, its two neighboring pixel indices
             (in our pixel model) are computed by floor (c - 0.5) and ceil
@@ -66,6 +75,8 @@ class ResNetRoIHead(nn.Module):
             len({len(pool_size), len(dim_in)}) == 1
         ), "pathway dimensions are not consistent."
         self.num_pathways = len(pool_size)
+        self.detach_final_fc = detach_final_fc
+
         for pathway in range(self.num_pathways):
             temporal_pool = nn.AvgPool3d(
                 [pool_size[pathway][0], 1, 1], stride=1
@@ -125,9 +136,59 @@ class ResNetRoIHead(nn.Module):
             x = self.dropout(x)
 
         x = x.view(x.shape[0], -1)
+        if self.detach_final_fc:
+            x = x.detach()
         x = self.projection(x)
         x = self.act(x)
         return x
+
+
+class MLPHead(nn.Module):
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        mlp_dim,
+        num_layers,
+        bn_on=False,
+        bias=True,
+        flatten=False,
+        xavier_init=True,
+        bn_sync_num=1,
+    ):
+        super(MLPHead, self).__init__()
+        self.flatten = flatten
+        b = False if bn_on else bias
+        # assert bn_on or bn_sync_num=1
+        mlp_layers = [nn.Linear(dim_in, mlp_dim, bias=b)]
+        mlp_layers[-1].xavier_init = xavier_init
+        for i in range(1, num_layers):
+            if bn_on:
+                if bn_sync_num > 1:
+                    mlp_layers.append(
+                        NaiveSyncBatchNorm1d(
+                            num_sync_devices=bn_sync_num, num_features=mlp_dim
+                        )
+                    )
+                else:
+                    mlp_layers.append(nn.BatchNorm1d(num_features=mlp_dim))
+            mlp_layers.append(nn.ReLU(inplace=True))
+            if i == num_layers - 1:
+                d = dim_out
+                b = bias
+            else:
+                d = mlp_dim
+            mlp_layers.append(nn.Linear(mlp_dim, d, bias=b))
+            mlp_layers[-1].xavier_init = xavier_init
+        self.projection = nn.Sequential(*mlp_layers)
+
+    def forward(self, x):
+        if x.ndim == 5:
+            x = x.permute((0, 2, 3, 4, 1))
+        if self.flatten:
+            x = x.reshape(-1, x.shape[-1])
+
+        return self.projection(x)
 
 
 class ResNetBasicHead(nn.Module):
@@ -146,6 +207,8 @@ class ResNetBasicHead(nn.Module):
         pool_size,
         dropout_rate=0.0,
         act_func="softmax",
+        detach_final_fc=False,
+        cfg=None,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -164,12 +227,21 @@ class ResNetBasicHead(nn.Module):
                 dropout.
             act_func (string): activation function to use. 'softmax': applies
                 softmax on the output. 'sigmoid': applies sigmoid on the output.
+            detach_final_fc (bool): if True, detach the fc layer from the
+                gradient graph. By doing so, only the final fc layer will be
+                trained.
+            cfg (struct): The config for the current experiment.
         """
         super(ResNetBasicHead, self).__init__()
         assert (
             len({len(pool_size), len(dim_in)}) == 1
         ), "pathway dimensions are not consistent."
         self.num_pathways = len(pool_size)
+        self.detach_final_fc = detach_final_fc
+        self.cfg = cfg
+        self.local_projection_modules = []
+        self.predictors = nn.ModuleList()
+        self.l2norm_feats = False
 
         for pathway in range(self.num_pathways):
             if pool_size[pathway] is None:
@@ -182,18 +254,48 @@ class ResNetBasicHead(nn.Module):
             self.dropout = nn.Dropout(dropout_rate)
         # Perform FC in a fully convolutional manner. The FC layer will be
         # initialized with a different std comparing to convolutional layers.
-        self.projection = nn.Linear(sum(dim_in), num_classes, bias=True)
+        if cfg.CONTRASTIVE.NUM_MLP_LAYERS == 1:
+            self.projection = nn.Linear(sum(dim_in), num_classes, bias=True)
+        else:
+            self.projection = MLPHead(
+                sum(dim_in),
+                num_classes,
+                cfg.CONTRASTIVE.MLP_DIM,
+                cfg.CONTRASTIVE.NUM_MLP_LAYERS,
+                bn_on=cfg.CONTRASTIVE.BN_MLP,
+                bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
+                if cfg.CONTRASTIVE.BN_SYNC_MLP
+                else 1,
+            )
 
         # Softmax for evaluation and testing.
         if act_func == "softmax":
             self.act = nn.Softmax(dim=4)
         elif act_func == "sigmoid":
             self.act = nn.Sigmoid()
+        elif act_func == "none":
+            self.act = None
         else:
             raise NotImplementedError(
                 "{} is not supported as an activation"
                 "function.".format(act_func)
             )
+
+        if cfg.CONTRASTIVE.PREDICTOR_DEPTHS:
+            d_in = num_classes
+            for i, n_layers in enumerate(cfg.CONTRASTIVE.PREDICTOR_DEPTHS):
+                local_mlp = MLPHead(
+                    d_in,
+                    num_classes,
+                    cfg.CONTRASTIVE.MLP_DIM,
+                    n_layers,
+                    bn_on=cfg.CONTRASTIVE.BN_MLP,
+                    flatten=False,
+                    bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
+                    if cfg.CONTRASTIVE.BN_SYNC_MLP
+                    else 1,
+                )
+                self.predictors.append(local_mlp)
 
     def forward(self, inputs):
         assert (
@@ -209,15 +311,38 @@ class ResNetBasicHead(nn.Module):
         # Perform dropout.
         if hasattr(self, "dropout"):
             x = self.dropout(x)
-        x = self.projection(x)
+        if self.detach_final_fc:
+            x = x.detach()
+        if self.l2norm_feats:
+            x = nn.functional.normalize(x, dim=1, p=2)
 
-        # Performs fully convlutional inference.
+        if (
+            x.shape[1:4] == torch.Size([1, 1, 1])
+            and self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+        ):
+            x = x.view(x.shape[0], -1)
+
+        x_proj = self.projection(x)
+
+        time_projs = []
+        if self.predictors:
+            x_in = x_proj
+            for proj in self.predictors:
+                time_projs.append(proj(x_in))
+
         if not self.training:
-            x = self.act(x)
-            x = x.mean([1, 2, 3])
+            if self.act is not None:
+                x_proj = self.act(x_proj)
+            # Performs fully convlutional inference.
+            if x_proj.ndim == 5 and x_proj.shape[1:4] > torch.Size([1, 1, 1]):
+                x_proj = x_proj.mean([1, 2, 3])
 
-        x = x.view(x.shape[0], -1)
-        return x
+        x_proj = x_proj.view(x_proj.shape[0], -1)
+
+        if time_projs:
+            return [x_proj] + time_projs
+        else:
+            return x_proj
 
 
 class X3DHead(nn.Module):
@@ -371,6 +496,7 @@ class TransformerBasicHead(nn.Module):
         num_classes,
         dropout_rate=0.0,
         act_func="softmax",
+        cfg=None,
     ):
         """
         Perform linear projection and activation as head for tranformers.
@@ -387,11 +513,28 @@ class TransformerBasicHead(nn.Module):
             self.dropout = nn.Dropout(dropout_rate)
         self.projection = nn.Linear(dim_in, num_classes, bias=True)
 
+        if cfg.CONTRASTIVE.NUM_MLP_LAYERS == 1:
+            self.projection = nn.Linear(dim_in, num_classes, bias=True)
+        else:
+            self.projection = MLPHead(
+                dim_in,
+                num_classes,
+                cfg.CONTRASTIVE.MLP_DIM,
+                cfg.CONTRASTIVE.NUM_MLP_LAYERS,
+                bn_on=cfg.CONTRASTIVE.BN_MLP,
+                bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
+                if cfg.CONTRASTIVE.BN_SYNC_MLP
+                else 1,
+            )
+        self.detach_final_fc = cfg.MODEL.DETACH_FINAL_FC
+
         # Softmax for evaluation and testing.
         if act_func == "softmax":
             self.act = nn.Softmax(dim=1)
         elif act_func == "sigmoid":
             self.act = nn.Sigmoid()
+        elif act_func == "none":
+            self.act = None
         else:
             raise NotImplementedError(
                 "{} is not supported as an activation"
@@ -401,8 +544,17 @@ class TransformerBasicHead(nn.Module):
     def forward(self, x):
         if hasattr(self, "dropout"):
             x = self.dropout(x)
+        if self.detach_final_fc:
+            x = x.detach()
         x = self.projection(x)
 
         if not self.training:
-            x = self.act(x)
+            if self.act is not None:
+                x = self.act(x)
+            # Performs fully convlutional inference.
+            if x.ndim == 5 and x.shape[1:4] > torch.Size([1, 1, 1]):
+                x = x.mean([1, 2, 3])
+
+        x = x.view(x.shape[0], -1)
+
         return x
