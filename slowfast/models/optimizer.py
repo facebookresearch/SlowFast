@@ -115,6 +115,13 @@ def construct_optimizer(model, cfg):
             eps=1e-08,
             weight_decay=cfg.SOLVER.WEIGHT_DECAY,
         )
+    elif cfg.SOLVER.OPTIMIZING_METHOD == "mt_adamw":
+        optimizer = torch.optim._multi_tensor.AdamW(
+            optim_params,
+            lr=cfg.SOLVER.BASE_LR,
+            eps=1e-08,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+        )
     else:
         raise NotImplementedError(
             "Does not support {} optimizer".format(cfg.SOLVER.OPTIMIZING_METHOD)
