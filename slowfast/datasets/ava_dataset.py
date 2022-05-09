@@ -38,8 +38,8 @@ class Ava(torch.utils.data.Dataset):
             self._jitter_max_scale = cfg.DATA.TRAIN_JITTER_SCALES[1]
             self._use_color_augmentation = cfg.AVA.TRAIN_USE_COLOR_AUGMENTATION
             self._pca_jitter_only = cfg.AVA.TRAIN_PCA_JITTER_ONLY
-            self._pca_eigval = cfg.AVA.TRAIN_PCA_EIGVAL
-            self._pca_eigvec = cfg.AVA.TRAIN_PCA_EIGVEC
+            self._pca_eigval = cfg.DATA.TRAIN_PCA_EIGVAL
+            self._pca_eigvec = cfg.DATA.TRAIN_PCA_EIGVEC
         else:
             self._crop_size = cfg.DATA.TEST_CROP_SIZE
             self._test_force_flip = cfg.AVA.TEST_FORCE_FLIP
@@ -96,6 +96,18 @@ class Ava(torch.utils.data.Dataset):
         logger.info("Number of boxes: {}.".format(self._num_boxes_used))
 
     def __len__(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
+        return self.num_videos
+
+    @property
+    def num_videos(self):
+        """
+        Returns:
+            (int): the number of videos in the dataset.
+        """
         return len(self._keyframe_indices)
 
     def _images_and_boxes_preprocessing_cv2(self, imgs, boxes):
@@ -347,10 +359,18 @@ class Ava(torch.utils.data.Dataset):
             frames (tensor): the frames of sampled from the video. The dimension
                 is `channel` x `num frames` x `height` x `width`.
             label (ndarray): the label for correspond boxes for the current video.
+            time index (zero): The time index is currently not supported for AVA.
             idx (int): the video index provided by the pytorch sampler.
             extra_data (dict): a dict containing extra data fields, like "boxes",
                 "ori_boxes" and "metadata".
         """
+        short_cycle_idx = None
+        # When short cycle is used, input index is a tupple.
+        if isinstance(idx, tuple):
+            idx, self._num_yielded = idx
+            if self.cfg.MULTIGRID.SHORT_CYCLE:
+                idx, short_cycle_idx = idx
+
         video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
         # Get the frame idxs for current clip.
         seq = utils.get_sequence(
@@ -413,4 +433,4 @@ class Ava(torch.utils.data.Dataset):
             "metadata": metadata,
         }
 
-        return imgs, label_arrs, idx, extra_data
+        return imgs, label_arrs, idx, torch.zeros(1), extra_data

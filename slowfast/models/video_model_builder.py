@@ -1,23 +1,44 @@
-#!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+
 
 """Video models."""
 
 import math
+from functools import partial
 import torch
 import torch.nn as nn
+from torch.nn.init import trunc_normal_
 
 import slowfast.utils.weight_init_helper as init_helper
+from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
+from slowfast.models.stem_helper import PatchEmbed
+from slowfast.models.utils import (
+    round_width,
+    validate_checkpoint_wrapper_import,
+)
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
 
+try:
+    from fairscale.nn.checkpoint import checkpoint_wrapper
+except ImportError:
+    checkpoint_wrapper = None
+
+
 # Number of blocks for different stages given the model depth.
-_MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
+_MODEL_STAGE_DEPTH = {18: (2, 2, 2, 2), 50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
 
 # Basis of temporal kernel sizes for each of the stage.
 _TEMPORAL_KERNEL_BASIS = {
+    "2d": [
+        [[1]],  # conv1 temporal kernel.
+        [[1]],  # res2 temporal kernel.
+        [[1]],  # res3 temporal kernel.
+        [[1]],  # res4 temporal kernel.
+        [[1]],  # res5 temporal kernel.
+    ],
     "c2d": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
@@ -25,7 +46,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[1]],  # res4 temporal kernel.
         [[1]],  # res5 temporal kernel.
     ],
-    "c2d_nopool": [
+    "slow_c2d": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
         [[1]],  # res3 temporal kernel.
@@ -39,7 +60,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[3, 1]],  # res4 temporal kernel.
         [[1, 3]],  # res5 temporal kernel.
     ],
-    "i3d_nopool": [
+    "slow_i3d": [
         [[5]],  # conv1 temporal kernel.
         [[3]],  # res2 temporal kernel.
         [[3, 1]],  # res3 temporal kernel.
@@ -70,10 +91,11 @@ _TEMPORAL_KERNEL_BASIS = {
 }
 
 _POOL1 = {
+    "2d": [[1, 1, 1]],
     "c2d": [[2, 1, 1]],
-    "c2d_nopool": [[1, 1, 1]],
+    "slow_c2d": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],
-    "i3d_nopool": [[1, 1, 1]],
+    "slow_i3d": [[1, 1, 1]],
     "slow": [[1, 1, 1]],
     "slowfast": [[1, 1, 1], [1, 1, 1]],
     "x3d": [[1, 1, 1]],
@@ -160,11 +182,15 @@ class SlowFast(nn.Module):
         """
         super(SlowFast, self).__init__()
         self.norm_module = get_norm(cfg)
+        self.cfg = cfg
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -357,6 +383,7 @@ class SlowFast(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
@@ -367,6 +394,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[None, None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES
@@ -383,9 +411,12 @@ class SlowFast(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
 
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s1_fuse(x)
         x = self.s2(x)
@@ -435,7 +466,10 @@ class ResNet(nn.Module):
         self.num_pathways = 1
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -450,6 +484,7 @@ class ResNet(nn.Module):
         pool_size = _POOL1[cfg.MODEL.ARCH]
         assert len({len(pool_size), self.num_pathways}) == 1
         assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
 
         (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
 
@@ -459,7 +494,7 @@ class ResNet(nn.Module):
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
-        self.s1 = stem_helper.VideoModelStem(
+        s1 = stem_helper.VideoModelStem(
             dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
             dim_out=[width_per_group],
             kernel=[temp_kernel[0][0] + [7, 7]],
@@ -468,7 +503,7 @@ class ResNet(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.s2 = resnet_helper.ResStage(
+        s2 = resnet_helper.ResStage(
             dim_in=[width_per_group],
             dim_out=[width_per_group * 4],
             dim_inner=[dim_inner],
@@ -487,6 +522,18 @@ class ResNet(nn.Module):
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
         )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
 
         for pathway in range(self.num_pathways):
             pool = nn.MaxPool3d(
@@ -566,13 +613,15 @@ class ResNet(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[width_per_group * 32],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[None, None]
+                pool_size=[None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES // pool_size[0][0],
@@ -582,15 +631,18 @@ class ResNet(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
-
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s2(x)
+        y = []  # Don't modify x list in place due to activation checkpoint.
         for pathway in range(self.num_pathways):
             pool = getattr(self, "pathway{}_pool".format(pathway))
-            x[pathway] = pool(x[pathway])
-        x = self.s3(x)
+            y.append(pool(x[pathway]))
+        x = self.s3(y)
         x = self.s4(x)
         x = self.s5(x)
         if self.enable_detection:
@@ -628,13 +680,13 @@ class X3D(nn.Module):
         self.dim_c1 = cfg.X3D.DIM_C1
 
         self.dim_res2 = (
-            self._round_width(self.dim_c1, exp_stage, divisor=8)
+            round_width(self.dim_c1, exp_stage, divisor=8)
             if cfg.X3D.SCALE_RES2
             else self.dim_c1
         )
-        self.dim_res3 = self._round_width(self.dim_res2, exp_stage, divisor=8)
-        self.dim_res4 = self._round_width(self.dim_res3, exp_stage, divisor=8)
-        self.dim_res5 = self._round_width(self.dim_res4, exp_stage, divisor=8)
+        self.dim_res3 = round_width(self.dim_res2, exp_stage, divisor=8)
+        self.dim_res4 = round_width(self.dim_res3, exp_stage, divisor=8)
+        self.dim_res5 = round_width(self.dim_res4, exp_stage, divisor=8)
 
         self.block_basis = [
             # blocks, c, stride
@@ -647,20 +699,6 @@ class X3D(nn.Module):
         init_helper.init_weights(
             self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
         )
-
-    def _round_width(self, width, multiplier, min_depth=8, divisor=8):
-        """Round width of filters based on width multiplier."""
-        if not multiplier:
-            return width
-
-        width *= multiplier
-        min_depth = min_depth or divisor
-        new_filters = max(
-            min_depth, int(width + divisor / 2) // divisor * divisor
-        )
-        if new_filters < 0.9 * width:
-            new_filters += divisor
-        return int(new_filters)
 
     def _round_repeats(self, repeats, multiplier):
         """Round number of layers based on depth multiplier."""
@@ -688,7 +726,7 @@ class X3D(nn.Module):
 
         w_mul = cfg.X3D.WIDTH_FACTOR
         d_mul = cfg.X3D.DEPTH_FACTOR
-        dim_res1 = self._round_width(self.dim_c1, w_mul)
+        dim_res1 = round_width(self.dim_c1, w_mul)
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
@@ -705,7 +743,7 @@ class X3D(nn.Module):
         # blob_in = s1
         dim_in = dim_res1
         for stage, block in enumerate(self.block_basis):
-            dim_out = self._round_width(block[1], w_mul)
+            dim_out = round_width(block[1], w_mul)
             dim_inner = int(cfg.X3D.BOTTLENECK_FACTOR * dim_out)
 
             n_rep = self._round_repeats(block[0], d_mul)
@@ -757,4 +795,279 @@ class X3D(nn.Module):
     def forward(self, x, bboxes=None):
         for module in self.children():
             x = module(x)
+        return x
+
+
+@MODEL_REGISTRY.register()
+class MViT(nn.Module):
+    """
+    Multiscale Vision Transformers
+    Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, Christoph Feichtenhofer
+    https://arxiv.org/abs/2104.11227
+    """
+
+    def __init__(self, cfg):
+        super().__init__()
+        # Get parameters.
+        assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE
+        self.cfg = cfg
+        pool_first = cfg.MVIT.POOL_FIRST
+        # Prepare input.
+        spatial_size = cfg.DATA.TRAIN_CROP_SIZE
+        temporal_size = cfg.DATA.NUM_FRAMES
+        in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
+        use_2d_patch = cfg.MVIT.PATCH_2D
+        self.patch_stride = cfg.MVIT.PATCH_STRIDE
+        if use_2d_patch:
+            self.patch_stride = [1] + self.patch_stride
+        # Prepare output.
+        num_classes = cfg.MODEL.NUM_CLASSES
+        embed_dim = cfg.MVIT.EMBED_DIM
+        # Prepare backbone
+        num_heads = cfg.MVIT.NUM_HEADS
+        mlp_ratio = cfg.MVIT.MLP_RATIO
+        qkv_bias = cfg.MVIT.QKV_BIAS
+        self.drop_rate = cfg.MVIT.DROPOUT_RATE
+        depth = cfg.MVIT.DEPTH
+        drop_path_rate = cfg.MVIT.DROPPATH_RATE
+        mode = cfg.MVIT.MODE
+        self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
+        if cfg.MVIT.NORM == "layernorm":
+            norm_layer = partial(nn.LayerNorm, eps=1e-6)
+        else:
+            raise NotImplementedError("Only supports layernorm.")
+        self.num_classes = num_classes
+        self.patch_embed = stem_helper.PatchEmbed(
+            dim_in=in_chans,
+            dim_out=embed_dim,
+            kernel=cfg.MVIT.PATCH_KERNEL,
+            stride=cfg.MVIT.PATCH_STRIDE,
+            padding=cfg.MVIT.PATCH_PADDING,
+            conv_2d=use_2d_patch,
+        )
+        self.input_dims = [temporal_size, spatial_size, spatial_size]
+        assert self.input_dims[1] == self.input_dims[2]
+        self.patch_dims = [
+            self.input_dims[i] // self.patch_stride[i]
+            for i in range(len(self.input_dims))
+        ]
+        num_patches = math.prod(self.patch_dims)
+
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, depth)
+        ]  # stochastic depth decay rule
+
+        if self.cls_embed_on:
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            pos_embed_dim = num_patches + 1
+        else:
+            pos_embed_dim = num_patches
+
+        if self.sep_pos_embed:
+            self.pos_embed_spatial = nn.Parameter(
+                torch.zeros(
+                    1, self.patch_dims[1] * self.patch_dims[2], embed_dim
+                )
+            )
+            self.pos_embed_temporal = nn.Parameter(
+                torch.zeros(1, self.patch_dims[0], embed_dim)
+            )
+            if self.cls_embed_on:
+                self.pos_embed_class = nn.Parameter(
+                    torch.zeros(1, 1, embed_dim)
+                )
+        else:
+            self.pos_embed = nn.Parameter(
+                torch.zeros(1, pos_embed_dim, embed_dim)
+            )
+
+        if self.drop_rate > 0.0:
+            self.pos_drop = nn.Dropout(p=self.drop_rate)
+
+        dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
+        for i in range(len(cfg.MVIT.DIM_MUL)):
+            dim_mul[cfg.MVIT.DIM_MUL[i][0]] = cfg.MVIT.DIM_MUL[i][1]
+        for i in range(len(cfg.MVIT.HEAD_MUL)):
+            head_mul[cfg.MVIT.HEAD_MUL[i][0]] = cfg.MVIT.HEAD_MUL[i][1]
+
+        pool_q = [[] for i in range(cfg.MVIT.DEPTH)]
+        pool_kv = [[] for i in range(cfg.MVIT.DEPTH)]
+        stride_q = [[] for i in range(cfg.MVIT.DEPTH)]
+        stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
+
+        for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
+            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
+                1:
+            ]
+            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
+                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
+            else:
+                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = [
+                    s + 1 if s > 1 else s for s in cfg.MVIT.POOL_Q_STRIDE[i][1:]
+                ]
+
+        # If POOL_KV_STRIDE_ADAPTIVE is not None, initialize POOL_KV_STRIDE.
+        if cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE is not None:
+            _stride_kv = cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE
+            cfg.MVIT.POOL_KV_STRIDE = []
+            for i in range(cfg.MVIT.DEPTH):
+                if len(stride_q[i]) > 0:
+                    _stride_kv = [
+                        max(_stride_kv[d] // stride_q[i][d], 1)
+                        for d in range(len(_stride_kv))
+                    ]
+                cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
+
+        for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
+            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
+                i
+            ][1:]
+            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
+                pool_kv[
+                    cfg.MVIT.POOL_KV_STRIDE[i][0]
+                ] = cfg.MVIT.POOL_KVQ_KERNEL
+            else:
+                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
+                    s + 1 if s > 1 else s
+                    for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
+                ]
+
+        self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
+
+        self.blocks = nn.ModuleList()
+
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+
+        for i in range(depth):
+            num_heads = round_width(num_heads, head_mul[i])
+            embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
+            dim_out = round_width(
+                embed_dim,
+                dim_mul[i + 1],
+                divisor=round_width(num_heads, head_mul[i + 1]),
+            )
+            attention_block = MultiScaleBlock(
+                dim=embed_dim,
+                dim_out=dim_out,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                drop_rate=self.drop_rate,
+                drop_path=dpr[i],
+                norm_layer=norm_layer,
+                kernel_q=pool_q[i] if len(pool_q) > i else [],
+                kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                stride_q=stride_q[i] if len(stride_q) > i else [],
+                stride_kv=stride_kv[i] if len(stride_kv) > i else [],
+                mode=mode,
+                has_cls_embed=self.cls_embed_on,
+                pool_first=pool_first,
+            )
+            if cfg.MODEL.ACT_CHECKPOINT:
+                attention_block = checkpoint_wrapper(attention_block)
+            self.blocks.append(attention_block)
+
+        embed_dim = dim_out
+        self.norm = norm_layer(embed_dim)
+
+        self.head = head_helper.TransformerBasicHead(
+            embed_dim,
+            num_classes,
+            dropout_rate=cfg.MODEL.DROPOUT_RATE,
+            act_func=cfg.MODEL.HEAD_ACT,
+            cfg=cfg,
+        )
+        if self.sep_pos_embed:
+            trunc_normal_(self.pos_embed_spatial, std=0.02)
+            trunc_normal_(self.pos_embed_temporal, std=0.02)
+            if self.cls_embed_on:
+                trunc_normal_(self.pos_embed_class, std=0.02)
+        else:
+            trunc_normal_(self.pos_embed, std=0.02)
+        if self.cls_embed_on:
+            trunc_normal_(self.cls_token, std=0.02)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.trunc_normal_(m.weight, std=0.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        if self.cfg.MVIT.ZERO_DECAY_POS_CLS:
+            if self.sep_pos_embed:
+                if self.cls_embed_on:
+                    return {
+                        "pos_embed_spatial",
+                        "pos_embed_temporal",
+                        "pos_embed_class",
+                        "cls_token",
+                    }
+                else:
+                    return {
+                        "pos_embed_spatial",
+                        "pos_embed_temporal",
+                        "pos_embed_class",
+                    }
+            else:
+                if self.cls_embed_on:
+                    return {"pos_embed", "cls_token"}
+                else:
+                    return {"pos_embed"}
+        else:
+            return {}
+
+    def forward(self, x):
+        x = x[0]
+        x = self.patch_embed(x)
+
+        T = self.cfg.DATA.NUM_FRAMES // self.patch_stride[0]
+        H = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
+        W = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
+        B, N, C = x.shape
+
+        if self.cls_embed_on:
+            cls_tokens = self.cls_token.expand(
+                B, -1, -1
+            )  # stole cls_tokens impl from Phil Wang, thanks
+            x = torch.cat((cls_tokens, x), dim=1)
+
+        if self.sep_pos_embed:
+            pos_embed = self.pos_embed_spatial.repeat(
+                1, self.patch_dims[0], 1
+            ) + torch.repeat_interleave(
+                self.pos_embed_temporal,
+                self.patch_dims[1] * self.patch_dims[2],
+                dim=1,
+            )
+            if self.cls_embed_on:
+                pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
+            x = x + pos_embed
+        else:
+            x = x + self.pos_embed
+
+        if self.drop_rate:
+            x = self.pos_drop(x)
+
+        if self.norm_stem:
+            x = self.norm_stem(x)
+
+        thw = [T, H, W]
+        for blk in self.blocks:
+            x, thw = blk(x, thw)
+
+        x = self.norm(x)
+        if self.cls_embed_on:
+            x = x[:, 0]
+        else:
+            x = x.mean(1)
+
+        x = self.head(x)
         return x

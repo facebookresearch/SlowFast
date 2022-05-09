@@ -110,6 +110,12 @@ class AVAMeter(object):
         )
         self.output_dir = cfg.OUTPUT_DIR
 
+        self.min_top1_err = 100.0
+        self.min_top5_err = 100.0
+        self.stats = {}
+        self.stats["top1_acc"] = 100.0
+        self.stats["top5_acc"] = 100.0
+
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
         Log the stats.
@@ -126,7 +132,9 @@ class AVAMeter(object):
         if self.mode == "train":
             stats = {
                 "_type": "{}_iter".format(self.mode),
-                "cur_epoch": "{}".format(cur_epoch + 1),
+                "cur_epoch": "{}/{}".format(
+                    cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH
+                ),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
                 "dt": self.iter_timer.seconds(),
@@ -139,7 +147,9 @@ class AVAMeter(object):
         elif self.mode == "val":
             stats = {
                 "_type": "{}_iter".format(self.mode),
-                "cur_epoch": "{}".format(cur_epoch + 1),
+                "cur_epoch": "{}/{}".format(
+                    cur_epoch + 1, self.cfg.SOLVER.MAX_EPOCH
+                ),
                 "cur_iter": "{}".format(cur_iter + 1),
                 "eta": eta,
                 "dt": self.iter_timer.seconds(),
@@ -234,7 +244,13 @@ class AVAMeter(object):
         )
         if log:
             stats = {"mode": self.mode, "map": self.full_map}
-            logging.log_json_stats(stats)
+            logging.log_json_stats(stats, self.output_dir)
+
+        map_str = "{:.{prec}f}".format(self.full_map * 100.0, prec=2)
+
+        self.min_top1_err = self.full_map
+        self.stats["top1_acc"] = map_str
+        self.stats["top5_acc"] = map_str
 
     def log_epoch_stats(self, cur_epoch):
         """
@@ -252,7 +268,7 @@ class AVAMeter(object):
                 "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
                 "RAM": "{:.2f}/{:.2f}G".format(*misc.cpu_mem_usage()),
             }
-            logging.log_json_stats(stats)
+            logging.log_json_stats(stats, self.output_dir)
 
 
 class TestMeter(object):
@@ -396,25 +412,25 @@ class TestMeter(object):
         ks (tuple): list of top-k values for topk_accuracies. For example,
             ks = (1, 5) correspods to top-1 and top-5 accuracy.
         """
-        if not all(self.clip_count == self.num_clips):
+        clip_check = self.clip_count == self.num_clips
+        if not all(clip_check):
             logger.warning(
-                "clip count {} ~= num clips {}".format(
-                    ", ".join(
-                        [
-                            "{}: {}".format(i, k)
-                            for i, k in enumerate(self.clip_count.tolist())
-                        ]
-                    ),
+                "clip count Ids={} = {} (should be {})".format(
+                    np.argwhere(~clip_check),
+                    self.clip_count[~clip_check],
                     self.num_clips,
                 )
             )
 
         self.stats = {"split": "test_final"}
         if self.multi_label:
-            map = get_map(
+            mean_ap = get_map(
                 self.video_preds.cpu().numpy(), self.video_labels.cpu().numpy()
             )
-            self.stats["map"] = map
+            map_str = "{:.{prec}f}".format(mean_ap * 100.0, prec=2)
+            self.stats["map"] = map_str
+            self.stats["top1_acc"] = map_str
+            self.stats["top5_acc"] = map_str
         else:
             num_topks_correct = metrics.topks_correct(
                 self.video_preds, self.video_labels, ks
@@ -425,6 +441,7 @@ class TestMeter(object):
             ]
             assert len({len(ks), len(topks)}) == 1
             for k, topk in zip(ks, topks):
+                # self.stats["top{}_acc".format(k)] = topk.cpu().numpy()
                 self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
                     topk, prec=2
                 )
@@ -580,7 +597,9 @@ class TrainMeter(object):
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "train_iter",
+            "_type": "train_iter_{}".format(
+                "ssl" if self._cfg.TASK == "ssl" else ""
+            ),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "dt": self.iter_timer.seconds(),
@@ -614,7 +633,9 @@ class TrainMeter(object):
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "train_epoch",
+            "_type": "train_epoch{}".format(
+                "_ssl" if self._cfg.TASK == "ssl" else ""
+            ),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "dt": self.iter_timer.seconds(),
             "dt_data": self.data_timer.seconds(),
@@ -631,10 +652,7 @@ class TrainMeter(object):
             stats["top1_err"] = top1_err
             stats["top5_err"] = top5_err
             stats["loss"] = avg_loss
-        if len(preds) > 0 and len(labels) > 0:
-            calc_binary_stats(preds, labels, stats, self._cfg)
-        self.logger.info(stats)
-        return stats
+        logging.log_json_stats(stats, self.output_dir)
 
 
 class ValMeter(object):
@@ -673,6 +691,8 @@ class ValMeter(object):
         Reset the Meter.
         """
         self.iter_timer.reset()
+        self.data_timer.reset()
+        self.net_timer.reset()
         self.mb_top1_err.reset()
         self.mb_top5_err.reset()
         self.num_top1_mis = 0
@@ -736,7 +756,9 @@ class ValMeter(object):
         eta_sec = self.iter_timer.seconds() * (self.max_iter - cur_iter - 1)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
         stats = {
-            "_type": "val_iter",
+            "_type": "val_iter{}".format(
+                "_ssl" if self._cfg.TASK == "ssl" else ""
+            ),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
@@ -765,7 +787,9 @@ class ValMeter(object):
             return None
 
         stats = {
-            "_type": "val_epoch",
+            "_type": "val_epoch{}".format(
+                "_ssl" if self._cfg.TASK == "ssl" else ""
+            ),
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "gpu_mem": "{:.2f}G".format(misc.gpu_mem_usage()),
@@ -787,12 +811,7 @@ class ValMeter(object):
             stats["min_top1_err"] = self.min_top1_err
             stats["min_top5_err"] = self.min_top5_err
 
-        if len(preds) > 0 and len(labels) > 0:
-            calc_binary_stats(preds, labels, stats, self._cfg)
-
-
-        self.logger.info(stats)
-        return stats
+        logging.log_json_stats(stats, self.output_dir)
 
 
 def get_map(preds, labels):
@@ -820,3 +839,58 @@ def get_map(preds, labels):
 
     mean_ap = np.mean(aps)
     return mean_ap
+
+
+class EpochTimer:
+    """
+    A timer which computes the epoch time.
+    """
+
+    def __init__(self) -> None:
+        self.timer = Timer()
+        self.timer.reset()
+        self.epoch_times = []
+
+    def reset(self) -> None:
+        """
+        Reset the epoch timer.
+        """
+        self.timer.reset()
+        self.epoch_times = []
+
+    def epoch_tic(self):
+        """
+        Start to record time.
+        """
+        self.timer.reset()
+
+    def epoch_toc(self):
+        """
+        Stop to record time.
+        """
+        self.timer.pause()
+        self.epoch_times.append(self.timer.seconds())
+
+    def last_epoch_time(self):
+        """
+        Get the time for the last epoch.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return self.epoch_times[-1]
+
+    def avg_epoch_time(self):
+        """
+        Calculate the average epoch time among the recorded epochs.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return np.mean(self.epoch_times)
+
+    def median_epoch_time(self):
+        """
+        Calculate the median epoch time among the recorded epochs.
+        """
+        assert len(self.epoch_times) > 0, "No epoch time has been recorded!"
+
+        return np.median(self.epoch_times)

@@ -3,12 +3,54 @@
 
 """Loss functions."""
 
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+
+class SoftTargetCrossEntropy(nn.Module):
+    """
+    Cross entropy loss with soft target.
+    """
+
+    def __init__(self, reduction="mean"):
+        """
+        Args:
+            reduction (str): specifies reduction to apply to the output. It can be
+                "mean" (default) or "none".
+        """
+        super(SoftTargetCrossEntropy, self).__init__()
+        self.reduction = reduction
+
+    def forward(self, x, y):
+        loss = torch.sum(-y * F.log_softmax(x, dim=-1), dim=-1)
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "none":
+            return loss
+        else:
+            raise NotImplementedError
+
+
+class ContrastiveLoss(nn.Module):
+    def __init__(self, reduction="mean"):
+        super(ContrastiveLoss, self).__init__()
+        self.reduction = reduction
+
+    def forward(self, inputs, dummy_labels=None):
+        targets = torch.zeros(inputs.shape[0], dtype=torch.long).cuda()
+        loss = nn.CrossEntropyLoss(reduction=self.reduction).cuda()(
+            inputs, targets
+        )
+        return loss
+
 
 _LOSSES = {
     "cross_entropy": nn.CrossEntropyLoss,
     "bce": nn.BCELoss,
     "bce_logit": nn.BCEWithLogitsLoss,
+    "soft_cross_entropy": SoftTargetCrossEntropy,
+    "contrastive_loss": ContrastiveLoss,
 }
 
 

@@ -8,8 +8,9 @@ import time
 from collections import defaultdict
 import cv2
 import torch
-from fvcore.common.file_io import PathManager
 from torch.utils.data.distributed import DistributedSampler
+
+from slowfast.utils.env import pathmgr
 
 from . import transform as transform
 
@@ -31,7 +32,7 @@ def retry_load_images(image_paths, retry=10, backend="pytorch"):
     for i in range(retry):
         imgs = []
         for image_path in image_paths:
-            with PathManager.open(image_path, "rb") as f:
+            with pathmgr.open(image_path, "rb") as f:
                 img_str = np.frombuffer(f.read(), np.uint8)
                 img = cv2.imdecode(img_str, flags=cv2.IMREAD_COLOR)
             imgs.append(img)
@@ -115,6 +116,9 @@ def spatial_sampling(
     crop_size=224,
     random_horizontal_flip=True,
     inverse_uniform_sampling=False,
+    aspect_ratio=None,
+    scale=None,
+    motion_shift=False,
 ):
     """
     Perform spatial sampling on the given video frames. If spatial_idx is
@@ -136,24 +140,41 @@ def spatial_sampling(
             [1 / max_scale, 1 / min_scale] and take a reciprocal to get the
             scale. If False, take a uniform sample from [min_scale,
             max_scale].
+        aspect_ratio (list): Aspect ratio range for resizing.
+        scale (list): Scale range for resizing.
+        motion_shift (bool): Whether to apply motion shift for resizing.
     Returns:
         frames (tensor): spatially sampled frames.
     """
     assert spatial_idx in [-1, 0, 1, 2]
     if spatial_idx == -1:
-        frames, _ = transform.random_short_side_scale_jitter(
-            images=frames,
-            min_size=min_scale,
-            max_size=max_scale,
-            inverse_uniform_sampling=inverse_uniform_sampling,
-        )
-        frames, _ = transform.random_crop(frames, crop_size)
+        if aspect_ratio is None and scale is None:
+            frames, _ = transform.random_short_side_scale_jitter(
+                images=frames,
+                min_size=min_scale,
+                max_size=max_scale,
+                inverse_uniform_sampling=inverse_uniform_sampling,
+            )
+            frames, _ = transform.random_crop(frames, crop_size)
+        else:
+            transform_func = (
+                transform.random_resized_crop_with_shift
+                if motion_shift
+                else transform.random_resized_crop
+            )
+            frames = transform_func(
+                images=frames,
+                target_height=crop_size,
+                target_width=crop_size,
+                scale=scale,
+                ratio=aspect_ratio,
+            )
         if random_horizontal_flip:
             frames, _ = transform.horizontal_flip(0.5, frames)
     else:
         # The testing is deterministic and no jitter should be performed.
         # min_scale, max_scale, and crop_size are expect to be the same.
-        assert len({min_scale, max_scale, crop_size}) == 1
+        assert len({min_scale, max_scale}) == 1
         frames, _ = transform.random_short_side_scale_jitter(
             frames, min_scale, max_scale
         )
@@ -225,7 +246,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
     """
     image_paths = defaultdict(list)
     labels = defaultdict(list)
-    with PathManager.open(frame_list_file, "r") as f:
+    with pathmgr.open(frame_list_file, "r") as f:
         assert f.readline().startswith("original_vido_id")
         for line in f:
             row = line.split()
@@ -253,7 +274,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
     return dict(image_paths), dict(labels)
 
 
-def tensor_normalize(tensor, mean, std):
+def tensor_normalize(tensor, mean, std, func=None):
     """
     Normalize a given tensor by subtracting the mean and dividing the std.
     Args:
@@ -268,6 +289,8 @@ def tensor_normalize(tensor, mean, std):
         mean = torch.tensor(mean)
     if type(std) == list:
         std = torch.tensor(std)
+    if func is not None:
+        tensor = func(tensor)
     tensor = tensor - mean
     tensor = tensor / std
     return tensor

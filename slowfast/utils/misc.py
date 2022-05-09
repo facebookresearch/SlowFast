@@ -9,7 +9,6 @@ import os
 from datetime import datetime
 import psutil
 import torch
-from fvcore.common.file_io import PathManager
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
@@ -19,6 +18,7 @@ import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
 from slowfast.models.batchnorm_helper import SubBatchNorm3d
+from slowfast.utils.env import pathmgr
 
 logger = logging.get_logger(__name__)
 
@@ -90,19 +90,33 @@ def _get_model_analysis_input(cfg, use_train_input):
     """
     rgb_dimension = 3
     if use_train_input:
-        input_tensors = torch.rand(
-            rgb_dimension,
-            cfg.DATA.NUM_FRAMES,
-            cfg.DATA.TRAIN_CROP_SIZE,
-            cfg.DATA.TRAIN_CROP_SIZE,
-        )
+        if cfg.TRAIN.DATASET in ["imagenet", "imagenetprefetch"]:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.DATA.TRAIN_CROP_SIZE,
+                cfg.DATA.TRAIN_CROP_SIZE,
+            )
+        else:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.DATA.NUM_FRAMES,
+                cfg.DATA.TRAIN_CROP_SIZE,
+                cfg.DATA.TRAIN_CROP_SIZE,
+            )
     else:
-        input_tensors = torch.rand(
-            rgb_dimension,
-            cfg.DATA.NUM_FRAMES,
-            cfg.DATA.TEST_CROP_SIZE,
-            cfg.DATA.TEST_CROP_SIZE,
-        )
+        if cfg.TEST.DATASET in ["imagenet", "imagenetprefetch"]:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.DATA.TEST_CROP_SIZE,
+                cfg.DATA.TEST_CROP_SIZE,
+            )
+        else:
+            input_tensors = torch.rand(
+                rgb_dimension,
+                cfg.DATA.NUM_FRAMES,
+                cfg.DATA.TEST_CROP_SIZE,
+                cfg.DATA.TEST_CROP_SIZE,
+            )
     model_inputs = pack_pathway_output(cfg, input_tensors)
     for i in range(len(model_inputs)):
         model_inputs[i] = model_inputs[i].unsqueeze(0)
@@ -317,7 +331,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
             subset file.
     """
     try:
-        with PathManager.open(path, "r") as f:
+        with pathmgr.open(path, "r") as f:
             class2idx = json.load(f)
     except Exception as err:
         print("Fail to load file from {} with error {}".format(path, err))
@@ -332,7 +346,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
     class_parent = None
     if parent_path is not None and parent_path != "":
         try:
-            with PathManager.open(parent_path, "r") as f:
+            with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
             print(
@@ -351,7 +365,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
     subset_ids = None
     if subset_path is not None and subset_path != "":
         try:
-            with PathManager.open(subset_path, "r") as f:
+            with pathmgr.open(subset_path, "r") as f:
                 subset = f.read().split("\n")
                 subset_ids = [
                     class2idx[name]
