@@ -289,6 +289,10 @@ def tensor_normalize(tensor, mean, std, func=None):
         mean = torch.tensor(mean)
     if type(std) == list:
         std = torch.tensor(std)
+    if mean.numel() == 1:
+        # Convert to B/W
+        tensor = tensor[:,:,:,0] * 0.299 + tensor[:,:,:,1]  * 0.587 + tensor[:,:,:,2] * 0.114
+        tensor = tensor.unsqueeze(-1)        
     if func is not None:
         tensor = func(tensor)
     tensor = tensor - mean

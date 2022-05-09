@@ -48,7 +48,7 @@ def calc_binary_stats(preds, labels, stats, cfg):
         stats.update({"rec@_{}".format(p): "{:.3f}".format(atPrec(precision, recall, thresholds, atPrec=p)[1]) for p in cfg.METRICS.AT_PREC})
 
         fpr, tpr, rocThresholds = roc_curve(labels, preds)
-        stats.update({"roc": auc(recall, precision)})
+        stats.update({"roc": auc(fpr, tpr)})
         stats.update({"tpr@_{}".format(fp): "{:.3f}".format(atFpr(fpr, tpr, rocThresholds, atFpr=fp)[1]) for fp in cfg.METRICS.AT_FPR})
         stats.update({"fpr@_{}".format(tp): "{:.3f}".format(atTpr(fpr, tpr, rocThresholds, atTpr=tp)[0]) for tp in cfg.METRICS.AT_TPR})
 
