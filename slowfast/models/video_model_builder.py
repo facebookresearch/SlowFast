@@ -13,13 +13,22 @@ import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
 from slowfast.models.stem_helper import PatchEmbed
-from slowfast.models.utils import round_width
+from slowfast.models.utils import (
+    round_width,
+    validate_checkpoint_wrapper_import,
+)
 
 from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
 
+try:
+    from fairscale.nn.checkpoint import checkpoint_wrapper
+except ImportError:
+    checkpoint_wrapper = None
+
+
 # Number of blocks for different stages given the model depth.
-_MODEL_STAGE_DEPTH = {50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
+_MODEL_STAGE_DEPTH = {18: (2, 2, 2, 2), 50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
 
 # Basis of temporal kernel sizes for each of the stage.
 _TEMPORAL_KERNEL_BASIS = {
@@ -37,7 +46,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[1]],  # res4 temporal kernel.
         [[1]],  # res5 temporal kernel.
     ],
-    "c2d_nopool": [
+    "slow_c2d": [
         [[1]],  # conv1 temporal kernel.
         [[1]],  # res2 temporal kernel.
         [[1]],  # res3 temporal kernel.
@@ -51,7 +60,7 @@ _TEMPORAL_KERNEL_BASIS = {
         [[3, 1]],  # res4 temporal kernel.
         [[1, 3]],  # res5 temporal kernel.
     ],
-    "i3d_nopool": [
+    "slow_i3d": [
         [[5]],  # conv1 temporal kernel.
         [[3]],  # res2 temporal kernel.
         [[3, 1]],  # res3 temporal kernel.
@@ -84,9 +93,9 @@ _TEMPORAL_KERNEL_BASIS = {
 _POOL1 = {
     "2d": [[1, 1, 1]],
     "c2d": [[2, 1, 1]],
-    "c2d_nopool": [[1, 1, 1]],
+    "slow_c2d": [[1, 1, 1]],
     "i3d": [[2, 1, 1]],
-    "i3d_nopool": [[1, 1, 1]],
+    "slow_i3d": [[1, 1, 1]],
     "slow": [[1, 1, 1]],
     "slowfast": [[1, 1, 1], [1, 1, 1]],
     "x3d": [[1, 1, 1]],
@@ -173,11 +182,15 @@ class SlowFast(nn.Module):
         """
         super(SlowFast, self).__init__()
         self.norm_module = get_norm(cfg)
+        self.cfg = cfg
         self.enable_detection = cfg.DETECTION.ENABLE
         self.num_pathways = 2
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -370,6 +383,7 @@ class SlowFast(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
@@ -380,6 +394,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[None, None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES
@@ -396,9 +411,12 @@ class SlowFast(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
 
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s1_fuse(x)
         x = self.s2(x)
@@ -448,7 +466,10 @@ class ResNet(nn.Module):
         self.num_pathways = 1
         self._construct_network(cfg)
         init_helper.init_weights(
-            self, cfg.MODEL.FC_INIT_STD, cfg.RESNET.ZERO_INIT_FINAL_BN
+            self,
+            cfg.MODEL.FC_INIT_STD,
+            cfg.RESNET.ZERO_INIT_FINAL_BN,
+            cfg.RESNET.ZERO_INIT_FINAL_CONV,
         )
 
     def _construct_network(self, cfg):
@@ -463,6 +484,7 @@ class ResNet(nn.Module):
         pool_size = _POOL1[cfg.MODEL.ARCH]
         assert len({len(pool_size), self.num_pathways}) == 1
         assert cfg.RESNET.DEPTH in _MODEL_STAGE_DEPTH.keys()
+        self.cfg = cfg
 
         (d2, d3, d4, d5) = _MODEL_STAGE_DEPTH[cfg.RESNET.DEPTH]
 
@@ -472,7 +494,7 @@ class ResNet(nn.Module):
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
-        self.s1 = stem_helper.VideoModelStem(
+        s1 = stem_helper.VideoModelStem(
             dim_in=cfg.DATA.INPUT_CHANNEL_NUM,
             dim_out=[width_per_group],
             kernel=[temp_kernel[0][0] + [7, 7]],
@@ -481,7 +503,7 @@ class ResNet(nn.Module):
             norm_module=self.norm_module,
         )
 
-        self.s2 = resnet_helper.ResStage(
+        s2 = resnet_helper.ResStage(
             dim_in=[width_per_group],
             dim_out=[width_per_group * 4],
             dim_inner=[dim_inner],
@@ -500,6 +522,18 @@ class ResNet(nn.Module):
             dilation=cfg.RESNET.SPATIAL_DILATIONS[0],
             norm_module=self.norm_module,
         )
+
+        # Based on profiling data of activation size, s1 and s2 have the activation sizes
+        # that are 4X larger than the second largest. Therefore, checkpointing them gives
+        # best memory savings. Further tuning is possible for better memory saving and tradeoffs
+        # with recomputing FLOPs.
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+            self.s1 = checkpoint_wrapper(s1)
+            self.s2 = checkpoint_wrapper(s2)
+        else:
+            self.s1 = s1
+            self.s2 = s2
 
         for pathway in range(self.num_pathways):
             pool = nn.MaxPool3d(
@@ -579,13 +613,15 @@ class ResNet(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 aligned=cfg.DETECTION.ALIGNED,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
             )
         else:
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[width_per_group * 32],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[None, None]
+                pool_size=[None]
                 if cfg.MULTIGRID.SHORT_CYCLE
+                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
                         cfg.DATA.NUM_FRAMES // pool_size[0][0],
@@ -595,15 +631,18 @@ class ResNet(nn.Module):
                 ],  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
+                detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
+                cfg=cfg,
             )
-
     def forward(self, x, bboxes=None):
+        x = x[:]  # avoid pass by reference
         x = self.s1(x)
         x = self.s2(x)
+        y = []  # Don't modify x list in place due to activation checkpoint.
         for pathway in range(self.num_pathways):
             pool = getattr(self, "pathway{}_pool".format(pathway))
-            x[pathway] = pool(x[pathway])
-        x = self.s3(x)
+            y.append(pool(x[pathway]))
+        x = self.s3(y)
         x = self.s4(x)
         x = self.s5(x)
         if self.enable_detection:
@@ -897,6 +936,10 @@ class MViT(nn.Module):
         self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
 
         self.blocks = nn.ModuleList()
+
+        if cfg.MODEL.ACT_CHECKPOINT:
+            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+
         for i in range(depth):
             num_heads = round_width(num_heads, head_mul[i])
             embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
@@ -905,26 +948,26 @@ class MViT(nn.Module):
                 dim_mul[i + 1],
                 divisor=round_width(num_heads, head_mul[i + 1]),
             )
-
-            self.blocks.append(
-                MultiScaleBlock(
-                    dim=embed_dim,
-                    dim_out=dim_out,
-                    num_heads=num_heads,
-                    mlp_ratio=mlp_ratio,
-                    qkv_bias=qkv_bias,
-                    drop_rate=self.drop_rate,
-                    drop_path=dpr[i],
-                    norm_layer=norm_layer,
-                    kernel_q=pool_q[i] if len(pool_q) > i else [],
-                    kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
-                    stride_q=stride_q[i] if len(stride_q) > i else [],
-                    stride_kv=stride_kv[i] if len(stride_kv) > i else [],
-                    mode=mode,
-                    has_cls_embed=self.cls_embed_on,
-                    pool_first=pool_first,
-                )
+            attention_block = MultiScaleBlock(
+                dim=embed_dim,
+                dim_out=dim_out,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                drop_rate=self.drop_rate,
+                drop_path=dpr[i],
+                norm_layer=norm_layer,
+                kernel_q=pool_q[i] if len(pool_q) > i else [],
+                kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                stride_q=stride_q[i] if len(stride_q) > i else [],
+                stride_kv=stride_kv[i] if len(stride_kv) > i else [],
+                mode=mode,
+                has_cls_embed=self.cls_embed_on,
+                pool_first=pool_first,
             )
+            if cfg.MODEL.ACT_CHECKPOINT:
+                attention_block = checkpoint_wrapper(attention_block)
+            self.blocks.append(attention_block)
 
         embed_dim = dim_out
         self.norm = norm_layer(embed_dim)
@@ -934,6 +977,7 @@ class MViT(nn.Module):
             num_classes,
             dropout_rate=cfg.MODEL.DROPOUT_RATE,
             act_func=cfg.MODEL.HEAD_ACT,
+            cfg=cfg,
         )
         if self.sep_pos_embed:
             trunc_normal_(self.pos_embed_spatial, std=0.02)

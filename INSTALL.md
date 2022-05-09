@@ -21,6 +21,7 @@
 - moviepy: (optional, for visualizing video on tensorboard) `conda install -c conda-forge moviepy` or `pip install moviepy`
 - PyTorchVideo: `pip install pytorchvideo`
 - [Detectron2](https://github.com/facebookresearch/detectron2):
+- FairScale: `pip install 'git+https://github.com/facebookresearch/fairscale'`
 ```
     pip install -U torch torchvision cython
     pip install -U 'git+https://github.com/facebookresearch/fvcore.git' 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'

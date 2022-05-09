@@ -267,6 +267,7 @@ def Ptvkinetics(cfg, mode):
             video_sampler=video_sampler,
             transform=transform,
             decode_audio=False,
+            decoder=cfg.DATA.DECODING_BACKEND,
         ),
     )
 

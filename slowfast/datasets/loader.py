@@ -6,10 +6,11 @@
 import itertools
 import numpy as np
 from functools import partial
+from typing import List
 import torch
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data.sampler import RandomSampler
+from torch.utils.data.sampler import RandomSampler, Sampler
 
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 
@@ -26,20 +27,23 @@ def multiple_samples_collate(batch, fold=False):
     Returns:
         (tuple): collated data batch.
     """
-    inputs, labels, video_idx, extra_data = zip(*batch)
+    inputs, labels, video_idx, time, extra_data = zip(*batch)
     inputs = [item for sublist in inputs for item in sublist]
     labels = [item for sublist in labels for item in sublist]
     video_idx = [item for sublist in video_idx for item in sublist]
-    inputs, labels, video_idx, extra_data = (
+    time = [item for sublist in time for item in sublist]
+
+    inputs, labels, video_idx, time, extra_data = (
         default_collate(inputs),
         default_collate(labels),
         default_collate(video_idx),
+        default_collate(time),
         default_collate(extra_data),
     )
     if fold:
-        return [inputs], labels, video_idx, extra_data
+        return [inputs], labels, video_idx, time, extra_data
     else:
-        return inputs, labels, video_idx, extra_data
+        return inputs, labels, video_idx, time, extra_data
 
 
 def detection_collate(batch):
@@ -52,8 +56,9 @@ def detection_collate(batch):
     Returns:
         (tuple): collated detection data batch.
     """
-    inputs, labels, video_idx, extra_data = zip(*batch)
+    inputs, labels, video_idx, time, extra_data = zip(*batch)
     inputs, video_idx = default_collate(inputs), default_collate(video_idx)
+    time = default_collate(time)
     labels = torch.tensor(np.concatenate(labels, axis=0)).float()
 
     collated_extra_data = {}
@@ -76,7 +81,7 @@ def detection_collate(batch):
         else:
             collated_extra_data[key] = default_collate(data)
 
-    return inputs, labels, video_idx, collated_extra_data
+    return inputs, labels, video_idx, time, collated_extra_data
 
 
 def construct_loader(cfg, split, is_precise_bn=False):

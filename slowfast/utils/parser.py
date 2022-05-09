@@ -48,13 +48,13 @@ def parse_args():
     )
     parser.add_argument(
         "--cfg",
-        dest="cfg_file",
-        help="Path to the config file",
-        default="configs/Kinetics/SLOWFAST_4x16_R50.yaml",
-        type=str,
+        dest="cfg_files",
+        help="Path to the config files",
+        default=["configs/Kinetics/SLOWFAST_4x16_R50.yaml"],
+        nargs="+",
     )
     parser.add_argument(
-        "opts",
+        "--opts",
         help="See slowfast/config/defaults.py for all options",
         default=None,
         nargs=argparse.REMAINDER,
@@ -64,7 +64,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_config(args):
+def load_config(args, path_to_config=None):
     """
     Given the arguemnts, load and initialize the configs.
     Args:
@@ -74,8 +74,8 @@ def load_config(args):
     # Setup cfg.
     cfg = get_cfg()
     # Load config from cfg.
-    if args.cfg_file is not None:
-        cfg.merge_from_file(args.cfg_file)
+    if path_to_config is not None:
+        cfg.merge_from_file(path_to_config)
     # Load config from command line, overwrite config from opts.
     if args.opts is not None:
         cfg.merge_from_list(args.opts)

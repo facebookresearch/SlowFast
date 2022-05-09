@@ -43,6 +43,7 @@ class BasicTransform(nn.Module):
         inplace_relu=True,
         eps=1e-5,
         bn_mmt=0.1,
+        dilation=1,
         norm_module=nn.BatchNorm3d,
         block_idx=0,
     ):
@@ -71,9 +72,9 @@ class BasicTransform(nn.Module):
         self._inplace_relu = inplace_relu
         self._eps = eps
         self._bn_mmt = bn_mmt
-        self._construct(dim_in, dim_out, stride, norm_module)
+        self._construct(dim_in, dim_out, stride, dilation, norm_module)
 
-    def _construct(self, dim_in, dim_out, stride, norm_module):
+    def _construct(self, dim_in, dim_out, stride, dilation, norm_module):
         # Tx3x3, BN, ReLU.
         self.a = nn.Conv3d(
             dim_in,
@@ -93,9 +94,13 @@ class BasicTransform(nn.Module):
             dim_out,
             kernel_size=[1, 3, 3],
             stride=[1, 1, 1],
-            padding=[0, 1, 1],
+            padding=[0, dilation, dilation],
+            dilation=[1, dilation, dilation],
             bias=False,
         )
+
+        self.b.final_conv = True
+
         self.b_bn = norm_module(
             num_features=dim_out, eps=self._eps, momentum=self._bn_mmt
         )
@@ -364,6 +369,8 @@ class BottleneckTransform(nn.Module):
             padding=[0, 0, 0],
             bias=False,
         )
+        self.c.final_conv = True
+
         self.c_bn = norm_module(
             num_features=dim_out, eps=self._eps, momentum=self._bn_mmt
         )

@@ -4,10 +4,12 @@
 """Utility function for weight initialization"""
 
 import torch.nn as nn
-from fvcore.nn.weight_init import c2_msra_fill
+from fvcore.nn.weight_init import c2_msra_fill, c2_xavier_fill
 
 
-def init_weights(model, fc_init_std=0.01, zero_init_final_bn=True):
+def init_weights(
+    model, fc_init_std=0.01, zero_init_final_bn=True, zero_init_final_conv=False
+):
     """
     Performs ResNet style weight initialization.
     Args:
@@ -17,15 +19,20 @@ def init_weights(model, fc_init_std=0.01, zero_init_final_bn=True):
     """
     for m in model.modules():
         if isinstance(m, nn.Conv3d):
-            """
-            Follow the initialization method proposed in:
-            {He, Kaiming, et al.
-            "Delving deep into rectifiers: Surpassing human-level
-            performance on imagenet classification."
-            arXiv preprint arXiv:1502.01852 (2015)}
-            """
-            c2_msra_fill(m)
-        elif isinstance(m, nn.BatchNorm3d):
+            # Note that there is no bias due to BN
+            if hasattr(m, "final_conv") and zero_init_final_conv:
+                m.weight.data.zero_()
+            else:
+                """
+                Follow the initialization method proposed in:
+                {He, Kaiming, et al.
+                "Delving deep into rectifiers: Surpassing human-level
+                performance on imagenet classification."
+                arXiv preprint arXiv:1502.01852 (2015)}
+                """
+                c2_msra_fill(m)
+
+        elif isinstance(m, (nn.BatchNorm3d, nn.BatchNorm2d, nn.BatchNorm1d)):
             if (
                 hasattr(m, "transform_final_bn")
                 and m.transform_final_bn
@@ -39,6 +46,9 @@ def init_weights(model, fc_init_std=0.01, zero_init_final_bn=True):
             if m.bias is not None:
                 m.bias.data.zero_()
         if isinstance(m, nn.Linear):
-            m.weight.data.normal_(mean=0.0, std=fc_init_std)
+            if hasattr(m, "xavier_init") and m.xavier_init:
+                c2_xavier_fill(m)
+            else:
+                m.weight.data.normal_(mean=0.0, std=fc_init_std)
             if m.bias is not None:
                 m.bias.data.zero_()
