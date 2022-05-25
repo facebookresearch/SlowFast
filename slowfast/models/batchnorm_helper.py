@@ -127,7 +127,7 @@ class GroupGather(Function):
             torch.zeros_like(input) for k in range(du.get_local_size())
         ]
         dist.all_gather(
-            input_list, input, async_op=False, group=du._LOCAL_PROCESS_GROUP
+            input_list, input, async_op=False, group=du.get_local_process_group()
         )
 
         inputs = torch.stack(input_list, dim=0)
@@ -155,7 +155,7 @@ class GroupGather(Function):
             grad_output_list,
             grad_output,
             async_op=False,
-            group=du._LOCAL_PROCESS_GROUP,
+            group=du.get_local_process_group(),
         )
 
         grads = torch.stack(grad_output_list, dim=0)
