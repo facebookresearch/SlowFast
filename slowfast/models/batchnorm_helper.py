@@ -4,12 +4,10 @@
 """BatchNorm (BN) utility functions and custom batch-size BN implementations"""
 
 from functools import partial
-import torch
-import torch.distributed as dist
-import torch.nn as nn
-from torch.autograd.function import Function
 
-import slowfast.utils.distributed as du
+import torch
+import torch.nn as nn
+from pytorchvideo.layers.batch_norm import NaiveSyncBatchNorm3d, NaiveSyncBatchNorm1d  # noqa
 
 
 def get_norm(cfg):
@@ -26,7 +24,8 @@ def get_norm(cfg):
         return partial(SubBatchNorm3d, num_splits=cfg.BN.NUM_SPLITS)
     elif cfg.BN.NORM_TYPE == "sync_batchnorm":
         return partial(
-            NaiveSyncBatchNorm3d, num_sync_devices=cfg.BN.NUM_SYNC_DEVICES
+            NaiveSyncBatchNorm3d, num_sync_devices=cfg.BN.NUM_SYNC_DEVICES,
+            global_sync=cfg.BN.GLOBAL_SYNC
         )
     else:
         raise NotImplementedError(
@@ -107,159 +106,3 @@ class SubBatchNorm3d(nn.Module):
             x = x * self.weight.view((-1, 1, 1, 1))
             x = x + self.bias.view((-1, 1, 1, 1))
         return x
-
-
-class GroupGather(Function):
-    """
-    GroupGather performs all gather on each of the local process/ GPU groups.
-    """
-
-    @staticmethod
-    def forward(ctx, input, num_sync_devices, num_groups):
-        """
-        Perform forwarding, gathering the stats across different process/ GPU
-        group.
-        """
-        ctx.num_sync_devices = num_sync_devices
-        ctx.num_groups = num_groups
-
-        input_list = [
-            torch.zeros_like(input) for k in range(du.get_local_size())
-        ]
-        dist.all_gather(
-            input_list, input, async_op=False, group=du.get_local_process_group()
-        )
-
-        inputs = torch.stack(input_list, dim=0)
-        if num_groups > 1:
-            rank = du.get_local_rank()
-            group_idx = rank // num_sync_devices
-            inputs = inputs[
-                group_idx
-                * num_sync_devices : (group_idx + 1)
-                * num_sync_devices
-            ]
-        inputs = torch.sum(inputs, dim=0)
-        return inputs
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        """
-        Perform backwarding, gathering the gradients across different process/ GPU
-        group.
-        """
-        grad_output_list = [
-            torch.zeros_like(grad_output) for k in range(du.get_local_size())
-        ]
-        dist.all_gather(
-            grad_output_list,
-            grad_output,
-            async_op=False,
-            group=du.get_local_process_group(),
-        )
-
-        grads = torch.stack(grad_output_list, dim=0)
-        if ctx.num_groups > 1:
-            rank = du.get_local_rank()
-            group_idx = rank // ctx.num_sync_devices
-            grads = grads[
-                group_idx
-                * ctx.num_sync_devices : (group_idx + 1)
-                * ctx.num_sync_devices
-            ]
-        grads = torch.sum(grads, dim=0)
-        return grads, None, None
-
-
-class NaiveSyncBatchNorm3d(nn.BatchNorm3d):
-    def __init__(self, num_sync_devices, **args):
-        """
-        Naive version of Synchronized 3D BatchNorm.
-        Args:
-            num_sync_devices (int): number of device to sync.
-            args (list): other arguments.
-        """
-        self.num_sync_devices = num_sync_devices
-        if self.num_sync_devices > 0:
-            assert du.get_local_size() % self.num_sync_devices == 0, (
-                du.get_local_size(),
-                self.num_sync_devices,
-            )
-            self.num_groups = du.get_local_size() // self.num_sync_devices
-        else:
-            self.num_sync_devices = du.get_local_size()
-            self.num_groups = 1
-        super(NaiveSyncBatchNorm3d, self).__init__(**args)
-
-    def forward(self, input):
-        if du.get_local_size() == 1 or not self.training:
-            return super().forward(input)
-
-        assert input.shape[0] > 0, "SyncBatchNorm does not support empty inputs"
-        C = input.shape[1]
-        mean = torch.mean(input, dim=[0, 2, 3, 4])
-        meansqr = torch.mean(input * input, dim=[0, 2, 3, 4])
-
-        vec = torch.cat([mean, meansqr], dim=0)
-        vec = GroupGather.apply(vec, self.num_sync_devices, self.num_groups) * (
-            1.0 / self.num_sync_devices
-        )
-
-        mean, meansqr = torch.split(vec, C)
-        var = meansqr - mean * mean
-        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
-        self.running_var += self.momentum * (var.detach() - self.running_var)
-
-        invstd = torch.rsqrt(var + self.eps)
-        scale = self.weight * invstd
-        bias = self.bias - mean * scale
-        scale = scale.reshape(1, -1, 1, 1, 1)
-        bias = bias.reshape(1, -1, 1, 1, 1)
-        return input * scale + bias
-
-
-class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
-    def __init__(self, num_sync_devices, **args):
-        """
-        Naive version of Synchronized 1D BatchNorm.
-        Args:
-            num_sync_devices (int): number of device to sync.
-            args (list): other arguments.
-        """
-        self.num_sync_devices = num_sync_devices
-        if self.num_sync_devices > 0:
-            assert du.get_local_size() % self.num_sync_devices == 0, (
-                du.get_local_size(),
-                self.num_sync_devices,
-            )
-            self.num_groups = du.get_local_size() // self.num_sync_devices
-        else:
-            self.num_sync_devices = du.get_local_size()
-            self.num_groups = 1
-        super(NaiveSyncBatchNorm1d, self).__init__(**args)
-
-    def forward(self, input):
-        if du.get_local_size() == 1 or not self.training:
-            return super().forward(input)
-
-        assert input.shape[0] > 0, "SyncBatchNorm does not support empty inputs"
-        C = input.shape[1]
-        mean = torch.mean(input, dim=[0])
-        meansqr = torch.mean(input * input, dim=[0])
-
-        vec = torch.cat([mean, meansqr], dim=0)
-        vec = GroupGather.apply(vec, self.num_sync_devices, self.num_groups) * (
-            1.0 / self.num_sync_devices
-        )
-
-        mean, meansqr = torch.split(vec, C)
-        var = meansqr - mean * mean
-        self.running_mean += self.momentum * (mean.detach() - self.running_mean)
-        self.running_var += self.momentum * (var.detach() - self.running_var)
-
-        invstd = torch.rsqrt(var + self.eps)
-        scale = self.weight * invstd
-        bias = self.bias - mean * scale
-        scale = scale.reshape(1, -1)
-        bias = bias.reshape(1, -1)
-        return input * scale + bias
