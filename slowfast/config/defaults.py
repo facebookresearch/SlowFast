@@ -111,10 +111,19 @@ _C.BN.NORM_TYPE = "batchnorm"
 # NUM_SPLITS splits, and run BN on each of them separately independently.
 _C.BN.NUM_SPLITS = 1
 
-# Parameter for NaiveSyncBatchNorm3d, where the stats across `NUM_SYNC_DEVICES`
-# devices will be synchronized.
+# Parameter for NaiveSyncBatchNorm, where the stats across `NUM_SYNC_DEVICES`
+# devices will be synchronized. `NUM_SYNC_DEVICES` cannot be larger than number of
+# devices per machine; if global sync is desired, set `GLOBAL_SYNC`.
+# By default ONLY applies to NaiveSyncBatchNorm3d; consider also setting
+# CONTRASTIVE.BN_SYNC_MLP if appropriate.
 _C.BN.NUM_SYNC_DEVICES = 1
 
+# Parameter for NaiveSyncBatchNorm. Setting `GLOBAL_SYNC` to True synchronizes
+# stats across all devices, across all machines; in this case, `NUM_SYNC_DEVICES`
+# must be set to None.
+# By default ONLY applies to NaiveSyncBatchNorm3d; consider also setting
+# CONTRASTIVE.BN_SYNC_MLP if appropriate.
+_C.BN.GLOBAL_SYNC = False
 
 # ---------------------------------------------------------------------------- #
 # Training options.

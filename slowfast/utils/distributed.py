@@ -9,25 +9,14 @@ import pickle
 import torch
 import torch.distributed as dist
 
-_LOCAL_PROCESS_GROUP = None
-
-
-def cat_all_gather(tensors, local=False):
-    """Performs the concatenated all_reduce operation on the provided tensors."""
-    if local:
-        gather_sz = get_local_size()
-    else:
-        gather_sz = torch.distributed.get_world_size()
-    tensors_gather = [torch.ones_like(tensors) for _ in range(gather_sz)]
-    torch.distributed.all_gather(
-        tensors_gather,
-        tensors,
-        async_op=False,
-        group=_LOCAL_PROCESS_GROUP if local else None,
-    )
-    output = torch.cat(tensors_gather, dim=0)
-    return output
-
+from pytorchvideo.layers.distributed import (  # noqa
+    get_world_size,
+    cat_all_gather,
+    init_distributed_training,
+    get_local_size,
+    get_local_rank,
+    get_local_process_group,
+)
 
 def all_gather(tensors):
     """
@@ -129,17 +118,6 @@ def is_root_proc():
         return dist.get_rank() == 0
     else:
         return True
-
-
-def get_world_size():
-    """
-    Get the size of the world.
-    """
-    if not dist.is_available():
-        return 1
-    if not dist.is_initialized():
-        return 1
-    return dist.get_world_size()
 
 
 def get_rank():
