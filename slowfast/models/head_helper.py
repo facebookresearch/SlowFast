@@ -155,6 +155,7 @@ class MLPHead(nn.Module):
         flatten=False,
         xavier_init=True,
         bn_sync_num=1,
+        global_sync=False,
     ):
         super(MLPHead, self).__init__()
         self.flatten = flatten
@@ -164,10 +165,12 @@ class MLPHead(nn.Module):
         mlp_layers[-1].xavier_init = xavier_init
         for i in range(1, num_layers):
             if bn_on:
-                if bn_sync_num > 1:
+                if global_sync or bn_sync_num > 1:
                     mlp_layers.append(
                         NaiveSyncBatchNorm1d(
-                            num_sync_devices=bn_sync_num, num_features=mlp_dim
+                            num_sync_devices=bn_sync_num,
+                            global_sync=global_sync,
+                            num_features=mlp_dim
                         )
                     )
                 else:
@@ -266,6 +269,10 @@ class ResNetBasicHead(nn.Module):
                 bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
+                global_sync=(
+                    cfg.CONTRASTIVE.BN_SYNC_MLP and
+                    cfg.BN.GLOBAL_SYNC
+                    ),
             )
 
         # Softmax for evaluation and testing.
@@ -294,6 +301,10 @@ class ResNetBasicHead(nn.Module):
                     bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
                     if cfg.CONTRASTIVE.BN_SYNC_MLP
                     else 1,
+                    global_sync=(
+                        cfg.CONTRASTIVE.BN_SYNC_MLP and
+                        cfg.BN.GLOBAL_SYNC
+                        ),
                 )
                 self.predictors.append(local_mlp)
 
@@ -525,6 +536,10 @@ class TransformerBasicHead(nn.Module):
                 bn_sync_num=cfg.BN.NUM_SYNC_DEVICES
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
+                global_sync=(
+                    cfg.CONTRASTIVE.BN_SYNC_MLP and
+                    cfg.BN.GLOBAL_SYNC
+                    ),
             )
         self.detach_final_fc = cfg.MODEL.DETACH_FINAL_FC
 

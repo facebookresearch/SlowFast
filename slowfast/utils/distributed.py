@@ -9,25 +9,14 @@ import pickle
 import torch
 import torch.distributed as dist
 
-_LOCAL_PROCESS_GROUP = None
-
-
-def cat_all_gather(tensors, local=False):
-    """Performs the concatenated all_reduce operation on the provided tensors."""
-    if local:
-        gather_sz = get_local_size()
-    else:
-        gather_sz = torch.distributed.get_world_size()
-    tensors_gather = [torch.ones_like(tensors) for _ in range(gather_sz)]
-    torch.distributed.all_gather(
-        tensors_gather,
-        tensors,
-        async_op=False,
-        group=_LOCAL_PROCESS_GROUP if local else None,
-    )
-    output = torch.cat(tensors_gather, dim=0)
-    return output
-
+from pytorchvideo.layers.distributed import (  # noqa
+    get_world_size,
+    cat_all_gather,
+    init_distributed_training,
+    get_local_size,
+    get_local_rank,
+    get_local_process_group,
+)
 
 def all_gather(tensors):
     """
@@ -126,17 +115,6 @@ def is_root_proc():
         return dist.get_rank() == 0
     else:
         return True
-
-
-def get_world_size():
-    """
-    Get the size of the world.
-    """
-    if not dist.is_available():
-        return 1
-    if not dist.is_initialized():
-        return 1
-    return dist.get_world_size()
 
 
 def get_rank():
@@ -280,50 +258,6 @@ def all_gather_unaligned(data, group=None):
         data_list.append(pickle.loads(buffer))
 
     return data_list
-
-
-def init_distributed_training(cfg):
-    """
-    Initialize variables needed for distributed training.
-    """
-    if cfg.NUM_GPUS <= 1:
-        return
-    num_gpus_per_machine = cfg.NUM_GPUS
-    num_machines = dist.get_world_size() // num_gpus_per_machine
-    for i in range(num_machines):
-        ranks_on_i = list(
-            range(i * num_gpus_per_machine, (i + 1) * num_gpus_per_machine)
-        )
-        pg = dist.new_group(ranks_on_i)
-        if i == cfg.SHARD_ID:
-            global _LOCAL_PROCESS_GROUP
-            _LOCAL_PROCESS_GROUP = pg
-
-
-def get_local_size() -> int:
-    """
-    Returns:
-        The size of the per-machine process group,
-        i.e. the number of processes per machine.
-    """
-    if not dist.is_available():
-        return 1
-    if not dist.is_initialized():
-        return 1
-    return dist.get_world_size(group=_LOCAL_PROCESS_GROUP)
-
-
-def get_local_rank() -> int:
-    """
-    Returns:
-        The rank of the current process within the local (per-machine) process group.
-    """
-    if not dist.is_available():
-        return 0
-    if not dist.is_initialized():
-        return 0
-    assert _LOCAL_PROCESS_GROUP is not None
-    return dist.get_rank(group=_LOCAL_PROCESS_GROUP)
 
 
 class GatherLayer(torch.autograd.Function):
