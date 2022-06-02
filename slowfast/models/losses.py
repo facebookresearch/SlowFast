@@ -3,6 +3,8 @@
 
 """Loss functions."""
 
+from functools import partial
+
 import torch
 import torch.nn as nn
 from pytorchvideo.losses.soft_target_cross_entropy import SoftTargetCrossEntropyLoss
@@ -24,7 +26,7 @@ _LOSSES = {
     "cross_entropy": nn.CrossEntropyLoss,
     "bce": nn.BCELoss,
     "bce_logit": nn.BCEWithLogitsLoss,
-    "soft_cross_entropy": SoftTargetCrossEntropyLoss,
+    "soft_cross_entropy": partial(SoftTargetCrossEntropyLoss, normalize_targets=False),
     "contrastive_loss": ContrastiveLoss,
 }
 
