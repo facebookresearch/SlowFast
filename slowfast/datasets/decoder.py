@@ -440,8 +440,8 @@ def pyav_decode(
             start_idx = start_end_delta_time[k, 0]
             end_idx = start_end_delta_time[k, 1]
             timebase = duration / frames_length
-            video_start_pts = int(start_idx)
-            video_end_pts = int(end_idx)
+            video_start_pts = int(start_idx * timebase)
+            video_end_pts = int(end_idx * timebase)
 
             frames = None
             # If video stream was found, fetch video frames from the video.
