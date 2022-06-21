@@ -121,9 +121,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
         # Gather all the predictions across all the devices to perform ensemble.
         if cfg.NUM_GPUS > 1:
-            preds, labels, video_idx = du.all_gather(
-                [preds, labels, video_idx]
-            )
+            preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
         if cfg.NUM_GPUS:
             preds = preds.cpu()
             labels = labels.cpu()

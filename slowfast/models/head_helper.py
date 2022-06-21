@@ -170,7 +170,7 @@ class MLPHead(nn.Module):
                         NaiveSyncBatchNorm1d(
                             num_sync_devices=bn_sync_num,
                             global_sync=global_sync,
-                            num_features=mlp_dim
+                            num_features=mlp_dim,
                         )
                     )
                 else:
@@ -270,9 +270,8 @@ class ResNetBasicHead(nn.Module):
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
                 global_sync=(
-                    cfg.CONTRASTIVE.BN_SYNC_MLP and
-                    cfg.BN.GLOBAL_SYNC
-                    ),
+                    cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                ),
             )
 
         # Softmax for evaluation and testing.
@@ -302,9 +301,8 @@ class ResNetBasicHead(nn.Module):
                     if cfg.CONTRASTIVE.BN_SYNC_MLP
                     else 1,
                     global_sync=(
-                        cfg.CONTRASTIVE.BN_SYNC_MLP and
-                        cfg.BN.GLOBAL_SYNC
-                        ),
+                        cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                    ),
                 )
                 self.predictors.append(local_mlp)
 
@@ -537,9 +535,8 @@ class TransformerBasicHead(nn.Module):
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
                 global_sync=(
-                    cfg.CONTRASTIVE.BN_SYNC_MLP and
-                    cfg.BN.GLOBAL_SYNC
-                    ),
+                    cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                ),
             )
         self.detach_final_fc = cfg.MODEL.DETACH_FINAL_FC
 

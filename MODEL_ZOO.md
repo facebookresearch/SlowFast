@@ -11,9 +11,11 @@
 | Slow | R50 | 3 x 10 | 8 x 8 | 74.8 | 91.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWONLY_8x8_R50.pkl) | Kinetics/c2/SLOW_8x8_R50 | K400 |
 | SlowFast | R50 | 3 x 10 | 4 x 16 | 75.6 | 92.0 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_4x16_R50.pkl) | Kinetics/c2/SLOWFAST_4x16_R50 | K400 |
 | SlowFast | R50 | 3 x 10 | 8 x 8 | 77.0 | 92.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | Kinetics/c2/SLOWFAST_8x8_R50 | K400 |
-| MViT | B-Conv | 1 x 5 | 16 x 4 | 78.4 | 93.5 | [`link`](https://drive.google.com/file/d/194gJinVejq6A1FmySNKQ8vAN5-FOY-QL/view?usp=sharing) | Kinetics/MVIT_B_16x4_CONV | K400 |
-| MViT | B-Conv | 1 x 5 | 32 x 3 | 80.4 | 94.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k400.pyth) | Kinetics/MVIT_B_32x3_CONV | K600 |
-| MViT | B-Conv | 1 x 5 | 32 x 3 | 83.9 | 96.5 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k600.pyth) | Kinetics/MVIT_B_32x3_CONV_K600 | K600 |
+| MViTv1 | B-Conv | 1 x 5 | 16 x 4 | 78.4 | 93.5 | [`link`](https://drive.google.com/file/d/194gJinVejq6A1FmySNKQ8vAN5-FOY-QL/view?usp=sharing) | Kinetics/MVIT_B_16x4_CONV | K400 |
+| MViTv1 | B-Conv | 1 x 5 | 32 x 3 | 80.4 | 94.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k400.pyth) | Kinetics/MVIT_B_32x3_CONV | K400 |
+| MViTv1 | B-Conv | 1 x 5 | 32 x 3 | 83.9 | 96.5 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k600.pyth) | Kinetics/MVIT_B_32x3_CONV_K600 | K600 |
+| MViTv2 | S | 1 x 5 | 16 x 4 | 81.0 | 94.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_k400_f302660347.pyth) | Kinetics/MVITv2_S_16x4 | K400 |
+| MViTv2 | B | 1 x 5 | 32 x 3 | 82.9 | 95.7 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_k400_f304025456.pyth) | Kinetics/MVITv2_B_32x3 | K400 |
 
 ## X3D models (details in projects/x3d)
 

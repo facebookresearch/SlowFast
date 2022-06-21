@@ -64,7 +64,7 @@ def compute_and_update_bn_stats(model, data_loader, num_batches=200):
             # Accumulates the bn stats.
             running_mean[i] += (bn.running_mean - running_mean[i]) / (ind + 1)
             # $E(x^2) = Var(x) + E(x)^2$.
-            cur_square_mean = bn.running_var + bn.running_mean ** 2
+            cur_square_mean = bn.running_var + bn.running_mean**2
             running_square_mean[i] += (
                 cur_square_mean - running_square_mean[i]
             ) / (ind + 1)
@@ -72,6 +72,6 @@ def compute_and_update_bn_stats(model, data_loader, num_batches=200):
     for i, bn in enumerate(bn_layers):
         bn.running_mean = running_mean[i]
         # Var(x) = $E(x^2) - E(x)^2$.
-        bn.running_var = running_square_mean[i] - bn.running_mean ** 2
+        bn.running_var = running_square_mean[i] - bn.running_mean**2
         # Sets the precise bn stats.
         bn.momentum = momentum_actual[i]

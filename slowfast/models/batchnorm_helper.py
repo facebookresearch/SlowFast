@@ -4,10 +4,13 @@
 """BatchNorm (BN) utility functions and custom batch-size BN implementations"""
 
 from functools import partial
-
 import torch
 import torch.nn as nn
-from pytorchvideo.layers.batch_norm import NaiveSyncBatchNorm3d, NaiveSyncBatchNorm1d  # noqa
+
+from pytorchvideo.layers.batch_norm import (
+    NaiveSyncBatchNorm1d,
+    NaiveSyncBatchNorm3d,
+)  # noqa
 
 
 def get_norm(cfg):
@@ -24,8 +27,9 @@ def get_norm(cfg):
         return partial(SubBatchNorm3d, num_splits=cfg.BN.NUM_SPLITS)
     elif cfg.BN.NORM_TYPE == "sync_batchnorm":
         return partial(
-            NaiveSyncBatchNorm3d, num_sync_devices=cfg.BN.NUM_SYNC_DEVICES,
-            global_sync=cfg.BN.GLOBAL_SYNC
+            NaiveSyncBatchNorm3d,
+            num_sync_devices=cfg.BN.NUM_SYNC_DEVICES,
+            global_sync=cfg.BN.GLOBAL_SYNC,
         )
     else:
         raise NotImplementedError(

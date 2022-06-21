@@ -127,7 +127,7 @@ class Nonlocal(nn.Module):
         #   2) dot_product normalization.
         if self.instantiation == "softmax":
             # Normalizing the affinity tensor theta_phi before softmax.
-            theta_phi = theta_phi * (self.dim_inner ** -0.5)
+            theta_phi = theta_phi * (self.dim_inner**-0.5)
             theta_phi = nn.functional.softmax(theta_phi, dim=2)
         elif self.instantiation == "dot_product":
             spatial_temporal_dim = theta_phi.shape[2]

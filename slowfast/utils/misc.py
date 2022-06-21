@@ -58,7 +58,7 @@ def gpu_mem_usage():
         mem_usage_bytes = torch.cuda.max_memory_allocated()
     else:
         mem_usage_bytes = 0
-    return mem_usage_bytes / 1024 ** 3
+    return mem_usage_bytes / 1024**3
 
 
 def cpu_mem_usage():
@@ -69,8 +69,8 @@ def cpu_mem_usage():
         total (float): total memory (GB).
     """
     vram = psutil.virtual_memory()
-    usage = (vram.total - vram.available) / 1024 ** 3
-    total = vram.total / 1024 ** 3
+    usage = (vram.total - vram.available) / 1024**3
+    total = vram.total / 1024**3
 
     return usage, total
 

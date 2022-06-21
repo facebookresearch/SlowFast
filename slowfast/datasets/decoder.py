@@ -3,9 +3,8 @@
 
 import logging
 import math
-import random
-
 import numpy as np
+import random
 import torch
 import torchvision.io as io
 
@@ -511,8 +510,9 @@ def decode(
         )  # clips come temporally ordered from decoder
     try:
         if backend == "pyav":
-            assert min_delta == -math.inf and max_delta == math.inf, \
-                "delta sampling not supported in pyav"
+            assert (
+                min_delta == -math.inf and max_delta == math.inf
+            ), "delta sampling not supported in pyav"
             frames_decoded, fps, decode_all_video = pyav_decode(
                 container,
                 sampling_rate,

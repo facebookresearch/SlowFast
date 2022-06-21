@@ -319,4 +319,4 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         x = self.proj(x)
         # B C (T) H W -> B (T)HW C
-        return x.flatten(2).transpose(1, 2)
+        return x.flatten(2).transpose(1, 2), x.shape

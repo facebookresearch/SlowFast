@@ -10,13 +10,14 @@ import torch
 import torch.distributed as dist
 
 from pytorchvideo.layers.distributed import (  # noqa
-    get_world_size,
     cat_all_gather,
-    init_distributed_training,
-    get_local_size,
-    get_local_rank,
     get_local_process_group,
+    get_local_rank,
+    get_local_size,
+    get_world_size,
+    init_distributed_training,
 )
+
 
 def all_gather(tensors):
     """
@@ -173,11 +174,11 @@ def _serialize_to_tensor(data, group):
     device = torch.device("cpu" if backend == "gloo" else "cuda")
 
     buffer = pickle.dumps(data)
-    if len(buffer) > 1024 ** 3:
+    if len(buffer) > 1024**3:
         logger = logging.getLogger(__name__)
         logger.warning(
             "Rank {} trying to all-gather {:.2f} GB of data on device {}".format(
-                get_rank(), len(buffer) / (1024 ** 3), device
+                get_rank(), len(buffer) / (1024**3), device
             )
         )
     storage = torch.ByteStorage.from_buffer(buffer)

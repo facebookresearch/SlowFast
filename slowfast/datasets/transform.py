@@ -989,9 +989,7 @@ def augment_raw_frames(frames, time_diff_prob=0.0, gaussian_prob=0.0):
     if time_diff_prob > 0.0 and random.random() < time_diff_prob:
         # T H W C -> C T H W.
         frames = frames.permute(3, 0, 1, 2)
-        frames = temporal_difference(
-            frames, use_grayscale=True, absolute=False
-        )
+        frames = temporal_difference(frames, use_grayscale=True, absolute=False)
         # end_idx -= 1
         frames += 255.0
         frames /= 2.0

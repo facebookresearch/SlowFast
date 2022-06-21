@@ -135,7 +135,7 @@ class MultigridSchedule(object):
         steps = cfg.SOLVER.STEPS
 
         default_size = float(
-            cfg.DATA.NUM_FRAMES * cfg.DATA.TRAIN_CROP_SIZE ** 2
+            cfg.DATA.NUM_FRAMES * cfg.DATA.TRAIN_CROP_SIZE**2
         )
         default_iters = steps[-1]
 

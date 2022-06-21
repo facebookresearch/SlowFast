@@ -7,12 +7,12 @@ import math
 from functools import partial
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
-from slowfast.models.stem_helper import PatchEmbed
 from slowfast.models.utils import (
     round_width,
     validate_checkpoint_wrapper_import,
@@ -634,6 +634,7 @@ class ResNet(nn.Module):
                 detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
                 cfg=cfg,
             )
+
     def forward(self, x, bboxes=None):
         x = x[:]  # avoid pass by reference
         x = self.s1(x)
@@ -801,7 +802,12 @@ class X3D(nn.Module):
 @MODEL_REGISTRY.register()
 class MViT(nn.Module):
     """
-    Multiscale Vision Transformers
+    Model builder for MViTv1 and MViTv2.
+
+    "MViTv2: Improved Multiscale Vision Transformers for Classification and Detection"
+    Yanghao Li, Chao-Yuan Wu, Haoqi Fan, Karttikeya Mangalam, Bo Xiong, Jitendra Malik, Christoph Feichtenhofer
+    https://arxiv.org/abs/2112.01526
+    "Multiscale Vision Transformers"
     Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, Christoph Feichtenhofer
     https://arxiv.org/abs/2104.11227
     """
@@ -832,13 +838,17 @@ class MViT(nn.Module):
         drop_path_rate = cfg.MVIT.DROPPATH_RATE
         mode = cfg.MVIT.MODE
         self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        # Params for positional embedding
+        self.use_abs_pos = cfg.MVIT.USE_ABS_POS
         self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
+        self.rel_pos_spatial = cfg.MVIT.REL_POS_SPATIAL
+        self.rel_pos_temporal = cfg.MVIT.REL_POS_TEMPORAL
         if cfg.MVIT.NORM == "layernorm":
             norm_layer = partial(nn.LayerNorm, eps=1e-6)
         else:
             raise NotImplementedError("Only supports layernorm.")
         self.num_classes = num_classes
-        self.patch_embed = stem_helper.PatchEmbed(
+        patch_embed = stem_helper.PatchEmbed(
             dim_in=in_chans,
             dim_out=embed_dim,
             kernel=cfg.MVIT.PATCH_KERNEL,
@@ -846,6 +856,9 @@ class MViT(nn.Module):
             padding=cfg.MVIT.PATCH_PADDING,
             conv_2d=use_2d_patch,
         )
+        if cfg.MODEL.ACT_CHECKPOINT:
+            patch_embed = checkpoint_wrapper(patch_embed)
+        self.patch_embed = patch_embed
         self.input_dims = [temporal_size, spatial_size, spatial_size]
         assert self.input_dims[1] == self.input_dims[2]
         self.patch_dims = [
@@ -864,23 +877,24 @@ class MViT(nn.Module):
         else:
             pos_embed_dim = num_patches
 
-        if self.sep_pos_embed:
-            self.pos_embed_spatial = nn.Parameter(
-                torch.zeros(
-                    1, self.patch_dims[1] * self.patch_dims[2], embed_dim
+        if self.use_abs_pos:
+            if self.sep_pos_embed:
+                self.pos_embed_spatial = nn.Parameter(
+                    torch.zeros(
+                        1, self.patch_dims[1] * self.patch_dims[2], embed_dim
+                    )
                 )
-            )
-            self.pos_embed_temporal = nn.Parameter(
-                torch.zeros(1, self.patch_dims[0], embed_dim)
-            )
-            if self.cls_embed_on:
-                self.pos_embed_class = nn.Parameter(
-                    torch.zeros(1, 1, embed_dim)
+                self.pos_embed_temporal = nn.Parameter(
+                    torch.zeros(1, self.patch_dims[0], embed_dim)
                 )
-        else:
-            self.pos_embed = nn.Parameter(
-                torch.zeros(1, pos_embed_dim, embed_dim)
-            )
+                if self.cls_embed_on:
+                    self.pos_embed_class = nn.Parameter(
+                        torch.zeros(1, 1, embed_dim)
+                    )
+            else:
+                self.pos_embed = nn.Parameter(
+                    torch.zeros(1, pos_embed_dim, embed_dim)
+                )
 
         if self.drop_rate > 0.0:
             self.pos_drop = nn.Dropout(p=self.drop_rate)
@@ -935,6 +949,7 @@ class MViT(nn.Module):
 
         self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
 
+        input_size = self.patch_dims
         self.blocks = nn.ModuleList()
 
         if cfg.MODEL.ACT_CHECKPOINT:
@@ -942,16 +957,23 @@ class MViT(nn.Module):
 
         for i in range(depth):
             num_heads = round_width(num_heads, head_mul[i])
-            embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
-            dim_out = round_width(
-                embed_dim,
-                dim_mul[i + 1],
-                divisor=round_width(num_heads, head_mul[i + 1]),
-            )
+            if cfg.MVIT.DIM_MUL_IN_ATT:
+                dim_out = round_width(
+                    embed_dim,
+                    dim_mul[i],
+                    divisor=round_width(num_heads, head_mul[i]),
+                )
+            else:
+                dim_out = round_width(
+                    embed_dim,
+                    dim_mul[i + 1],
+                    divisor=round_width(num_heads, head_mul[i + 1]),
+                )
             attention_block = MultiScaleBlock(
                 dim=embed_dim,
                 dim_out=dim_out,
                 num_heads=num_heads,
+                input_size=input_size,
                 mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias,
                 drop_rate=self.drop_rate,
@@ -964,12 +986,23 @@ class MViT(nn.Module):
                 mode=mode,
                 has_cls_embed=self.cls_embed_on,
                 pool_first=pool_first,
+                rel_pos_spatial=self.rel_pos_spatial,
+                rel_pos_temporal=self.rel_pos_temporal,
+                rel_pos_zero_init=cfg.MVIT.REL_POS_ZERO_INIT,
+                residual_pooling=cfg.MVIT.RESIDUAL_POOLING,
+                dim_mul_in_att=cfg.MVIT.DIM_MUL_IN_ATT,
+                separate_qkv=cfg.MVIT.SEPARATE_QKV,
             )
             if cfg.MODEL.ACT_CHECKPOINT:
                 attention_block = checkpoint_wrapper(attention_block)
             self.blocks.append(attention_block)
 
-        embed_dim = dim_out
+            if len(stride_q[i]) > 0:
+                input_size = [
+                    size // stride
+                    for size, stride in zip(input_size, stride_q[i])
+                ]
+            embed_dim = dim_out
         self.norm = norm_layer(embed_dim)
 
         self.head = head_helper.TransformerBasicHead(
@@ -979,13 +1012,14 @@ class MViT(nn.Module):
             act_func=cfg.MODEL.HEAD_ACT,
             cfg=cfg,
         )
-        if self.sep_pos_embed:
-            trunc_normal_(self.pos_embed_spatial, std=0.02)
-            trunc_normal_(self.pos_embed_temporal, std=0.02)
-            if self.cls_embed_on:
-                trunc_normal_(self.pos_embed_class, std=0.02)
-        else:
-            trunc_normal_(self.pos_embed, std=0.02)
+        if self.use_abs_pos:
+            if self.sep_pos_embed:
+                trunc_normal_(self.pos_embed_spatial, std=0.02)
+                trunc_normal_(self.pos_embed_temporal, std=0.02)
+                if self.cls_embed_on:
+                    trunc_normal_(self.pos_embed_class, std=0.02)
+            else:
+                trunc_normal_(self.pos_embed, std=0.02)
         if self.cls_embed_on:
             trunc_normal_(self.cls_token, std=0.02)
         self.apply(self._init_weights)
@@ -1001,36 +1035,58 @@ class MViT(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay(self):
+        names = []
         if self.cfg.MVIT.ZERO_DECAY_POS_CLS:
-            if self.sep_pos_embed:
-                if self.cls_embed_on:
-                    return {
-                        "pos_embed_spatial",
-                        "pos_embed_temporal",
-                        "pos_embed_class",
-                        "cls_token",
-                    }
+            if self.use_abs_pos:
+                if self.sep_pos_embed:
+                    names.extend(
+                        [
+                            "pos_embed_spatial",
+                            "pos_embed_temporal",
+                            "pos_embed_class",
+                        ]
+                    )
                 else:
-                    return {
-                        "pos_embed_spatial",
-                        "pos_embed_temporal",
-                        "pos_embed_class",
-                    }
-            else:
-                if self.cls_embed_on:
-                    return {"pos_embed", "cls_token"}
-                else:
-                    return {"pos_embed"}
-        else:
-            return {}
+                    names.append(["pos_embed"])
+            if self.rel_pos_spatial:
+                names.extend(["rel_pos_h", "rel_pos_w", "rel_pos_hw"])
+            if self.rel_pos_temporal:
+                names.extend(["rel_pos_t"])
+            if self.cls_embed_on:
+                names.append("cls_token")
+
+        return names
+
+    def _get_pos_embed(self, pos_embed, bcthw):
+        t, h, w = bcthw[-3], bcthw[-2], bcthw[-1]
+        if self.cls_embed_on:
+            cls_pos_embed = pos_embed[:, 0:1, :]
+            pos_embed = pos_embed[:, 1:]
+        txy_num = pos_embed.shape[1]
+        p_t, p_h, p_w = self.patch_dims
+        assert p_t * p_h * p_w == txy_num
+
+        if (p_t, p_h, p_w) != (t, h, w):
+            new_pos_embed = F.interpolate(
+                pos_embed[:, :, :]
+                .reshape(1, p_t, p_h, p_w, -1)
+                .permute(0, 4, 1, 2, 3),
+                size=(t, h, w),
+                mode="trilinear",
+            )
+            pos_embed = new_pos_embed.reshape(1, -1, t * h * w).permute(0, 2, 1)
+
+        if self.cls_embed_on:
+            pos_embed = torch.cat((cls_pos_embed, pos_embed), dim=1)
+
+        return pos_embed
 
     def forward(self, x):
         x = x[0]
-        x = self.patch_embed(x)
+        x, bcthw = self.patch_embed(x)
 
         T = self.cfg.DATA.NUM_FRAMES // self.patch_stride[0]
-        H = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
-        W = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
+        H, W = bcthw[-2], bcthw[-1]
         B, N, C = x.shape
 
         if self.cls_embed_on:
@@ -1039,19 +1095,22 @@ class MViT(nn.Module):
             )  # stole cls_tokens impl from Phil Wang, thanks
             x = torch.cat((cls_tokens, x), dim=1)
 
-        if self.sep_pos_embed:
-            pos_embed = self.pos_embed_spatial.repeat(
-                1, self.patch_dims[0], 1
-            ) + torch.repeat_interleave(
-                self.pos_embed_temporal,
-                self.patch_dims[1] * self.patch_dims[2],
-                dim=1,
-            )
-            if self.cls_embed_on:
-                pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
-            x = x + pos_embed
-        else:
-            x = x + self.pos_embed
+        if self.use_abs_pos:
+            if self.sep_pos_embed:
+                pos_embed = self.pos_embed_spatial.repeat(
+                    1, self.patch_dims[0], 1
+                ) + torch.repeat_interleave(
+                    self.pos_embed_temporal,
+                    self.patch_dims[1] * self.patch_dims[2],
+                    dim=1,
+                )
+                if self.cls_embed_on:
+                    pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
+                pos_embed = self._get_pos_embed(pos_embed, bcthw)
+                x = x + pos_embed
+            else:
+                pos_embed = self._get_pos_embed(self.pos_embed, bcthw)
+                x = x + pos_embed
 
         if self.drop_rate:
             x = self.pos_drop(x)

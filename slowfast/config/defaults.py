@@ -3,7 +3,6 @@
 
 """Configs."""
 import math
-
 from fvcore.common.config import CfgNode
 
 from . import custom_config
@@ -487,6 +486,26 @@ _C.MVIT.SEP_POS_EMBED = False
 # Dropout rate for the MViT backbone.
 _C.MVIT.DROPOUT_RATE = 0.0
 
+# If True, use absolute positional embedding.
+_C.MVIT.USE_ABS_POS = True
+
+# If True, use relative positional embedding for spatial dimentions
+_C.MVIT.REL_POS_SPATIAL = False
+
+# If True, use relative positional embedding for temporal dimentions
+_C.MVIT.REL_POS_TEMPORAL = False
+
+# If True, init rel with zero
+_C.MVIT.REL_POS_ZERO_INIT = False
+
+# If True, using Residual Pooling connection
+_C.MVIT.RESIDUAL_POOLING = False
+
+# Dim mul in qkv linear layers of attention block instead of MLP
+_C.MVIT.DIM_MUL_IN_ATT = False
+
+# If True, using separate linear layers for Q, K, V in attention blocks.
+_C.MVIT.SEPARATE_QKV = False
 
 # -----------------------------------------------------------------------------
 # SlowFast options
@@ -879,13 +898,13 @@ _C.MULTIGRID.EPOCH_FACTOR = 1.5
 # Enable short cycles.
 _C.MULTIGRID.SHORT_CYCLE = False
 # Short cycle additional spatial dimensions relative to the default crop size.
-_C.MULTIGRID.SHORT_CYCLE_FACTORS = [0.5, 0.5 ** 0.5]
+_C.MULTIGRID.SHORT_CYCLE_FACTORS = [0.5, 0.5**0.5]
 
 _C.MULTIGRID.LONG_CYCLE = False
 # (Temporal, Spatial) dimensions relative to the default shape.
 _C.MULTIGRID.LONG_CYCLE_FACTORS = [
-    (0.25, 0.5 ** 0.5),
-    (0.5, 0.5 ** 0.5),
+    (0.25, 0.5**0.5),
+    (0.5, 0.5**0.5),
     (0.5, 1),
     (1, 1),
 ]
