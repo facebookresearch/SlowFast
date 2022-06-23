@@ -415,6 +415,23 @@ def pyav_decode(
         # If failed to fetch the decoding information, decode the entire video.
         decode_all_video = True
         video_start_pts, video_end_pts = 0, math.inf
+        start_end_delta_time = None
+
+        frames = None
+        if container.streams.video:
+            video_frames, max_pts = pyav_decode_stream(
+                container,
+                video_start_pts,
+                video_end_pts,
+                container.streams.video[0],
+                {"video": 0},
+            )
+            container.close()
+
+            frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
+            frames = torch.as_tensor(np.stack(frames))
+        frames_out = [frames]
+
     else:
         # Perform selective decoding.
         decode_all_video = False
