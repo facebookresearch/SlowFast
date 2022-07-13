@@ -35,7 +35,7 @@ Here we can train a standard MViTv2 model from scratch by:
 
 ```
 python tools/run_net.py \
-  --cfg configs/Kinetics/MVIT-B.yaml \
+  --cfg configs/Kinetics/MVITv2_S_16x4.yaml \
   DATA.PATH_TO_DATA_DIR path_to_your_dataset \
 ```
 
