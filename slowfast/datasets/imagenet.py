@@ -41,6 +41,7 @@ class Imagenet(torch.utils.data.Dataset):
             self._construct_imdb()
         else:
             self._load_imdb()
+        self.num_videos = len(self._imdb)
 
     def _load_imdb(self):
         split_path = os.path.join(
@@ -194,10 +195,11 @@ class Imagenet(torch.utils.data.Dataset):
         if isinstance(im, list):
             label = [label for _ in range(len(im))]
             dummy = [torch.Tensor() for _ in range(len(im))]
-            return im, label, dummy, dummy, {}
+            return im, label, index, dummy, {}
         else:
             dummy = torch.Tensor()
-            return [im], label, dummy, dummy, {}
+            return [im], label, index, dummy, {}
+
 
     def __len__(self):
         return len(self._imdb)

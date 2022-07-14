@@ -29,6 +29,17 @@ MViT is a multiscale transformer which serves as a general vision backbone for d
 | MViTv2-B | 32 x 3 | 82.9 | 95.7 | 225 x 1 x 5 | 51.2 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_k400_f304025456.pyth) | Kinetics/MVITv2_B_32x3 |
 | MViTv2-L | 40 x 3 | 86.1 | 97.0 | 2828 x 3 x 5 | 217.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_L_40x3_k400_f306903192.pyth) | Kinetics/MVITv2_L_40x3_test |
 
+
+### ImageNet-1K
+
+| name | resolution |acc@1 | #params | FLOPs | 1k model |
+|:---:|:---:|:---:|:---:| :---:|:---:|
+| MViTv2-T | 224x224 | 82.3 | 24M | 4.7G | [model](https://dl.fbaipublicfiles.com/mvit/mvitv2_models/MViTv2_T_in1k.pyth) |
+| MViTv2-S | 224x224 | 83.6 | 35M | 7.0G | [model](https://dl.fbaipublicfiles.com/mvit/mvitv2_models/MViTv2_S_in1k.pyth) |
+| MViTv2-B | 224x224 | 84.4 | 52M | 10.2G | [model](https://dl.fbaipublicfiles.com/mvit/mvitv2_models/MViTv2_B_in1k.pyth) |
+
+For more ImageNet results, please check the MViTv2 for image classification [repo](https://github.com/facebookresearch/mvit).
+
 ## Get started
 
 Here we can train a standard MViTv2 model from scratch by:
