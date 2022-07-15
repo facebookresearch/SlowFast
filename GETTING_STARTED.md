@@ -9,7 +9,7 @@ Here we can start with training a simple C2D models by running:
 ```
 python tools/run_net.py \
   --cfg configs/Kinetics/C2D_8x8_R50.yaml \
-  DATA.PATH_TO_DATA_DIR path_to_your_dataset \
+  --opts DATA.PATH_TO_DATA_DIR path_to_your_dataset \
   NUM_GPUS 2 \
   TRAIN.BATCH_SIZE 16 \
 ```
@@ -53,7 +53,7 @@ We have `TRAIN.ENABLE` and `TEST.ENABLE` to control whether training or testing 
 ```
 python tools/run_net.py \
   --cfg configs/Kinetics/C2D_8x8_R50.yaml \
-  DATA.PATH_TO_DATA_DIR path_to_your_dataset \
+  --opts DATA.PATH_TO_DATA_DIR path_to_your_dataset \
   TEST.CHECKPOINT_FILE_PATH path_to_your_checkpoint \
   TRAIN.ENABLE False \
 ```
