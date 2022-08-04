@@ -118,7 +118,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         else:
             # Perform the forward pass.
             preds = model(inputs)
-
         # Gather all the predictions across all the devices to perform ensemble.
         if cfg.NUM_GPUS > 1:
             preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
@@ -128,10 +127,12 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             video_idx = video_idx.cpu()
 
         test_meter.iter_toc()
-        # Update and log stats.
-        test_meter.update_stats(
-            preds.detach(), labels.detach(), video_idx.detach()
-        )
+
+        if not cfg.VIS_MASK.ENABLE:
+            # Update and log stats.
+            test_meter.update_stats(
+                preds.detach(), labels.detach(), video_idx.detach()
+            )
         test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
@@ -177,83 +178,107 @@ def test(cfg):
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
 
-    # Print config.
-    logger.info("Test with config:")
-    logger.info(cfg)
+    if len(cfg.TEST.NUM_TEMPORAL_CLIPS) == 0:
+        cfg.TEST.NUM_TEMPORAL_CLIPS = [cfg.TEST.NUM_ENSEMBLE_VIEWS]
 
-    # Build the video model and print model statistics.
-    model = build_model(cfg)
+    test_meters = []
+    for num_view in cfg.TEST.NUM_TEMPORAL_CLIPS:
 
-    out_str_prefix = "lin" if cfg.MODEL.DETACH_FINAL_FC else ""
+        cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
 
-    if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, use_train_input=False)
+        # Print config.
+        logger.info("Test with config:")
+        logger.info(cfg)
 
-    if (
-        cfg.TASK == "ssl"
-        and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-        and cfg.CONTRASTIVE.KNN_ON
-    ):
-        train_loader = loader.construct_loader(cfg, "train")
-        out_str_prefix = "knn"
-        if hasattr(model, "module"):
-            model.module.init_knn_labels(train_loader)
+        # Build the video model and print model statistics.
+        model = build_model(cfg)
+        flops, params = 0.0, 0.0
+        if du.is_master_proc() and cfg.LOG_MODEL_INFO:
+            model.eval()
+            flops, params = misc.log_model_info(
+                model, cfg, use_train_input=False
+            )
+
+        if du.is_master_proc() and cfg.LOG_MODEL_INFO:
+            misc.log_model_info(model, cfg, use_train_input=False)
+        if (
+            cfg.TASK == "ssl"
+            and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+            and cfg.CONTRASTIVE.KNN_ON
+        ):
+            train_loader = loader.construct_loader(cfg, "train")
+            if hasattr(model, "module"):
+                model.module.init_knn_labels(train_loader)
+            else:
+                model.init_knn_labels(train_loader)
+
+        cu.load_test_checkpoint(cfg, model)
+
+        # Create video testing loaders.
+        test_loader = loader.construct_loader(cfg, "test")
+        logger.info("Testing model for {} iterations".format(len(test_loader)))
+
+        if cfg.DETECTION.ENABLE:
+            assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
+            test_meter = AVAMeter(len(test_loader), cfg, mode="test")
         else:
-            model.init_knn_labels(train_loader)
+            assert (
+                test_loader.dataset.num_videos
+                % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
+                == 0
+            )
+            # Create meters for multi-view testing.
+            test_meter = TestMeter(
+                test_loader.dataset.num_videos
+                // (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS),
+                cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
+                cfg.MODEL.NUM_CLASSES
+                if not cfg.TASK == "ssl"
+                else cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM,
+                len(test_loader),
+                cfg.DATA.MULTI_LABEL,
+                cfg.DATA.ENSEMBLE_METHOD,
+            )
 
-    cu.load_test_checkpoint(cfg, model)
+        # Set up writer for logging to Tensorboard format.
+        if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
+            cfg.NUM_GPUS * cfg.NUM_SHARDS
+        ):
+            writer = tb.TensorboardWriter(cfg)
+        else:
+            writer = None
 
-    # Create video testing loaders.
-    test_loader = loader.construct_loader(cfg, "test")
-    logger.info("Testing model for {} iterations".format(len(test_loader)))
+        # # Perform multi-view test on the entire dataset.
+        test_meter = perform_test(test_loader, model, test_meter, cfg, writer)
+        test_meters.append(test_meter)
+        if writer is not None:
+            writer.close()
 
-    if cfg.DETECTION.ENABLE:
-        assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
-        test_meter = AVAMeter(len(test_loader), cfg, mode="test")
-    else:
-        assert (
-            test_loader.dataset.num_videos
-            % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
-            == 0
+    result_string_views = "_p{:.2f}_f{:.2f}".format(params / 1e6, flops)
+
+    for view, test_meter in zip(cfg.TEST.NUM_TEMPORAL_CLIPS, test_meters):
+        logger.info(
+            "Finalized testing with {} temporal clips and {} spatial crops".format(
+                view, cfg.TEST.NUM_SPATIAL_CROPS
+            )
         )
-        # Create meters for multi-view testing.
-        test_meter = TestMeter(
-            test_loader.dataset.num_videos
-            // (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS),
-            cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
-            cfg.MODEL.NUM_CLASSES
-            if not cfg.TASK == "ssl"
-            else cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM,
-            len(test_loader),
-            cfg.DATA.MULTI_LABEL,
-            cfg.DATA.ENSEMBLE_METHOD,
+        result_string_views += "_{}a{}" "".format(
+            view, test_meter.stats["top1_acc"]
         )
 
-    # Set up writer for logging to Tensorboard format.
-    if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-        cfg.NUM_GPUS * cfg.NUM_SHARDS
-    ):
-        writer = tb.TensorboardWriter(cfg)
-    else:
-        writer = None
-
-    # # Perform multi-view test on the entire dataset.
-    test_meter = perform_test(test_loader, model, test_meter, cfg, writer)
-    if writer is not None:
-        writer.close()
-    result_string = (
-        "_a{}{}{} Top1 Acc: {} Top5 Acc: {} MEM: {:.2f} dataset: {}{}"
-        "".format(
-            out_str_prefix,
-            cfg.TEST.DATASET[0],
-            test_meter.stats["top1_acc"],
-            test_meter.stats["top1_acc"],
-            test_meter.stats["top5_acc"],
-            misc.gpu_mem_usage(),
-            cfg.TEST.DATASET[0],
-            cfg.MODEL.NUM_CLASSES,
+        result_string = (
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
+            "".format(
+                params / 1e6,
+                flops,
+                view,
+                test_meter.stats["top1_acc"],
+                test_meter.stats["top5_acc"],
+                misc.gpu_mem_usage(),
+                flops,
+            )
         )
-    )
-    logger.info("testing done: {}".format(result_string))
 
-    return result_string
+        logger.info("{}".format(result_string))
+    logger.info("{}".format(result_string_views))
+    return result_string + " \n " + result_string_views

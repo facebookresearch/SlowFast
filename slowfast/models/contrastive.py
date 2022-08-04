@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-"""CSC model."""
-
 import math
 import numpy as np
 import torch
@@ -1082,7 +1080,8 @@ class Memory1D(nn.Module):
         return
 
 
-def cancel_swav_gradients(model, cfg, epoch_exact):
+def contrastive_parameter_surgery(model, cfg, epoch_exact, cur_iter):
+
     # cancel some gradients in first epoch of SwAV
     if (
         cfg.MODEL.MODEL_NAME == "ContrastiveModel"
@@ -1092,4 +1091,76 @@ def cancel_swav_gradients(model, cfg, epoch_exact):
         for name, p in model.named_parameters():
             if "swav_prototypes" in name:
                 p.grad = None
-    return model
+
+    iters_noupdate = 0
+    if (
+        cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+        and cfg.CONTRASTIVE.TYPE == "moco"
+    ):
+        assert (
+            cfg.CONTRASTIVE.QUEUE_LEN % (cfg.TRAIN.BATCH_SIZE * cfg.NUM_SHARDS)
+            == 0
+        )
+        iters_noupdate = (
+            cfg.CONTRASTIVE.QUEUE_LEN // cfg.TRAIN.BATCH_SIZE // cfg.NUM_SHARDS
+        )
+
+    if cur_iter < iters_noupdate and epoch_exact < 1:  #  for e.g. MoCo
+        logger.info(
+            "Not updating parameters {}/{}".format(cur_iter, iters_noupdate)
+        )
+        update_param = False
+    else:
+        update_param = True
+
+    return model, update_param
+
+
+def contrastive_forward(model, cfg, inputs, index, time, epoch_exact, scaler):
+    if cfg.CONTRASTIVE.SEQUENTIAL:
+        perform_backward = False
+        mdl = model.module if hasattr(model, "module") else model
+        keys = (
+            mdl.compute_key_feat(
+                inputs,
+                compute_predictor_keys=False,
+                batched_inference=True if len(inputs) < 2 else False,
+            )
+            if cfg.CONTRASTIVE.TYPE == "moco" or cfg.CONTRASTIVE.TYPE == "byol"
+            else [None] * len(inputs)
+        )
+        for k, vid in enumerate(inputs):
+            other_keys = keys[:k] + keys[k + 1 :]
+            time_cur = torch.cat(
+                [
+                    time[:, k : k + 1, :],
+                    time[:, :k, :],
+                    time[:, k + 1 :, :],
+                ],
+                1,
+            )  # q, kpre, kpost
+            vids = [vid]
+            if (
+                cfg.CONTRASTIVE.TYPE == "swav"
+                or cfg.CONTRASTIVE.TYPE == "simclr"
+            ):
+                if k < len(inputs) - 1:
+                    vids = inputs[k : k + 2]
+                else:
+                    break
+            lgt_k, loss_k = model(
+                vids, index, time_cur, epoch_exact, keys=other_keys
+            )
+            scaler.scale(loss_k).backward()
+            if k == 0:
+                preds, partial_loss = lgt_k, loss_k.detach()
+            else:
+                preds = torch.cat([preds, lgt_k], dim=0)
+                partial_loss += loss_k.detach()
+        partial_loss /= len(inputs) * 2.0  # to have same loss as symm model
+        if cfg.CONTRASTIVE.TYPE == "moco":
+            mdl._dequeue_and_enqueue(keys)
+    else:
+        perform_backward = True
+        preds, partial_loss = model(inputs, index, time, epoch_exact, keys=None)
+    return model, preds, partial_loss, perform_backward

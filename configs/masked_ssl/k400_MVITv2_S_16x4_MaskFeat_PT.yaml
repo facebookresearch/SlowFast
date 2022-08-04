@@ -1,0 +1,98 @@
+TASK: ssl
+TRAIN:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 32
+  EVAL_PERIOD: 1000000
+  CHECKPOINT_PERIOD: 10
+  AUTO_RESUME: True
+DATA:
+  USE_OFFSET_SAMPLING: True
+  DECODING_BACKEND: torchvision
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 4
+  TRAIN_JITTER_SCALES: [256, 320]
+  TRAIN_CROP_SIZE: 224
+  TEST_CROP_SIZE: 224
+  INPUT_CHANNEL_NUM: [3]
+  DECODING_SHORT_SIZE: 320
+  TRAIN_JITTER_SCALES_RELATIVE: [0.5, 1.0]
+  TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
+MVIT:
+  DEPTH: 16
+  NUM_HEADS: 1
+  EMBED_DIM: 96
+  PATCH_KERNEL: [3, 7, 7]
+  PATCH_STRIDE: [2, 4, 4]
+  PATCH_PADDING: [1, 3, 3]
+  ZERO_DECAY_POS_CLS: False
+  QKV_BIAS: True
+  DIM_MUL: [[1, 2.0], [3, 2.0], [14, 2.0]]
+  HEAD_MUL: [[1, 2.0], [3, 2.0], [14, 2.0]]
+  # Highlight: [14, 1, 1, 1] instead of [14, 1, 2, 2] for 14x14 output
+  POOL_Q_STRIDE: [[0, 1, 1, 1], [1, 1, 2, 2], [2, 1, 1, 1], [3, 1, 2, 2], [4, 1, 1, 1], [5, 1, 1, 1], [6, 1, 1, 1], [7, 1, 1, 1], [8, 1, 1, 1], [9, 1, 1, 1], [10, 1, 1, 1], [11, 1, 1, 1], [12, 1, 1, 1], [13, 1, 1, 1], [14, 1, 1, 1], [15, 1, 1, 1]]
+  POOL_KVQ_KERNEL: [3, 3, 3]
+  POOL_KV_STRIDE_ADAPTIVE: [1, 8, 8]
+  DROPPATH_RATE: 0.0
+  CLS_EMBED_ON: True # default: True
+  USE_ABS_POS: False # default: True
+  SEP_POS_EMBED: True # default: false
+  REL_POS_SPATIAL: True # default: false
+  REL_POS_TEMPORAL: True # default: false
+  RESIDUAL_POOLING: True
+  MODE: "conv"
+MASK:
+  ENABLE: True
+  PRETRAIN_DEPTH: [15]
+  HEAD_TYPE: "separate"
+  PRED_HOG: True
+AUG:
+  ENABLE: True
+  COLOR_JITTER: None
+  AA_TYPE: ""
+  RE_PROB: 0.0
+  GEN_MASK_LOADER: True
+  MASK_RATIO: 0.4
+
+  # Mask Cube (Default)
+  MASK_TUBE: False
+  MASK_FRAMES: False
+  MASK_WINDOW_SIZE: [8, 7, 7]
+MIXUP:
+  ENABLE: False
+BN:
+  USE_PRECISE_STATS: False
+  NUM_BATCHES_PRECISE: 200
+SOLVER:
+  CLIP_GRAD_L2NORM: 0.02
+  BASE_LR: 0.0001
+  BASE_LR_SCALE_NUM_SHARDS: True
+  LR_POLICY: cosine
+  COSINE_AFTER_WARMUP: True
+  COSINE_END_LR: 1e-6
+  MAX_EPOCH: 300
+  WARMUP_EPOCHS: 10.0
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 0.05
+  ZERO_WD_1D_PARAM: True
+  WARMUP_START_LR: 1e-6
+  OPTIMIZING_METHOD: adamw
+MODEL:
+  ARCH: maskmvit
+  MODEL_NAME: MaskMViT
+  LOSS_FUNC: multi_mse
+  DROPOUT_RATE: 0.0
+TEST:
+  ENABLE: False
+  DATASET: kinetics
+  BATCH_SIZE: 16
+  NUM_SPATIAL_CROPS: 1
+  NUM_TEMPORAL_CLIPS: [5, 10]
+DATA_LOADER:
+  NUM_WORKERS: 8
+  PIN_MEMORY: True
+NUM_GPUS: 8
+NUM_SHARDS: 1
+RNG_SEED: 0
+OUTPUT_DIR: .
+LOG_MODEL_INFO: False

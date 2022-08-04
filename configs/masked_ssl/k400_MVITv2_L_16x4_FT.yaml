@@ -1,0 +1,108 @@
+TASK: ssl_eval
+TRAIN:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 16
+  EVAL_PERIOD: 5
+  CHECKPOINT_PERIOD: 5
+  AUTO_RESUME: True
+  CHECKPOINT_EPOCH_RESET: True
+DATA:
+  USE_OFFSET_SAMPLING: True
+  DECODING_BACKEND: torchvision
+  NUM_FRAMES: 16
+  SAMPLING_RATE: 4
+  TRAIN_JITTER_SCALES: [256, 320]
+  DECODING_SHORT_SIZE: 320
+  TRAIN_CROP_SIZE: 224
+  TEST_CROP_SIZE: 224
+  INPUT_CHANNEL_NUM: [3]
+  TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
+  TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
+MVIT:
+  ZERO_DECAY_POS_CLS: False
+  SEP_POS_EMBED: True
+  PATCH_KERNEL: (3, 7, 7)
+  PATCH_STRIDE: (2, 4, 4)
+  PATCH_PADDING: (1, 3, 3)
+  MLP_RATIO: 4.0
+  QKV_BIAS: True
+  NORM: "layernorm"
+  EMBED_DIM: 144
+  NUM_HEADS: 2
+  DEPTH: 48 # [2, 6, 36, 2]
+  DIM_MUL: [[2, 2.0], [8, 2.0], [44, 2.0]]
+  HEAD_MUL: [[2, 2.0], [8, 2.0], [44, 2.0]]
+  POOL_Q_STRIDE: [[0, 1, 1, 1], [1, 1, 1, 1], [2, 1, 2, 2], [3, 1, 1, 1], [4, 1, 1, 1], [5, 1, 1, 1], [6, 1, 1, 1], [7, 1, 1, 1], [8, 1, 2, 2], [9, 1, 1, 1], [10, 1, 1, 1],
+  [11, 1, 1, 1], [12, 1, 1, 1], [13, 1, 1, 1], [14, 1, 1, 1], [15, 1, 1, 1], [16, 1, 1, 1], [17, 1, 1, 1], [18, 1, 1, 1], [19, 1, 1, 1], [20, 1, 1, 1],
+  [21, 1, 1, 1], [22, 1, 1, 1], [23, 1, 1, 1], [24, 1, 1, 1], [25, 1, 1, 1], [26, 1, 1, 1], [27, 1, 1, 1], [28, 1, 1, 1], [29, 1, 1, 1], [30, 1, 1, 1],
+  [31, 1, 1, 1], [32, 1, 1, 1], [33, 1, 1, 1], [34, 1, 1, 1], [35, 1, 1, 1], [36, 1, 1, 1], [37, 1, 1, 1], [38, 1, 1, 1], [39, 1, 1, 1], [40, 1, 1, 1],
+  [41, 1, 1, 1], [42, 1, 1, 1], [43, 1, 1, 1], [44, 1, 2, 2], [45, 1, 1, 1], [46, 1, 1, 1], [47, 1, 1, 1]]
+  POOL_KV_STRIDE_ADAPTIVE: [1, 8, 8]
+  POOL_KVQ_KERNEL: [3, 3, 3]
+  # Please check if your loaded model has cls token.
+  # It would be better to have cls token. But some of old models forget to turn this on.
+  CLS_EMBED_ON: True # default: True
+  # uncomment comment for abs pos:
+  # SEP_POS_EMBED: True
+
+  # uncomment for rel pos:
+  USE_ABS_POS: False # default: True
+  REL_POS_SPATIAL: True # default: false
+  REL_POS_TEMPORAL: True # default: false
+
+  MODE: "conv"
+  RESIDUAL_POOLING: True
+  DROPPATH_RATE: 0.2
+  LAYER_SCALE_INIT_VALUE: 0.0
+  USE_MEAN_POOLING: True
+  HEAD_INIT_SCALE: 0.001
+AUG:
+  ENABLE: True
+  COLOR_JITTER: None
+  AA_TYPE: rand-m7-mstd0.5-inc1
+  INTERPOLATION: bicubic
+  RE_PROB: 0.25
+  RE_MODE: pixel
+  RE_COUNT: 1
+  RE_SPLIT: False
+MIXUP:
+  ENABLE: True
+  ALPHA: 0.8
+  CUTMIX_ALPHA: 1.0
+  PROB: 1.0
+  SWITCH_PROB: 0.5
+  LABEL_SMOOTH_VALUE: 0.1
+SOLVER:
+  MAX_EPOCH: 75
+  LAYER_DECAY: 0.875
+  WARMUP_EPOCHS: 5.0
+  CLIP_GRAD_L2NORM: 5.0
+  ZERO_WD_1D_PARAM: True
+  BASE_LR_SCALE_NUM_SHARDS: True
+  BASE_LR: 0.0006
+  COSINE_AFTER_WARMUP: True
+  COSINE_END_LR: 1e-5
+  WARMUP_START_LR: 1e-8
+  LR_POLICY: cosine
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 0.05
+  OPTIMIZING_METHOD: adamw
+MODEL:
+  NUM_CLASSES: 400
+  ARCH: mvit
+  MODEL_NAME: MViT
+  LOSS_FUNC: soft_cross_entropy # default cross_entropy
+  DROPOUT_RATE: 0.0
+TEST:
+  ENABLE: True
+  DATASET: kinetics
+  BATCH_SIZE: 64
+  NUM_SPATIAL_CROPS: 1
+DATA_LOADER:
+  NUM_WORKERS: 8
+  PIN_MEMORY: True
+NUM_GPUS: 8
+NUM_SHARDS: 1
+RNG_SEED: 0
+OUTPUT_DIR: .

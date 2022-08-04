@@ -181,8 +181,13 @@ class MixUp:
         return lam
 
     def __call__(self, x, target):
-        assert len(x) > 1, "Batch size should be greater than 1 for mixup."
-        lam = self._mix_batch(x)
+        if self.mix_prob > 0.0:
+            assert len(x) > 1, "Batch size should be greater than 1 for mixup."
+            lam = self._mix_batch(x)
+        elif self.mix_prob == 0.0:
+            lam = 1.0
+        else:
+            raise NotImplementedError
         target = mixup_target(
             target, self.num_classes, lam, self.label_smoothing
         )

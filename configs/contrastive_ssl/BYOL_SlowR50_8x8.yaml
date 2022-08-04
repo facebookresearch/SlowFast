@@ -1,13 +1,11 @@
 TASK: ssl
 TRAIN:
   DATASET: kinetics
-  BATCH_SIZE: 64
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 5
   AUTO_RESUME: True
-  MIXED_PRECISION: True
 MODEL:
-  NUM_CLASSES: 128
+  NUM_CLASSES: 256
   MODEL_NAME: ContrastiveModel
   ARCH: slow_c2d
   ARCH: slow
@@ -15,23 +13,29 @@ MODEL:
   DROPOUT_RATE: 0.0
   HEAD_ACT: none
 CONTRASTIVE:
-  T: 0.1 # default 0.07
-  NUM_MLP_LAYERS: 3 # default 1
+  T: 0.5
+  DIM: 256 # 128 default, if changed, change nCls too
+  NUM_MLP_LAYERS: 2 # default 1
+  BN_MLP: True
+  BN_SYNC_MLP: True
+  MLP_DIM: 4096
   SEQUENTIAL: True  # def fault
-  MOCO_MULTI_VIEW_QUEUE: True # default: False
-  MOMENTUM: 0.994 # default 0.5 ours: 0.999
+  MOMENTUM: 0.996 # default 0.5
   MOMENTUM_ANNEALING: True # default false
-  TYPE: moco # default mem
+  TYPE: byol # default mem
+  PREDICTOR_DEPTHS: [2]
 DATA:
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
-  TRAIN_CROP_NUM_TEMPORAL: 4  # default 1
+  # NUM_FRAMES: 16 # dont forget to change these parameters in linear & finetuning configs
+  # SAMPLING_RATE: 4
+  TRAIN_CROP_NUM_TEMPORAL: 2  # default 1
   TRAIN_CROP_NUM_SPATIAL: 1  # default 1
   TRAIN_JITTER_SCALES_RELATIVE: [0.2, 0.766]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   SSL_MOCOV2_AUG: True
-  COLOR_RND_GRAYSCALE: 0.2 # default 0.0
   SSL_COLOR_JITTER: True # default false
+  COLOR_RND_GRAYSCALE: 0.2 # default 0.0
   SSL_COLOR_HUE: 0.15
   SSL_COLOR_BRI_CON_SAT: [0.6, 0.6, 0.6] # default [0.4, 0.4, 0.4]
   TRAIN_JITTER_SCALES: [256, 320]
@@ -39,26 +43,32 @@ DATA:
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
   PATH_LABEL_SEPARATOR: " "
-DATA_LOADER:
-  NUM_WORKERS: 8
 BN:
   USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
   WEIGHT_DECAY: 0.0
+  NUM_SYNC_DEVICES: 8
+  NORM_TYPE: "sync_batchnorm"
+  # NORM_TYPE: "sync_batchnorm_apex"
 SOLVER:
+  # BASE_LR: 1.2 # for rho=4 clips
+  BASE_LR: 0.6
+  LARS_ON: True
   BASE_LR_SCALE_NUM_SHARDS: True
-  BASE_LR: 0.05
-  BASE_LR: 0.1
   LR_POLICY: cosine
   MAX_EPOCH: 200
-  WARMUP_EPOCHS: 35.0
   MOMENTUM: 0.9
+  WEIGHT_DECAY: 1e-6
+  WARMUP_EPOCHS: 35.0
   WARMUP_START_LR: 0.001
   OPTIMIZING_METHOD: sgd
 TEST:
   ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 64
+DATA_LOADER:
+  NUM_WORKERS: 10
+  PIN_MEMORY: True
 NUM_GPUS: 8
 RNG_SEED: 0
 OUTPUT_DIR: .

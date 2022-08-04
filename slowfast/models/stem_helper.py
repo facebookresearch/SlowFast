@@ -3,6 +3,7 @@
 
 """ResNe(X)t 3D stem helper."""
 
+import torch
 import torch.nn as nn
 
 
@@ -316,7 +317,9 @@ class PatchEmbed(nn.Module):
             padding=padding,
         )
 
-    def forward(self, x):
+    def forward(self, x, keep_spatial=False):
         x = self.proj(x)
+        if keep_spatial:
+            return x, x.shape
         # B C (T) H W -> B (T)HW C
         return x.flatten(2).transpose(1, 2), x.shape

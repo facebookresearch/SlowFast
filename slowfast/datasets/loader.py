@@ -148,13 +148,20 @@ def construct_loader(cfg, split, is_precise_bn=False):
             # Create a loader
             if cfg.DETECTION.ENABLE:
                 collate_func = detection_collate
-            elif cfg.AUG.NUM_SAMPLE > 1 and split in ["train"]:
+            elif (
+                (
+                    cfg.AUG.NUM_SAMPLE > 1
+                    or cfg.DATA.TRAIN_CROP_NUM_TEMPORAL > 1
+                    or cfg.DATA.TRAIN_CROP_NUM_SPATIAL > 1
+                )
+                and split in ["train"]
+                and not cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+            ):
                 collate_func = partial(
                     multiple_samples_collate, fold="imagenet" in dataset_name
                 )
             else:
                 collate_func = None
-
             loader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=batch_size,

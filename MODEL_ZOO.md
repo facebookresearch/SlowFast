@@ -68,8 +68,8 @@ We also release the imagenet pretrained model if finetuning from ImageNet is pre
 
 | architecture | size |  Top1 |  Top5  |  model  | Config |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-| ResNet | R50 | 23.6 | 6.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) | ImageNet/RES_R50 |
-| MVIT | B-16-Conv | 17.1 | 3.7 | [`link`](https://drive.google.com/file/d/1dYYqUB-3DSgBVc9d6o-rW8ojtVsrFLgp/view?usp=sharing) | ImageNet/MVIT_B_16_CONV |
+| ResNet | R50 | 73.7 | 93.2 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) | ImageNet/RES_R50 |
+| MVIT | B-16-Conv | 82.9 | 96.3 | [`link`](https://drive.google.com/file/d/1dYYqUB-3DSgBVc9d6o-rW8ojtVsrFLgp/view?usp=sharing) | ImageNet/MVIT_B_16_CONV |
 
 
 

@@ -84,7 +84,7 @@ def get_multiple_start_end_idx(
     num_clips_uniform,
     min_delta=0,
     max_delta=math.inf,
-    use_offset=False
+    use_offset=False,
 ):
     """
     Sample a clip of size clip_size from a video of size video_size and
@@ -114,7 +114,7 @@ def get_multiple_start_end_idx(
         min_delta=0,
         max_delta=math.inf,
         num_retries=100,
-        use_offset=False
+        use_offset=False,
     ):
         se_inds = np.empty((0, 2))
         dt = np.empty((0))
@@ -125,13 +125,15 @@ def get_multiple_start_end_idx(
                 if clip_idx == -1:
                     # Random temporal sampling.
                     start_idx = random.uniform(0, max_start)
-                else: # Uniformly sample the clip with the given index.
+                else:  # Uniformly sample the clip with the given index.
                     if use_offset:
                         if num_clips_uniform == 1:
                             # Take the center clip if num_clips is 1.
                             start_idx = math.floor(max_start / 2)
                         else:
-                            start_idx = clip_idx * math.floor(max_start / (num_clips_uniform - 1))
+                            start_idx = clip_idx * math.floor(
+                                max_start / (num_clips_uniform - 1)
+                            )
                     else:
                         start_idx = max_start * clip_idx / num_clips_uniform
 
@@ -302,10 +304,7 @@ def torchvision_decode(
         decode_all_video = False  # try selective decoding
 
         clip_sizes = [
-            np.maximum(
-                1.0,
-                sampling_rate[i] * num_frames[i] / target_fps * fps
-            )
+            np.maximum(1.0, sampling_rate[i] * num_frames[i] / target_fps * fps)
             for i in range(len(sampling_rate))
         ]
         start_end_delta_time = get_multiple_start_end_idx(
@@ -558,12 +557,9 @@ def decode(
         frames_decoded = [frames_decoded]
     num_decoded = len(frames_decoded)
     clip_sizes = [
-            np.maximum(
-                1.0,
-                sampling_rate[i] * num_frames[i] / target_fps * fps
-            )
-            for i in range(len(sampling_rate))
-        ]
+        np.maximum(1.0, sampling_rate[i] * num_frames[i] / target_fps * fps)
+        for i in range(len(sampling_rate))
+    ]
 
     if decode_all_video:  # full video was decoded (not trimmed yet)
         assert num_decoded == 1 and start_end_delta_time is None

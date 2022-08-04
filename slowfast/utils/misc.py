@@ -9,10 +9,12 @@ import os
 from datetime import datetime
 import psutil
 import torch
+import torchvision.io as io
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
 from torch import nn
+from torchvision.utils import make_grid
 
 import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
@@ -90,7 +92,7 @@ def _get_model_analysis_input(cfg, use_train_input):
     """
     rgb_dimension = 3
     if use_train_input:
-        if cfg.TRAIN.DATASET in ["imagenet", "imagenetprefetch"]:
+        if "imagenet" in cfg.TRAIN.DATASET:
             input_tensors = torch.rand(
                 rgb_dimension,
                 cfg.DATA.TRAIN_CROP_SIZE,
@@ -104,7 +106,7 @@ def _get_model_analysis_input(cfg, use_train_input):
                 cfg.DATA.TRAIN_CROP_SIZE,
             )
     else:
-        if cfg.TEST.DATASET in ["imagenet", "imagenetprefetch"]:
+        if "imagenet" in cfg.TEST.DATASET:
             input_tensors = torch.rand(
                 rgb_dimension,
                 cfg.DATA.TEST_CROP_SIZE,
@@ -181,13 +183,11 @@ def log_model_info(model, cfg, use_train_input=True):
             log info for testing.
     """
     logger.info("Model:\n{}".format(model))
-    logger.info("Params: {:,}".format(params_count(model)))
+    params = params_count(model)
+    logger.info("Params: {:,}".format(params))
     logger.info("Mem: {:,} MB".format(gpu_mem_usage()))
-    logger.info(
-        "Flops: {:,} G".format(
-            get_model_stats(model, cfg, "flop", use_train_input)
-        )
-    )
+    flops = get_model_stats(model, cfg, "flop", use_train_input)
+    logger.info("Flops: {:,} G".format(flops))
     logger.info(
         "Activations: {:,} M".format(
             get_model_stats(model, cfg, "activation", use_train_input)
@@ -195,6 +195,7 @@ def log_model_info(model, cfg, use_train_input=True):
     )
     logger.info("nvidia-smi")
     os.system("nvidia-smi")
+    return flops, params
 
 
 def is_eval_epoch(cfg, cur_epoch, multigrid_schedule):
@@ -249,6 +250,124 @@ def plot_input(tensor, bboxes=(), texts=(), path="./tmp_vis.png"):
         if texts is not None and len(texts) > i:
             ax[i].text(0, 0, texts[i])
     f.savefig(path)
+
+
+def plot_input_normed(
+    tensor,
+    bboxes=(),
+    texts=(),
+    path="./tmp_vis.png",
+    folder_path="",
+    make_grids=False,
+    output_video=False,
+):
+    """
+    Plot the input tensor with the optional bounding box and save it to disk.
+    Args:
+        tensor (tensor): a tensor with shape of `NxCxHxW`.
+        bboxes (tuple): bounding boxes with format of [[x, y, h, w]].
+        texts (tuple): a tuple of string to plot.
+        path (str): path to the image to save to.
+    """
+    tensor = tensor.float()
+    try:
+        os.mkdir(folder_path)
+    except Exception as e:
+        pass
+    tensor = convert_normalized_images(tensor)
+    if output_video:
+        # assert make_grids, "video needs to have make_grids on"
+        assert tensor.ndim == 5
+        sz = tensor.shape
+
+        if make_grids:
+            vid = tensor.reshape([sz[0], sz[1] * sz[2], sz[3], sz[4]])
+            vid = make_grid(vid, padding=8, pad_value=1.0, nrow=sz[0])
+            vid = vid.reshape([sz[1], sz[2], vid.shape[1], vid.shape[2]])
+        else:
+            vid = tensor.reshape([sz[0] * sz[1], sz[2], sz[3], sz[4]])
+
+        vid = vid.permute([0, 2, 3, 1])
+        vid *= 255.0
+        vid = vid.to(torch.uint8)
+        fps = 30.0 * vid.shape[0] / 64.0
+        io.video.write_video(path, vid, fps, video_codec="libx264")
+    elif make_grids:
+        if tensor.ndim > 4 and tensor.shape[0] == 1:
+            tensor = tensor.squeeze()
+            nrow = 1
+        elif tensor.ndim == 5:
+            nrow = tensor.shape[1]
+            tensor = tensor.reshape(
+                shape=(-1, tensor.shape[2], tensor.shape[3], tensor.shape[4])
+            )
+        vis2 = (
+            make_grid(tensor, padding=8, pad_value=1.0, nrow=nrow)
+            .permute(1, 2, 0)
+            .cpu()
+            .numpy()
+        )
+        plt.imsave(fname=path, arr=vis2, format="png")
+    else:
+        f, ax = plt.subplots(
+            nrows=tensor.shape[0],
+            ncols=tensor.shape[1],
+            figsize=(10 * tensor.shape[1], 10 * tensor.shape[0]),
+        )
+
+        if tensor.shape[0] == 1:
+            for i in range(tensor.shape[1]):
+                ax[i].axis("off")
+                ax[i].imshow(tensor[0][i].permute(1, 2, 0))
+                # ax[1][0].axis('off')
+                if bboxes is not None and len(bboxes) > i:
+                    for box in bboxes[i]:
+                        x1, y1, x2, y2 = box
+                        ax[i].vlines(x1, y1, y2, colors="g", linestyles="solid")
+                        ax[i].vlines(x2, y1, y2, colors="g", linestyles="solid")
+                        ax[i].hlines(y1, x1, x2, colors="g", linestyles="solid")
+                        ax[i].hlines(y2, x1, x2, colors="g", linestyles="solid")
+
+            if texts is not None and len(texts) > i:
+                ax[i].text(0, 0, texts[i])
+        else:
+            for i in range(tensor.shape[0]):
+                for j in range(tensor.shape[1]):
+                    ax[i][j].axis("off")
+                    ax[i][j].imshow(tensor[i][j].permute(1, 2, 0))
+                    # ax[1][0].axis('off')
+                    if bboxes is not None and len(bboxes) > i:
+                        for box in bboxes[i]:
+                            x1, y1, x2, y2 = box
+                            ax[i].vlines(
+                                x1, y1, y2, colors="g", linestyles="solid"
+                            )
+                            ax[i].vlines(
+                                x2, y1, y2, colors="g", linestyles="solid"
+                            )
+                            ax[i].hlines(
+                                y1, x1, x2, colors="g", linestyles="solid"
+                            )
+                            ax[i].hlines(
+                                y2, x1, x2, colors="g", linestyles="solid"
+                            )
+
+                    if texts is not None and len(texts) > i:
+                        ax[i].text(0, 0, texts[i])
+        print(f"{path}")
+        f.tight_layout(pad=0.0)
+        with pathmgr.open(path, "wb") as h:
+            f.savefig(h)
+
+
+def convert_normalized_images(tensor):
+
+    tensor = tensor * 0.225
+    tensor = tensor + 0.45
+
+    tensor = tensor.clamp(min=0.0, max=1.0)
+
+    return tensor
 
 
 def frozen_bn_stats(model):

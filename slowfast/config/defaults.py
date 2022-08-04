@@ -131,6 +131,10 @@ _C.TRAIN = CfgNode()
 # If True Train the model, else skip training.
 _C.TRAIN.ENABLE = True
 
+# Kill training if loss explodes over this ratio from the previous 5 measurements.
+# Only enforced if > 0.0
+_C.TRAIN.KILL_LOSS_EXPLOSION_FACTOR = 0.0
+
 # Dataset.
 _C.TRAIN.DATASET = "kinetics"
 
@@ -163,6 +167,9 @@ _C.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN = ()  # ("backbone.",)
 
 # If True, use FP16 for activations
 _C.TRAIN.MIXED_PRECISION = False
+
+# if True, inflate some params from imagenet model.
+_C.TRAIN.CHECKPOINT_IN_INIT = False
 
 # ---------------------------------------------------------------------------- #
 # Augmentation options.
@@ -197,6 +204,32 @@ _C.AUG.RE_COUNT = 1
 
 # Do not random erase first (clean) augmentation split.
 _C.AUG.RE_SPLIT = False
+
+# Whether to generate input mask during image processing.
+_C.AUG.GEN_MASK_LOADER = False
+
+# If True, masking mode is "tube". Default is "cube".
+_C.AUG.MASK_TUBE = False
+
+# If True, masking mode is "frame". Default is "cube".
+_C.AUG.MASK_FRAMES = False
+
+# The size of generated masks.
+_C.AUG.MASK_WINDOW_SIZE = [8, 7, 7]
+
+# The ratio of masked tokens out of all tokens. Also applies to MViT supervised training
+_C.AUG.MASK_RATIO = 0.0
+
+# The maximum number of a masked block. None means no maximum limit. (Used only in image MaskFeat.)
+_C.AUG.MAX_MASK_PATCHES_PER_BLOCK = None
+
+# ---------------------------------------------------------------------------- #
+# Masked pretraining visualization options.
+# ---------------------------------------------------------------------------- #
+_C.VIS_MASK = CfgNode()
+
+# Whether to do visualization.
+_C.VIS_MASK.ENABLE = False
 
 # ---------------------------------------------------------------------------- #
 # MipUp options.
@@ -250,6 +283,8 @@ _C.TEST.NUM_SPATIAL_CROPS = 3
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
 # Path to saving prediction results file.
 _C.TEST.SAVE_RESULTS_PATH = ""
+
+_C.TEST.NUM_TEMPORAL_CLIPS = []
 # -----------------------------------------------------------------------------
 # ResNet options
 # -----------------------------------------------------------------------------
@@ -372,6 +407,7 @@ _C.MODEL.SINGLE_PATHWAY_ARCH = [
     "slow",
     "x3d",
     "mvit",
+    "maskmvit",
 ]
 
 # Model architectures that has multiple pathways.
@@ -444,6 +480,9 @@ _C.MVIT.QKV_BIAS = True
 # Drop path rate for the tranfomer.
 _C.MVIT.DROPPATH_RATE = 0.1
 
+# The initial value of layer scale gamma. Set 0.0 to disable layer scale.
+_C.MVIT.LAYER_SCALE_INIT_VALUE = 0.0
+
 # Depth of the transformer.
 _C.MVIT.DEPTH = 16
 
@@ -460,7 +499,7 @@ _C.MVIT.HEAD_MUL = []
 
 # Stride size for the Pool KV at layer i.
 # Format: [[i, stride_t_i, stride_h_i, stride_w_i], ...,]
-_C.MVIT.POOL_KV_STRIDE = None
+_C.MVIT.POOL_KV_STRIDE = []
 
 # Initial stride size for KV at layer 1. The stride size will be further reduced with
 # the raio of MVIT.DIM_MUL. If will overwrite MVIT.POOL_KV_STRIDE if not None.
@@ -506,6 +545,66 @@ _C.MVIT.DIM_MUL_IN_ATT = False
 
 # If True, using separate linear layers for Q, K, V in attention blocks.
 _C.MVIT.SEPARATE_QKV = False
+
+# The initialization scale factor for the head parameters.
+_C.MVIT.HEAD_INIT_SCALE = 1.0
+
+# Whether to use the mean pooling of all patch tokens as the output.
+_C.MVIT.USE_MEAN_POOLING = False
+
+# If True, use frozen sin cos positional embedding.
+_C.MVIT.USE_FIXED_SINCOS_POS = False
+
+# -----------------------------------------------------------------------------
+# Masked pretraining options
+# -----------------------------------------------------------------------------
+_C.MASK = CfgNode()
+
+# Whether to enable Masked style pretraining.
+_C.MASK.ENABLE = False
+
+# Whether to enable MAE (discard encoder tokens).
+_C.MASK.MAE_ON = False
+
+# Whether to enable random masking in mae
+_C.MASK.MAE_RND_MASK = False
+
+# Whether to do random masking per-frame in mae
+_C.MASK.PER_FRAME_MASKING = False
+
+# only predict loss on temporal strided patches, or predict full time extent
+_C.MASK.TIME_STRIDE_LOSS = True
+
+# Whether to normalize the pred pixel loss
+_C.MASK.NORM_PRED_PIXEL = True
+
+# Whether to fix initialization with inverse depth of layer for pretraining.
+_C.MASK.SCALE_INIT_BY_DEPTH = False
+
+# Base embedding dimension for the decoder transformer.
+_C.MASK.DECODER_EMBED_DIM = 512
+
+# Base embedding dimension for the decoder transformer.
+_C.MASK.DECODER_SEP_POS_EMBED = False
+
+# Use a KV kernel in decoder?
+_C.MASK.DEC_KV_KERNEL = []
+
+# Use a KV stride in decoder?
+_C.MASK.DEC_KV_STRIDE = []
+
+# The depths of features which are inputs of the prediction head.
+_C.MASK.PRETRAIN_DEPTH = [15]
+
+# The type of Masked pretraining prediction head.
+# Can be "separate", "separate_xformer".
+_C.MASK.HEAD_TYPE = "separate"
+
+# The depth of MAE's decoder
+_C.MASK.DECODER_DEPTH = 0
+
+# The weight of HOG target loss.
+_C.MASK.PRED_HOG = False
 
 # -----------------------------------------------------------------------------
 # SlowFast options
@@ -605,6 +704,9 @@ _C.DATA.TRAIN_JITTER_FPS = 0.0
 # Decoding backend, options include `pyav` or `torchvision`
 _C.DATA.DECODING_BACKEND = "torchvision"
 
+# Decoding resize to short size (set to native size for best speed)
+_C.DATA.DECODING_SHORT_SIZE = 256
+
 # if True, sample uniformly in [1 / max_scale, 1 / min_scale] and take a
 # reciprocal to get the scale. If False, take a uniform sample from
 # [min_scale, max_scale].
@@ -667,6 +769,15 @@ _C.DATA.SSL_BLUR_SIGMA_MIN = [0.0, 0.1]
 # SimCLR / MoCo v2 blur augmentation maximum gaussian sigma
 _C.DATA.SSL_BLUR_SIGMA_MAX = [0.0, 2.0]
 
+
+# If combine train/val split as training for in21k
+_C.DATA.IN22K_TRAINVAL = False
+
+# If not None, use IN1k as val split when training in21k
+_C.DATA.IN22k_VAL_IN1K = ""
+
+# don't use real video for kinetics.py
+_C.DATA.DUMMY_LOAD = False
 
 # ---------------------------------------------------------------------------- #
 # Optimizer options
@@ -739,6 +850,11 @@ _C.SOLVER.CLIP_GRAD_L2NORM = None
 # LARS optimizer
 _C.SOLVER.LARS_ON = False
 
+# The layer-wise decay of learning rate. Set to 1. to disable.
+_C.SOLVER.LAYER_DECAY = 1.0
+
+# Adam's beta
+_C.SOLVER.BETAS = (0.9, 0.999)
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #

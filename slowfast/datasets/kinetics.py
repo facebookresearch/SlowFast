@@ -18,7 +18,11 @@ from . import utils as utils
 from . import video_container as container
 from .build import DATASET_REGISTRY
 from .random_erasing import RandomErasing
-from .transform import create_random_augment
+from .transform import (
+    MaskingGenerator,
+    MaskingGenerator3D,
+    create_random_augment,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -74,6 +78,7 @@ class Kinetics(torch.utils.data.Dataset):
             if self.mode in ["train"] and self.cfg.DATA.LOADER_CHUNK_SIZE > 0
             else False
         )
+        self.dummy_output = None
         # For training or validation mode, one single clip is sampled from every
         # video. For testing, NUM_ENSEMBLE_VIEWS clips are sampled from every
         # video. For every clip, NUM_SPATIAL_CROPS is cropped spatially from
@@ -87,13 +92,14 @@ class Kinetics(torch.utils.data.Dataset):
 
         logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
-        self.randaug = False
+        self.aug = False
         self.rand_erase = False
         self.use_temporal_gradient = False
         self.temporal_gradient_rate = 0.0
+        self.cur_epoch = 0
 
         if self.mode == "train" and self.cfg.AUG.ENABLE:
-            self.randaug = True
+            self.aug = True
             if self.cfg.AUG.RE_PROB > 0:
                 self.rand_erase = True
 
@@ -193,7 +199,8 @@ class Kinetics(torch.utils.data.Dataset):
             index, self._num_yielded = index
             if self.cfg.MULTIGRID.SHORT_CYCLE:
                 index, short_cycle_idx = index
-
+        if self.dummy_output is not None:
+            return self.dummy_output
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
             temporal_sample_index = -1
@@ -284,7 +291,10 @@ class Kinetics(torch.utils.data.Dataset):
                         self._path_to_videos[index], e
                     )
                 )
-            # Select a random video if the current video was not able to access.
+                if self.mode not in ["test"]:
+                    # let's try another one
+                    index = random.randint(0, len(self._path_to_videos) - 1)
+                continue  # Select a random video if the current video was not able to access.
             if video_container is None:
                 logger.warning(
                     "Failed to meta load video idx {} from {}; trial {}".format(
@@ -415,7 +425,7 @@ class Kinetics(torch.utils.data.Dataset):
                             gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
                         )
 
-                    if self.randaug:
+                    if self.aug and self.cfg.AUG.AA_TYPE:
                         aug_transform = create_random_augment(
                             input_size=(f_out[idx].size(1), f_out[idx].size(2)),
                             auto_augment=self.cfg.AUG.AA_TYPE,
@@ -478,18 +488,65 @@ class Kinetics(torch.utils.data.Dataset):
                         ).permute(1, 0, 2, 3)
 
                     f_out[idx] = utils.pack_pathway_output(self.cfg, f_out[idx])
+                    if self.cfg.AUG.GEN_MASK_LOADER:
+                        mask = self._gen_mask()
+                        f_out[idx] = f_out[idx] + [torch.Tensor(), mask]
             frames = f_out[0] if num_out == 1 else f_out
             time_idx = np.array(time_idx_out)
-            if num_aug > 1:
-                label = [label] * num_aug
-                index = [index] * num_aug
+            if (
+                num_aug * num_decode > 1
+                and not self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+            ):
+                label = [label] * num_aug * num_decode
+                index = [index] * num_aug * num_decode
+            if self.cfg.DATA.DUMMY_LOAD:
+                if self.dummy_output is None:
+                    self.dummy_output = (frames, label, index, time_idx, {})
             return frames, label, index, time_idx, {}
         else:
-            raise RuntimeError(
-                "Failed to fetch video idx {} from {}; after {} trials".format(
-                    index, self._path_to_videos[index], i_try
+            logger.warning(
+                "Failed to fetch video after {} retries.".format(
+                    self._num_retries
                 )
             )
+
+    def _gen_mask(self):
+        if self.cfg.AUG.MASK_TUBE:
+            num_masking_patches = round(
+                np.prod(self.cfg.AUG.MASK_WINDOW_SIZE) * self.cfg.AUG.MASK_RATIO
+            )
+            min_mask = num_masking_patches // 5
+            masked_position_generator = MaskingGenerator(
+                mask_window_size=self.cfg.AUG.MASK_WINDOW_SIZE,
+                num_masking_patches=num_masking_patches,
+                max_num_patches=None,
+                min_num_patches=min_mask,
+            )
+            mask = masked_position_generator()
+            mask = np.tile(mask, (8, 1, 1))
+        elif self.cfg.AUG.MASK_FRAMES:
+            mask = np.zeros(shape=self.cfg.AUG.MASK_WINDOW_SIZE, dtype=np.int)
+            n_mask = round(
+                self.cfg.AUG.MASK_WINDOW_SIZE[0] * self.cfg.AUG.MASK_RATIO
+            )
+            mask_t_ind = random.sample(
+                range(0, self.cfg.AUG.MASK_WINDOW_SIZE[0]), n_mask
+            )
+            mask[mask_t_ind, :, :] += 1
+        else:
+            num_masking_patches = round(
+                np.prod(self.cfg.AUG.MASK_WINDOW_SIZE) * self.cfg.AUG.MASK_RATIO
+            )
+            max_mask = np.prod(self.cfg.AUG.MASK_WINDOW_SIZE[1:])
+            min_mask = max_mask // 5
+            masked_position_generator = MaskingGenerator3D(
+                mask_window_size=self.cfg.AUG.MASK_WINDOW_SIZE,
+                num_masking_patches=num_masking_patches,
+                max_num_patches=max_mask,
+                min_num_patches=min_mask,
+            )
+            mask = masked_position_generator()
+        return mask
 
     def _frame_to_list_img(self, frames):
         img_list = [

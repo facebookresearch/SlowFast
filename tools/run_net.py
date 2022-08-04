@@ -20,6 +20,7 @@ def main():
     print("config files: {}".format(args.cfg_files))
     for path_to_config in args.cfg_files:
         cfg = load_config(args, path_to_config)
+        cfg = assert_and_infer_cfg(cfg)
 
         # Perform training.
         if cfg.TRAIN.ENABLE:
@@ -27,7 +28,13 @@ def main():
 
         # Perform multi-clip testing.
         if cfg.TEST.ENABLE:
-            launch_job(cfg=cfg, init_method=args.init_method, func=test)
+            if cfg.TEST.NUM_ENSEMBLE_VIEWS == -1:
+                num_view_list = [1, 3, 5, 7, 10]
+                for num_view in num_view_list:
+                    cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
+                    launch_job(cfg=cfg, init_method=args.init_method, func=test)
+            else:
+                launch_job(cfg=cfg, init_method=args.init_method, func=test)
 
         # Perform model visualization.
         if cfg.TENSORBOARD.ENABLE and (

@@ -193,6 +193,7 @@ class MultiScaleAttention(nn.Module):
         head_dim = dim_out // num_heads
         self.scale = head_dim**-0.5
         self.has_cls_embed = has_cls_embed
+        self.mode = mode
         padding_q = [int(q // 2) for q in kernel_q]
         padding_kv = [int(kv // 2) for kv in kernel_kv]
 
@@ -212,7 +213,6 @@ class MultiScaleAttention(nn.Module):
             kernel_q = ()
         if numpy.prod(kernel_kv) == 1 and numpy.prod(stride_kv) == 1:
             kernel_kv = ()
-        self.mode = mode
 
         if mode in ("avg", "max"):
             pool_op = nn.MaxPool3d if mode == "max" else nn.AvgPool3d
@@ -454,6 +454,7 @@ class MultiScaleBlock(nn.Module):
         qk_scale=None,
         drop_rate=0.0,
         drop_path=0.0,
+        layer_scale_init_value=0.0,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
         up_rate=None,
@@ -519,6 +520,17 @@ class MultiScaleBlock(nn.Module):
             act_layer=act_layer,
             drop_rate=drop_rate,
         )
+        if layer_scale_init_value > 0:
+            self.gamma_1 = nn.Parameter(
+                layer_scale_init_value * torch.ones((dim)), requires_grad=True
+            )
+            self.gamma_2 = nn.Parameter(
+                layer_scale_init_value * torch.ones((dim_out)),
+                requires_grad=True,
+            )
+        else:
+            self.gamma_1, self.gamma_2 = None, None
+
         if dim != dim_out:
             self.proj = nn.Linear(dim, dim_out)
 
@@ -526,11 +538,11 @@ class MultiScaleBlock(nn.Module):
             nn.MaxPool3d(
                 kernel_skip, stride_skip, padding_skip, ceil_mode=False
             )
-            if len(kernel_skip) > 0
+            if len(stride_skip) > 0 and numpy.prod(stride_skip) > 1
             else None
         )
 
-    def forward(self, x, thw_shape):
+    def forward(self, x, thw_shape=None):
         x_norm = self.norm1(x)
         x_block, thw_shape_new = self.attn(x_norm, thw_shape)
         if self.dim_mul_in_att and self.dim != self.dim_out:
@@ -538,10 +550,19 @@ class MultiScaleBlock(nn.Module):
         x_res, _ = attention_pool(
             x, self.pool_skip, thw_shape, has_cls_embed=self.has_cls_embed
         )
-        x = x_res + self.drop_path(x_block)
+        if self.gamma_1 is not None:
+            x = x_res + self.drop_path(self.gamma_1 * x_block)
+        else:
+            x = x_res + self.drop_path(x_block)
         x_norm = self.norm2(x)
         x_mlp = self.mlp(x_norm)
         if not self.dim_mul_in_att and self.dim != self.dim_out:
             x = self.proj(x_norm)
-        x = x + self.drop_path(x_mlp)
-        return x, thw_shape_new
+        if self.gamma_2 is not None:
+            x = x + self.drop_path(self.gamma_2 * x_mlp)
+        else:
+            x = x + self.drop_path(x_mlp)
+        if thw_shape:
+            return x, thw_shape_new
+        else:
+            return x

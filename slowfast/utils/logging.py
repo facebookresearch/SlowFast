@@ -91,13 +91,13 @@ def log_json_stats(stats, output_dir=None):
         stats (dict): a dictionary of statistical information to log.
     """
     stats = {
-        k: decimal.Decimal("{:.3f}".format(v)) if isinstance(v, float) else v
+        k: decimal.Decimal("{:.5f}".format(v)) if isinstance(v, float) else v
         for k, v in stats.items()
     }
     json_stats = simplejson.dumps(stats, sort_keys=True, use_decimal=True)
     logger = get_logger(__name__)
     logger.info("json_stats: {:s}".format(json_stats))
-    if du.is_root_proc() and output_dir:
+    if du.is_master_proc(du.get_world_size()) and output_dir:
         filename = os.path.join(output_dir, "json_stats.log")
         try:
             with pathmgr.open(

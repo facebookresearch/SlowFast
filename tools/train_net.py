@@ -20,7 +20,10 @@ import slowfast.visualization.tensorboard_vis as tb
 from slowfast.datasets import loader
 from slowfast.datasets.mixup import MixUp
 from slowfast.models import build_model
-from slowfast.models.contrastive import cancel_swav_gradients
+from slowfast.models.contrastive import (
+    contrastive_forward,
+    contrastive_parameter_surgery,
+)
 from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
@@ -66,18 +69,6 @@ def train_epoch(
             num_classes=cfg.MODEL.NUM_CLASSES,
         )
 
-    iters_noupdate = 0
-    if (
-        cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-        and cfg.CONTRASTIVE.TYPE == "moco"
-    ):
-        assert (
-            cfg.CONTRASTIVE.QUEUE_LEN % (cfg.TRAIN.BATCH_SIZE * cfg.NUM_SHARDS)
-            == 0
-        )
-        iters_noupdate = (
-            cfg.CONTRASTIVE.QUEUE_LEN // cfg.TRAIN.BATCH_SIZE // cfg.NUM_SHARDS
-        )
     if cfg.MODEL.FROZEN_BN:
         misc.frozen_bn_stats(model)
     # Explicitly declare reduction to mean.
@@ -97,15 +88,17 @@ def train_epoch(
                         inputs[i] = inputs[i].cuda(non_blocking=True)
             else:
                 inputs = inputs.cuda(non_blocking=True)
-            labels = labels.cuda()
+            if not isinstance(labels, list):
+                labels = labels.cuda(non_blocking=True)
+                index = index.cuda(non_blocking=True)
+                time = time.cuda(non_blocking=True)
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
                         val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
-            index = index.cuda()
-            time = time.cuda()
+
         batch_size = (
             inputs[0][0].size(0)
             if isinstance(inputs[0], list)
@@ -139,43 +132,47 @@ def train_epoch(
             elif cfg.DETECTION.ENABLE:
                 # Compute the predictions.
                 preds = model(inputs, meta["boxes"])
+            elif cfg.MASK.ENABLE:
+                preds, labels = model(inputs)
             else:
                 preds = model(inputs)
-        if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-            labels = torch.zeros(
-                preds.size(0), dtype=labels.dtype, device=labels.device
-            )
+            if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
+                labels = torch.zeros(
+                    preds.size(0), dtype=labels.dtype, device=labels.device
+                )
 
-        if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
-            loss = partial_loss
-        else:
-            # Compute the loss.
-            loss = loss_fun(preds, labels)
+            if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
+                loss = partial_loss
+            else:
+                # Compute the loss.
+                loss = loss_fun(preds, labels)
+
+        loss_extra = None
+        if isinstance(loss, (list, tuple)):
+            loss, loss_extra = loss
 
         # check Nan Loss.
         misc.check_nan_losses(loss)
-
         if perform_backward:
             scaler.scale(loss).backward()
         # Unscales the gradients of optimizer's assigned params in-place
         scaler.unscale_(optimizer)
         # Clip gradients if necessary
         if cfg.SOLVER.CLIP_GRAD_VAL:
-            torch.nn.utils.clip_grad_value_(
+            grad_norm = torch.nn.utils.clip_grad_value_(
                 model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
             )
         elif cfg.SOLVER.CLIP_GRAD_L2NORM:
-            torch.nn.utils.clip_grad_norm_(
+            grad_norm = torch.nn.utils.clip_grad_norm_(
                 model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
             )
-
-        model = cancel_swav_gradients(model, cfg, epoch_exact)
-        if cur_iter < iters_noupdate and cur_epoch == 0:  #  for e.g. MoCo
-            logger.info(
-                "Not updating parameters {}/{}".format(cur_iter, iters_noupdate)
-            )
         else:
-            # Update the parameters.
+            grad_norm = optim.get_grad_norm_(model.parameters())
+        # Update the parameters. (defaults to True)
+        model, update_param = contrastive_parameter_surgery(
+            model, cfg, epoch_exact, cur_iter
+        )
+        if update_param:
             scaler.step(optimizer)
         scaler.update()
 
@@ -209,8 +206,25 @@ def train_epoch(
             if cfg.DATA.MULTI_LABEL:
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
-                    [loss] = du.all_reduce([loss])
-                loss = loss.item()
+                    loss, grad_norm = du.all_reduce([loss, grad_norm])
+                loss, grad_norm = (
+                    loss.item(),
+                    grad_norm.item(),
+                )
+            elif cfg.MASK.ENABLE:
+                # Gather all the predictions across all the devices.
+                if cfg.NUM_GPUS > 1:
+                    loss, grad_norm = du.all_reduce([loss, grad_norm])
+                    if loss_extra:
+                        loss_extra = du.all_reduce(loss_extra)
+                loss, grad_norm, top1_err, top5_err = (
+                    loss.item(),
+                    grad_norm.item(),
+                    0.0,
+                    0.0,
+                )
+                if loss_extra:
+                    loss_extra = [one_loss.item() for one_loss in loss_extra]
             else:
                 # Compute the errors.
                 num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
@@ -219,13 +233,14 @@ def train_epoch(
                 ]
                 # Gather all the predictions across all the devices.
                 if cfg.NUM_GPUS > 1:
-                    loss, top1_err, top5_err = du.all_reduce(
-                        [loss.detach(), top1_err, top5_err]
+                    loss, grad_norm, top1_err, top5_err = du.all_reduce(
+                        [loss.detach(), grad_norm, top1_err, top5_err]
                     )
 
                 # Copy the stats from GPU to CPU (sync point).
-                loss, top1_err, top5_err = (
+                loss, grad_norm, top1_err, top5_err = (
                     loss.item(),
+                    grad_norm.item(),
                     top1_err.item(),
                     top5_err.item(),
                 )
@@ -236,10 +251,12 @@ def train_epoch(
                 top5_err,
                 loss,
                 lr,
+                grad_norm,
                 batch_size
                 * max(
                     cfg.NUM_GPUS, 1
                 ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
+                loss_extra,
             )
             # write to tensorboard format if available.
             if writer is not None:
@@ -252,8 +269,6 @@ def train_epoch(
                     },
                     global_step=data_size * cur_epoch + cur_iter,
                 )
-
-        torch.cuda.synchronize()
         train_meter.iter_toc()  # do measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         torch.cuda.synchronize()
@@ -360,6 +375,8 @@ def eval_epoch(
                 if cfg.NUM_GPUS > 1:
                     preds, labels = du.all_gather([preds, labels])
             else:
+                if cfg.DATA.IN22k_VAL_IN1K != "":
+                    preds = preds[:, :1000]
                 # Compute the errors.
                 num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
 
@@ -418,56 +435,6 @@ def eval_epoch(
     val_meter.reset()
 
 
-def contrastive_forward(model, cfg, inputs, index, time, epoch_exact, scaler):
-    if cfg.CONTRASTIVE.SEQUENTIAL:
-        perform_backward = False
-        mdl = model.module if hasattr(model, "module") else model
-        keys = (
-            mdl.compute_key_feat(
-                inputs,
-                compute_predictor_keys=False,
-                batched_inference=True if len(inputs) < 2 else False,
-            )
-            if cfg.CONTRASTIVE.TYPE == "moco" or cfg.CONTRASTIVE.TYPE == "byol"
-            else [None] * len(inputs)
-        )
-        for k, vid in enumerate(inputs):
-            other_keys = keys[:k] + keys[k + 1 :]
-            time_cur = torch.cat(
-                [
-                    time[:, k : k + 1, :],
-                    time[:, :k, :],
-                    time[:, k + 1 :, :],
-                ],
-                1,
-            )  # q, kpre, kpost
-            vids = [vid]
-            if (
-                cfg.CONTRASTIVE.TYPE == "swav"
-                or cfg.CONTRASTIVE.TYPE == "simclr"
-            ):
-                if k < len(inputs) - 1:
-                    vids = inputs[k : k + 2]
-                else:
-                    break
-            lgt_k, loss_k = model(
-                vids, index, time_cur, epoch_exact, keys=other_keys
-            )
-            scaler.scale(loss_k).backward()
-            if k == 0:
-                preds, partial_loss = lgt_k, loss_k.detach()
-            else:
-                preds = torch.cat([preds, lgt_k], dim=0)
-                partial_loss += loss_k.detach()
-        partial_loss /= len(inputs) * 2.0  # to have same loss as symm model
-        if cfg.CONTRASTIVE.TYPE == "moco":
-            mdl._dequeue_and_enqueue(keys)
-    else:
-        perform_backward = True
-        preds, partial_loss = model(inputs, index, time, epoch_exact, keys=None)
-    return model, preds, partial_loss, perform_backward
-
-
 def calculate_and_update_precise_bn(loader, model, num_iters=200, use_gpu=True):
     """
     Update the stats in bn layers by calculate the precise stats.
@@ -512,7 +479,7 @@ def build_trainer(cfg):
     # Build the video model and print model statistics.
     model = build_model(cfg)
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, use_train_input=True)
+        flops, params = misc.log_model_info(model, cfg, use_train_input=True)
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
@@ -567,8 +534,9 @@ def train(cfg):
 
     # Build the video model and print model statistics.
     model = build_model(cfg)
+    flops, params = 0.0, 0.0
     if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-        misc.log_model_info(model, cfg, use_train_input=True)
+        flops, params = misc.log_model_info(model, cfg, use_train_input=True)
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
@@ -614,6 +582,7 @@ def train(cfg):
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
             epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
             clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
+            IN_INIT=cfg.TRAIN.CHECKPOINT_IN_INIT,
         )
         start_epoch = checkpoint_epoch + 1
     else:
@@ -737,8 +706,13 @@ def train(cfg):
             )
             or cur_epoch == cfg.SOLVER.MAX_EPOCH - 1
         )
-        is_eval_epoch = misc.is_eval_epoch(
-            cfg, cur_epoch, None if multigrid is None else multigrid.schedule
+        is_eval_epoch = (
+            misc.is_eval_epoch(
+                cfg,
+                cur_epoch,
+                None if multigrid is None else multigrid.schedule,
+            )
+            and not cfg.MASK.ENABLE
         )
 
         # Compute precise BN stats.
@@ -778,10 +752,20 @@ def train(cfg):
             )
     if writer is not None:
         writer.close()
-    result_string = "Top1 Acc: {:.2f} Top5 Acc: {:.2f} MEM: {:.2f}" "".format(
-        100 - val_meter.min_top1_err,
-        100 - val_meter.min_top5_err,
-        misc.gpu_mem_usage(),
+    result_string = (
+        "_p{:.2f}_f{:.2f} _t{:.2f}_m{:.2f} _a{:.2f} Top5 Acc: {:.2f} MEM: {:.2f} f: {:.4f}"
+        "".format(
+            params / 1e6,
+            flops,
+            epoch_timer.median_epoch_time() / 60.0
+            if len(epoch_timer.epoch_times)
+            else 0.0,
+            misc.gpu_mem_usage(),
+            100 - val_meter.min_top1_err,
+            100 - val_meter.min_top5_err,
+            misc.gpu_mem_usage(),
+            flops,
+        )
     )
     logger.info("training done: {}".format(result_string))
 

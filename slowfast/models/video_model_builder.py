@@ -10,15 +10,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import trunc_normal_
 
+import slowfast.utils.logging as logging
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
 from slowfast.models.utils import (
+    calc_mvit_feature_geometry,
+    get_3d_sincos_pos_embed,
     round_width,
     validate_checkpoint_wrapper_import,
 )
 
-from . import head_helper, resnet_helper, stem_helper
+from . import head_helper, operators, resnet_helper, stem_helper  # noqa
 from .build import MODEL_REGISTRY
 
 try:
@@ -26,6 +29,7 @@ try:
 except ImportError:
     checkpoint_wrapper = None
 
+logger = logging.get_logger(__name__)
 
 # Number of blocks for different stages given the model depth.
 _MODEL_STAGE_DEPTH = {18: (2, 2, 2, 2), 50: (3, 4, 6, 3), 101: (3, 4, 23, 3)}
@@ -822,10 +826,14 @@ class MViT(nn.Module):
         spatial_size = cfg.DATA.TRAIN_CROP_SIZE
         temporal_size = cfg.DATA.NUM_FRAMES
         in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
-        use_2d_patch = cfg.MVIT.PATCH_2D
+        self.use_2d_patch = cfg.MVIT.PATCH_2D
+        self.enable_detection = cfg.DETECTION.ENABLE
         self.patch_stride = cfg.MVIT.PATCH_STRIDE
-        if use_2d_patch:
+        if self.use_2d_patch:
             self.patch_stride = [1] + self.patch_stride
+        self.T = cfg.DATA.NUM_FRAMES // self.patch_stride[0]
+        self.H = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
+        self.W = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
         # Prepare output.
         num_classes = cfg.MODEL.NUM_CLASSES
         embed_dim = cfg.MVIT.EMBED_DIM
@@ -836,10 +844,14 @@ class MViT(nn.Module):
         self.drop_rate = cfg.MVIT.DROPOUT_RATE
         depth = cfg.MVIT.DEPTH
         drop_path_rate = cfg.MVIT.DROPPATH_RATE
+        layer_scale_init_value = cfg.MVIT.LAYER_SCALE_INIT_VALUE
+        head_init_scale = cfg.MVIT.HEAD_INIT_SCALE
         mode = cfg.MVIT.MODE
         self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        self.use_mean_pooling = cfg.MVIT.USE_MEAN_POOLING
         # Params for positional embedding
         self.use_abs_pos = cfg.MVIT.USE_ABS_POS
+        self.use_fixed_sincos_pos = cfg.MVIT.USE_FIXED_SINCOS_POS
         self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
         self.rel_pos_spatial = cfg.MVIT.REL_POS_SPATIAL
         self.rel_pos_temporal = cfg.MVIT.REL_POS_TEMPORAL
@@ -848,17 +860,17 @@ class MViT(nn.Module):
         else:
             raise NotImplementedError("Only supports layernorm.")
         self.num_classes = num_classes
-        patch_embed = stem_helper.PatchEmbed(
+        self.patch_embed = stem_helper.PatchEmbed(
             dim_in=in_chans,
             dim_out=embed_dim,
             kernel=cfg.MVIT.PATCH_KERNEL,
             stride=cfg.MVIT.PATCH_STRIDE,
             padding=cfg.MVIT.PATCH_PADDING,
-            conv_2d=use_2d_patch,
+            conv_2d=self.use_2d_patch,
         )
+
         if cfg.MODEL.ACT_CHECKPOINT:
-            patch_embed = checkpoint_wrapper(patch_embed)
-        self.patch_embed = patch_embed
+            self.patch_embed = checkpoint_wrapper(self.patch_embed)
         self.input_dims = [temporal_size, spatial_size, spatial_size]
         assert self.input_dims[1] == self.input_dims[2]
         self.patch_dims = [
@@ -893,7 +905,12 @@ class MViT(nn.Module):
                     )
             else:
                 self.pos_embed = nn.Parameter(
-                    torch.zeros(1, pos_embed_dim, embed_dim)
+                    torch.zeros(
+                        1,
+                        pos_embed_dim,
+                        embed_dim,
+                    ),
+                    requires_grad=not self.use_fixed_sincos_pos,
                 )
 
         if self.drop_rate > 0.0:
@@ -978,6 +995,7 @@ class MViT(nn.Module):
                 qkv_bias=qkv_bias,
                 drop_rate=self.drop_rate,
                 drop_path=dpr[i],
+                layer_scale_init_value=layer_scale_init_value,
                 norm_layer=norm_layer,
                 kernel_q=pool_q[i] if len(pool_q) > i else [],
                 kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
@@ -996,22 +1014,35 @@ class MViT(nn.Module):
             if cfg.MODEL.ACT_CHECKPOINT:
                 attention_block = checkpoint_wrapper(attention_block)
             self.blocks.append(attention_block)
-
             if len(stride_q[i]) > 0:
                 input_size = [
                     size // stride
                     for size, stride in zip(input_size, stride_q[i])
                 ]
+
             embed_dim = dim_out
+
         self.norm = norm_layer(embed_dim)
 
-        self.head = head_helper.TransformerBasicHead(
-            embed_dim,
-            num_classes,
-            dropout_rate=cfg.MODEL.DROPOUT_RATE,
-            act_func=cfg.MODEL.HEAD_ACT,
-            cfg=cfg,
-        )
+        if self.enable_detection:
+            self.head = head_helper.ResNetRoIHead(
+                dim_in=[embed_dim],
+                num_classes=num_classes,
+                pool_size=[[temporal_size // self.patch_stride[0], 1, 1]],
+                resolution=[[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2],
+                scale_factor=[cfg.DETECTION.SPATIAL_SCALE_FACTOR],
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                aligned=cfg.DETECTION.ALIGNED,
+            )
+        else:
+            self.head = head_helper.TransformerBasicHead(
+                embed_dim,
+                num_classes,
+                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                act_func=cfg.MODEL.HEAD_ACT,
+                cfg=cfg,
+            )
         if self.use_abs_pos:
             if self.sep_pos_embed:
                 trunc_normal_(self.pos_embed_spatial, std=0.02)
@@ -1020,12 +1051,28 @@ class MViT(nn.Module):
                     trunc_normal_(self.pos_embed_class, std=0.02)
             else:
                 trunc_normal_(self.pos_embed, std=0.02)
+                if self.use_fixed_sincos_pos:
+                    pos_embed = get_3d_sincos_pos_embed(
+                        self.pos_embed.shape[-1],
+                        self.H,
+                        self.T,
+                        cls_token=self.cls_embed_on,
+                    )
+                    self.pos_embed.data.copy_(
+                        torch.from_numpy(pos_embed).float().unsqueeze(0)
+                    )
+
         if self.cls_embed_on:
             trunc_normal_(self.cls_token, std=0.02)
         self.apply(self._init_weights)
 
+        self.head.projection.weight.data.mul_(head_init_scale)
+        self.head.projection.bias.data.mul_(head_init_scale)
+
+        self.feat_size, self.feat_stride = calc_mvit_feature_geometry(cfg)
+
     def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
+        if isinstance(m, (nn.Linear, nn.Conv2d, nn.Conv3d)):
             nn.init.trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
@@ -1081,18 +1128,26 @@ class MViT(nn.Module):
 
         return pos_embed
 
-    def forward(self, x):
+    def forward(self, x, bboxes=None, return_attn=False):
         x = x[0]
         x, bcthw = self.patch_embed(x)
-
-        T = self.cfg.DATA.NUM_FRAMES // self.patch_stride[0]
-        H, W = bcthw[-2], bcthw[-1]
+        bcthw = list(bcthw)
+        if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
+            bcthw.insert(2, torch.tensor(self.T))
+        T, H, W = bcthw[-3], bcthw[-2], bcthw[-1]
+        assert len(bcthw) == 5 and (T, H, W) == (self.T, self.H, self.W), bcthw
         B, N, C = x.shape
+
+        s = 1 if self.cls_embed_on else 0
+        if self.use_fixed_sincos_pos:
+            x += self.pos_embed[:, s:, :]  # s: on/off cls token
 
         if self.cls_embed_on:
             cls_tokens = self.cls_token.expand(
                 B, -1, -1
             )  # stole cls_tokens impl from Phil Wang, thanks
+            if self.use_fixed_sincos_pos:
+                cls_tokens = cls_tokens + self.pos_embed[:, :s, :]
             x = torch.cat((cls_tokens, x), dim=1)
 
         if self.use_abs_pos:
@@ -1106,11 +1161,9 @@ class MViT(nn.Module):
                 )
                 if self.cls_embed_on:
                     pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
-                pos_embed = self._get_pos_embed(pos_embed, bcthw)
-                x = x + pos_embed
+                x += self._get_pos_embed(pos_embed, bcthw)
             else:
-                pos_embed = self._get_pos_embed(self.pos_embed, bcthw)
-                x = x + pos_embed
+                x += self._get_pos_embed(self.pos_embed, bcthw)
 
         if self.drop_rate:
             x = self.pos_drop(x)
@@ -1119,14 +1172,30 @@ class MViT(nn.Module):
             x = self.norm_stem(x)
 
         thw = [T, H, W]
-        for blk in self.blocks:
+        for i, blk in enumerate(self.blocks):
             x, thw = blk(x, thw)
 
-        x = self.norm(x)
-        if self.cls_embed_on:
-            x = x[:, 0]
-        else:
-            x = x.mean(1)
+        if self.enable_detection:
+            x = self.norm(x)
+            if self.cls_embed_on:
+                x = x[:, 1:]
 
-        x = self.head(x)
+            B, _, C = x.shape
+            x = x.transpose(1, 2).reshape(B, C, thw[0], thw[1], thw[2])
+
+            x = self.head([x], bboxes)
+        else:
+            if self.use_mean_pooling:
+                if self.cls_embed_on:
+                    x = x[:, 1:]
+                x = x.mean(1)
+                x = self.norm(x)
+            elif self.cls_embed_on:
+                x = self.norm(x)
+                x = x[:, 0]
+            else:  # this is default, [norm->mean]
+                x = self.norm(x)
+                x = x.mean(1)
+            x = self.head(x)
+
         return x

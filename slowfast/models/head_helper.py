@@ -3,14 +3,19 @@
 
 """ResNe(X)t Head helper."""
 
+from functools import partial
 import torch
 import torch.nn as nn
 from detectron2.layers import ROIAlign
 
+import slowfast.utils.logging as logging
+from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import (
     NaiveSyncBatchNorm1d as NaiveSyncBatchNorm1d,
 )
 from slowfast.models.nonlocal_helper import Nonlocal
+
+logger = logging.get_logger(__name__)
 
 
 class ResNetRoIHead(nn.Module):
@@ -570,3 +575,116 @@ class TransformerBasicHead(nn.Module):
         x = x.view(x.shape[0], -1)
 
         return x
+
+
+class MSSeparateHead(nn.Module):
+    """
+    Perform linear projection or Transformer-based decoder (optionally MultiScale)
+    for mask prediction models.
+    Args:
+        blocks (MultiScaleBlock): the encoder blocks to provide input dimensions of the head.
+        num_classes (int): the dimension of the prediction target (eg. HOG or pixels).
+        feat_sz (list): the spatiotemporal sizes of the input features.
+    """
+
+    def __init__(
+        self,
+        blocks,
+        cfg,
+        num_classes,
+        feat_sz,
+    ):
+        super(MSSeparateHead, self).__init__()
+        head_type = cfg.MASK.HEAD_TYPE.split("_")
+        assert head_type[0] == "separate"
+        if len(head_type) > 1:
+            transform_type = head_type[1]
+            assert transform_type in ["xformer"]
+        else:
+            transform_type = None
+
+        depth_list = cfg.MASK.PRETRAIN_DEPTH
+        mlp_ratio = cfg.MVIT.MLP_RATIO
+        qkv_bias = cfg.MVIT.QKV_BIAS
+        drop_rate = cfg.MVIT.DROPOUT_RATE
+        kernel_kv = cfg.MASK.DEC_KV_KERNEL
+        stride_kv = cfg.MASK.DEC_KV_STRIDE
+        mode = cfg.MVIT.MODE
+        self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        pool_first = cfg.MVIT.POOL_FIRST
+        if cfg.MVIT.NORM == "layernorm":
+            norm_layer = partial(nn.LayerNorm, eps=1e-6)
+        else:
+            raise NotImplementedError("Only supports layernorm.")
+
+        self.transforms = nn.ModuleList()
+        self.projections = nn.ModuleList()
+        for depth, num_class, feature_size in zip(
+            depth_list, num_classes, feat_sz
+        ):
+            head_dim = (
+                cfg.MASK.DECODER_EMBED_DIM
+                if cfg.MASK.MAE_ON
+                else blocks[depth].dim_out
+            )
+            op = []
+            if transform_type == "xformer":
+                assert cfg.MASK.DECODER_DEPTH > 0
+                for _ in range(cfg.MASK.DECODER_DEPTH):
+                    dim_out = cfg.MASK.DECODER_EMBED_DIM
+                    op.append(
+                        MultiScaleBlock(
+                            dim=head_dim,
+                            dim_out=dim_out,
+                            input_size=feature_size,
+                            num_heads=dim_out // 64,
+                            mlp_ratio=mlp_ratio,
+                            qkv_bias=qkv_bias,
+                            drop_rate=drop_rate,
+                            drop_path=0.0,
+                            norm_layer=norm_layer,
+                            kernel_q=[],
+                            kernel_kv=kernel_kv,
+                            stride_q=[],
+                            stride_kv=stride_kv,
+                            mode=mode,
+                            has_cls_embed=self.cls_embed_on,
+                            pool_first=pool_first,
+                        )
+                    )
+                    head_dim = dim_out
+
+            op.append(norm_layer(head_dim))
+            self.transforms.append(nn.Sequential(*op))
+            self.projections.append(nn.Linear(head_dim, num_class, bias=True))
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.trunc_normal_(m.weight, std=0.02)
+            # FYI: MAE uses xavier_uniform following official JAX ViT:
+            # torch.nn.init.xavier_uniform_(m.weight)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    def forward(self, block_outputs, output_masks, return_all, thw):
+        model_outputs = []
+        for idx, x in enumerate(block_outputs):
+            for _, blk in enumerate(self.transforms[idx]):
+                if isinstance(blk, MultiScaleBlock):
+                    x, thw = blk(x, thw)
+                else:
+                    x = blk(x)
+
+            if self.cls_embed_on:
+                x = x[:, 1:]
+            if not return_all:
+                mask = output_masks[idx]
+                x = x[mask]
+            x = self.projections[idx](x)
+            model_outputs.append(x)
+        return model_outputs
