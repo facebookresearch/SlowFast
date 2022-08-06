@@ -15,7 +15,7 @@ In CVPR, 2022. [[Paper](https://arxiv.org/abs/2112.09133)]
 
 | name | top1 |  config pre-train (PT) | config fine-tune | model PT |
 | ------------- | ------------- | ------------- | ------------- | ------------- |
-| ViT-B | 81.3 |  in1k_VIT_B_MaskFeat_PT | in1k_VIT_B_MaskFeat_FT | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/masked_models/in1k_VIT_B_MaskFeat_PT_epoch_01600.pyth) |
+| ViT-B | 84.0 |  in1k_VIT_B_MaskFeat_PT | in1k_VIT_B_MaskFeat_FT | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/masked_models/in1k_VIT_B_MaskFeat_PT_epoch_01600.pyth) |
 | ViT-L | 85.7 |  in1k_VIT_L_MaskFeat_PT | in1k_VIT_L_MaskFeat_FT | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/masked_models/in1k_VIT_L_MaskFeat_PT_epoch_01600.pyth) |
 
 
