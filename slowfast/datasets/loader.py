@@ -206,3 +206,10 @@ def shuffle_dataset(loader, cur_epoch):
     if isinstance(sampler, DistributedSampler):
         # DistributedSampler shuffles data based on epoch
         sampler.set_epoch(cur_epoch)
+
+    if hasattr(loader.dataset, "prefetcher"):
+        sampler = loader.dataset.prefetcher.sampler
+        if isinstance(sampler, DistributedSampler):
+            # DistributedSampler shuffles data based on epoch
+            print("prefetcher sampler")
+            sampler.set_epoch(cur_epoch)
