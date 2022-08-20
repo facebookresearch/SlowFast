@@ -70,6 +70,16 @@ class Ssv2(torch.utils.data.Dataset):
         logger.info("Constructing Something-Something V2 {}...".format(mode))
         self._construct_loader()
 
+        self.aug = False
+        self.rand_erase = False
+        self.use_temporal_gradient = False
+        self.temporal_gradient_rate = 0.0
+
+        if self.mode == "train" and self.cfg.AUG.ENABLE:
+            self.aug = True
+            if self.cfg.AUG.RE_PROB > 0:
+                self.rand_erase = True
+
     def _construct_loader(self):
         """
         Construct the video loader.
@@ -249,23 +259,58 @@ class Ssv2(torch.utils.data.Dataset):
             )
         )
 
-        # Perform color normalization.
-        frames = utils.tensor_normalize(
-            frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
-        )
+        if self.aug:
+            if self.cfg.AUG.NUM_SAMPLE > 1:
 
-        # T H W C -> C T H W.
-        frames = frames.permute(3, 0, 1, 2)
-        # Perform data augmentation.
-        frames = utils.spatial_sampling(
-            frames,
-            spatial_idx=spatial_sample_index,
-            min_scale=min_scale,
-            max_scale=max_scale,
-            crop_size=crop_size,
-            random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-            inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-        )
+                frame_list = []
+                label_list = []
+                index_list = []
+                for _ in range(self.cfg.AUG.NUM_SAMPLE):
+                    new_frames = utils.aug_frame(
+                        self.cfg,
+                        self.mode,
+                        self.rand_erase,
+                        frames,
+                        spatial_sample_index,
+                        min_scale,
+                        max_scale,
+                        crop_size,
+                    )
+                    new_frames = utils.pack_pathway_output(self.cfg, new_frames)
+                    frame_list.append(new_frames)
+                    label_list.append(label)
+                    index_list.append(index)
+                return frame_list, label_list, index_list, [0] * self.cfg.AUG.NUM_SAMPLE, {}
+
+            else:
+                frames = utils.aug_frame(
+                    self.cfg,
+                    self.mode,
+                    self.rand_erase,
+                    frames,
+                    spatial_sample_index,
+                    min_scale,
+                    max_scale,
+                    crop_size,
+                )
+        else:
+            # Perform color normalization.
+            frames = utils.tensor_normalize(
+                frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
+            )
+
+            # T H W C -> C T H W.
+            frames = frames.permute(3, 0, 1, 2)
+            # Perform data augmentation.
+            frames = utils.spatial_sampling(
+                frames,
+                spatial_idx=spatial_sample_index,
+                min_scale=min_scale,
+                max_scale=max_scale,
+                crop_size=crop_size,
+                random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+            )
         frames = utils.pack_pathway_output(self.cfg, frames)
         return frames, label, index, 0, {}
 

@@ -582,7 +582,7 @@ def train(cfg):
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
             epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
             clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
-            IN_INIT=cfg.TRAIN.CHECKPOINT_IN_INIT,
+            image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
         )
         start_epoch = checkpoint_epoch + 1
     else:

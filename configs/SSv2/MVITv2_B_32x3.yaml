@@ -1,46 +1,55 @@
 TRAIN:
   ENABLE: True
-  DATASET: imagenet
-  BATCH_SIZE: 256
-  EVAL_PERIOD: 10
-  CHECKPOINT_PERIOD: 1
+  DATASET: ssv2
+  BATCH_SIZE: 16
+  EVAL_PERIOD: 2
+  CHECKPOINT_PERIOD: 2
   AUTO_RESUME: True
+  # CHECKPOINT_FILE_PATH:
+  CHECKPOINT_TYPE: pytorch
+  CHECKPOINT_EPOCH_RESET: True
 DATA:
-  # PATH_TO_DATA_DIR: path-to-imagenet-dir
-  MEAN: [0.485, 0.456, 0.406]
-  STD: [0.229, 0.224, 0.225]
-  NUM_FRAMES: 1
+  DECODING_BACKEND: torchvision
+  NUM_FRAMES: 32
+  SAMPLING_RATE: 3
+  TRAIN_JITTER_SCALES: [256, 320]
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 224
   INPUT_CHANNEL_NUM: [3]
+  INV_UNIFORM_SAMPLE: True
+  RANDOM_FLIP: False
+  REVERSE_INPUT_CHANNEL: True
+  # PATH_TO_DATA_DIR:
 MVIT:
-  PATCH_2D: True
   ZERO_DECAY_POS_CLS: False
-  MODE: "conv"
-  CLS_EMBED_ON: False
-  PATCH_KERNEL: [7, 7]
-  PATCH_STRIDE: [4, 4]
-  PATCH_PADDING: [3, 3]
-  EMBED_DIM: 96
-  NUM_HEADS: 1
-  MLP_RATIO: 4.0
-  QKV_BIAS: True
- DROPPATH_RATE: 0.3
-  DEPTH: 24
-  NORM: "layernorm"
-  DIM_MUL: [[2, 2.0], [5, 2.0], [21, 2.0]]
-  HEAD_MUL: [[2, 2.0], [5, 2.0], [21, 2.0]]
-  POOL_KVQ_KERNEL: [1, 3, 3]
-  POOL_KV_STRIDE_ADAPTIVE: [1, 4, 4]
-  POOL_Q_STRIDE: [[0, 1, 1, 1], [1, 1, 1, 1], [2, 1, 2, 2], [3, 1, 1, 1], [4, 1, 1, 1], [5, 1, 2, 2], [6, 1, 1, 1], [7, 1, 1, 1], [8, 1, 1, 1], [9, 1, 1, 1], [10, 1, 1, 1], [11, 1, 1, 1], [12, 1, 1, 1], [13, 1, 1, 1], [14, 1, 1, 1], [15, 1, 1, 1], [16, 1, 1, 1], [17, 1, 1, 1], [18, 1, 1, 1], [19, 1, 1, 1], [20, 1, 1, 1], [21, 1, 2, 2], [22, 1, 1, 1], [23, 1, 1, 1]]
-  RESIDUAL_POOLING: True
   USE_ABS_POS: False
   REL_POS_SPATIAL: True
+  REL_POS_TEMPORAL: True
+  DEPTH: 24
+  NUM_HEADS: 1
+  EMBED_DIM: 96
+  PATCH_KERNEL: (3, 7, 7)
+  PATCH_STRIDE: (2, 4, 4)
+  PATCH_PADDING: (1, 3, 3)
+  MLP_RATIO: 4.0
+  QKV_BIAS: True
+  DROPPATH_RATE: 0.4
+  NORM: "layernorm"
+  MODE: "conv"
+  CLS_EMBED_ON: True
+  DIM_MUL: [[2, 2.0], [5, 2.0], [21, 2.0]]
+  HEAD_MUL: [[2, 2.0], [5, 2.0], [21, 2.0]]
+  POOL_KVQ_KERNEL: [3, 3, 3]
+  POOL_KV_STRIDE_ADAPTIVE: [1, 8, 8]
+  POOL_Q_STRIDE: [[0, 1, 1, 1], [1, 1, 1, 1], [2, 1, 2, 2], [3, 1, 1, 1], [4, 1, 1, 1], [5, 1, 2, 2], [6, 1, 1, 1], [7, 1, 1, 1], [8, 1, 1, 1], [9, 1, 1, 1], [10, 1, 1, 1], [11, 1, 1, 1], [12, 1, 1, 1], [13, 1, 1, 1], [14, 1, 1, 1], [15, 1, 1, 1], [16, 1, 1, 1], [17, 1, 1, 1], [18, 1, 1, 1], [19, 1, 1, 1], [20, 1, 1, 1], [21, 1, 2, 2], [22, 1, 1, 1], [23, 1, 1, 1]]
+  DROPOUT_RATE: 0.0
   DIM_MUL_IN_ATT: True
+  RESIDUAL_POOLING: True
 AUG:
+  NUM_SAMPLE: 1
   ENABLE: True
   COLOR_JITTER: 0.4
-  AA_TYPE: rand-m9-n6-mstd0.5-inc1
+  AA_TYPE: rand-m7-n4-mstd0.5-inc1
   INTERPOLATION: bicubic
   RE_PROB: 0.25
   RE_MODE: pixel
@@ -53,36 +62,41 @@ MIXUP:
   PROB: 1.0
   SWITCH_PROB: 0.5
   LABEL_SMOOTH_VALUE: 0.1
+BN:
+  USE_PRECISE_STATS: False
+  NUM_BATCHES_PRECISE: 200
 SOLVER:
+  ZERO_WD_1D_PARAM: True
   BASE_LR_SCALE_NUM_SHARDS: True
-  BASE_LR: 0.00025
-  LR_POLICY: cosine
-  MAX_EPOCH: 300
-  MOMENTUM: 0.9
-  WEIGHT_DECAY: 0.05
-  WARMUP_EPOCHS: 70.0
-  WARMUP_START_LR: 1e-8
-  OPTIMIZING_METHOD: adamw
+  BASE_LR: 0.0015
   COSINE_AFTER_WARMUP: True
   COSINE_END_LR: 1e-6
-  ZERO_WD_1D_PARAM: True
-  CLIP_GRAD_L2NORM: 1.0
+  WARMUP_START_LR: 1e-4
+  WARMUP_EPOCHS: 3.0
+  LR_POLICY: cosine
+  MAX_EPOCH: 100
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 1e-4
+  OPTIMIZING_METHOD: sgd
+  COSINE_AFTER_WARMUP: True
 MODEL:
-  NUM_CLASSES: 1000
+  NUM_CLASSES: 174
   ARCH: mvit
   MODEL_NAME: MViT
   LOSS_FUNC: soft_cross_entropy
-  DROPOUT_RATE: 0.0
+  DROPOUT_RATE: 0.5
 TEST:
   ENABLE: True
-  DATASET: imagenet
-  BATCH_SIZE: 256
+  DATASET: ssv2
+  BATCH_SIZE: 64
   NUM_ENSEMBLE_VIEWS: 1
-  NUM_SPATIAL_CROPS: 1
+  NUM_SPATIAL_CROPS: 3
 DATA_LOADER:
-  NUM_WORKERS: 8
+  NUM_WORKERS: 2
   PIN_MEMORY: True
 NUM_GPUS: 8
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
+PREFETCH:
+  NUM_LOADERS: 3

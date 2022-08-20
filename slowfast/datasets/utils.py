@@ -10,9 +10,15 @@ import cv2
 import torch
 from torch.utils.data.distributed import DistributedSampler
 
+from torchvision import transforms
+
 from slowfast.utils.env import pathmgr
 
 from . import transform as transform
+
+from .random_erasing import RandomErasing
+from .transform import create_random_augment
+
 
 logger = logging.getLogger(__name__)
 
@@ -348,3 +354,99 @@ def loader_worker_init_fn(dataset):
         dataset (torch.utils.data.Dataset): the given dataset.
     """
     return None
+
+
+def aug_frame(
+    cfg,
+    mode,
+    rand_erase,
+    frames,
+    spatial_sample_index,
+    min_scale,
+    max_scale,
+    crop_size,
+):
+    """
+    Perform augmentations on the given video frames, including
+    random augmentation, normalization, spatial sampling and optional random
+    erasing.
+    Args:
+        cfg (CfgNode): configs.
+        mode (string): Options includes `train`, `val`, or `test` mode.
+        rand_erase (bool): if performing random erasing.
+        frames (tensor): frames of images sampled from the video. The
+            dimension is `num frames` x `height` x `width` x `channel`.
+        spatial_sample_index (int): if -1, perform random spatial sampling.
+            If 0, 1, or 2, perform left, center, right crop if width is larger
+             thanheight, and perform top, center, buttom crop if height is larger
+            than width.
+        min_scale (int): the minimal size of scaling.
+        max_scale (int): the maximal size of scaling.
+        crop_size (int): the size of height and width used to crop the
+            frames.
+    Returns:
+        frames (tensor): spatially sampled frames.
+    """
+    if cfg.AUG.AA_TYPE:
+        aug_transform = create_random_augment(
+            input_size=(frames.size(1), frames.size(2)),
+            auto_augment=cfg.AUG.AA_TYPE,
+            interpolation=cfg.AUG.INTERPOLATION,
+        )
+        # T H W C -> T C H W.
+        frames = frames.permute(0, 3, 1, 2)
+        list_img = _frame_to_list_img(frames)
+        list_img = aug_transform(list_img)
+        frames = _list_img_to_frames(list_img)
+        frames = frames.permute(0, 2, 3, 1)
+
+    frames = tensor_normalize(frames, cfg.DATA.MEAN, cfg.DATA.STD)
+    # T H W C -> C T H W.
+    frames = frames.permute(3, 0, 1, 2)
+    # Perform data augmentation.
+    scl, asp = (
+        cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
+        cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE,
+    )
+    relative_scales = None if (mode not in ["train"] or len(scl) == 0) else scl
+    relative_aspect = None if (mode not in ["train"] or len(asp) == 0) else asp
+    frames = spatial_sampling(
+        frames,
+        spatial_idx=spatial_sample_index,
+        min_scale=min_scale,
+        max_scale=max_scale,
+        crop_size=crop_size,
+        random_horizontal_flip=cfg.DATA.RANDOM_FLIP,
+        inverse_uniform_sampling=cfg.DATA.INV_UNIFORM_SAMPLE,
+        aspect_ratio=relative_aspect,
+        scale=relative_scales,
+        motion_shift=cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
+        if mode in ["train"]
+        else False,
+    )
+
+    if rand_erase:
+        erase_transform = RandomErasing(
+            cfg.AUG.RE_PROB,
+            mode=cfg.AUG.RE_MODE,
+            max_count=cfg.AUG.RE_COUNT,
+            num_splits=cfg.AUG.RE_COUNT,
+            device="cpu",
+        )
+        frames = frames.permute(1, 0, 2, 3)
+        frames = erase_transform(frames)
+        frames = frames.permute(1, 0, 2, 3)
+
+    return frames
+
+
+def _frame_to_list_img(frames):
+    img_list = [
+        transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))
+    ]
+    return img_list
+
+
+def _list_img_to_frames(img_list):
+    img_list = [transforms.ToTensor()(img) for img in img_list]
+    return torch.stack(img_list)

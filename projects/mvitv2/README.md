@@ -30,6 +30,16 @@ MViT is a multiscale transformer which serves as a general vision backbone for d
 | MViTv2-L | 40 x 3 | 86.1 | 97.0 | 2828 x 3 x 5 | 217.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_L_40x3_k400_f306903192.pyth) | Kinetics/MVITv2_L_40x3_test |
 
 
+### SSv2
+
+
+| name | pretrain | frame length x sample rate | top1 |  top5  | Flops (G) x views | #params (M) |  model | config |
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+| MViTv2-S | K400 | 16 x 4 | 68.2 | 91.4 | 64 x 3 x 1 | 34.4 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_ssv2_f308341823.pyth) | SSv2/MVITv2_S_16x4 |
+| MViTv2-B | K400 | 32 x 3 | 70.5 | 92.7 | 225 x 3 x 1 | 51.1 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_ssv2_f305803282.pyth) | SSv2/MVITv2_B_32x3 |
+| MViTv2-L | IN21K + K400 | 40 x 3 | 73.3 | 94.1 | 2828 x 3 x 1 | 213.1 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_L_40x3_ssv2_f309603968.pyth) | SSv2/MVITv2_L_40x3 |
+
+
 ### ImageNet-1K
 
 | name | resolution |acc@1 | #params | FLOPs | 1k model |
