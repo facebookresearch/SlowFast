@@ -146,13 +146,22 @@ class Imagenet(torch.utils.data.Dataset):
             )
         else:
             t = []
-            size = int((256 / 224) * test_size)
-            t.append(
-                transforms_tv.Resize(
-                    size, interpolation=transforms_tv.InterpolationMode.BICUBIC
-                ),  # to maintain same ratio w.r.t. 224 images
-            )
-            t.append(transforms_tv.CenterCrop(test_size))
+            if self.cfg.DATA.IN_VAL_CROP_RATIO == 0.0:
+                t.append(
+                    transforms_tv.Resize((test_size, test_size),
+                    interpolation=transforms_tv.InterpolationMode.BICUBIC),
+                )
+            else:
+                size = int(
+                    (1.0 / self.cfg.DATA.IN_VAL_CROP_RATIO) * test_size
+                )  # = 1/0.875 * test_size
+                t.append(
+                    transforms_tv.Resize(
+                        size,
+                        interpolation=transforms_tv.InterpolationMode.BICUBIC
+                    ),  # to maintain same ratio w.r.t. 224 images
+                )
+                t.append(transforms_tv.CenterCrop(test_size))
             t.append(transforms_tv.ToTensor())
             t.append(
                 transforms_tv.Normalize(self.cfg.DATA.MEAN, self.cfg.DATA.STD)

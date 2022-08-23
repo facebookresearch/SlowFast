@@ -776,6 +776,9 @@ _C.DATA.IN22K_TRAINVAL = False
 # If not None, use IN1k as val split when training in21k
 _C.DATA.IN22k_VAL_IN1K = ""
 
+# Large resolution models may use different crop ratios
+_C.DATA.IN_VAL_CROP_RATIO = 0.875 # 224/256 = 0.875
+
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
 
