@@ -605,6 +605,25 @@ _C.MASK.DECODER_DEPTH = 0
 
 # The weight of HOG target loss.
 _C.MASK.PRED_HOG = False
+# Reversible Configs
+_C.MVIT.REV = CfgNode()
+
+# Enable Reversible Model
+_C.MVIT.REV.ENABLE = False
+
+# Method to fuse the reversible paths
+# see :class: `TwoStreamFusion` for all the options
+_C.MVIT.REV.RESPATH_FUSE = "concat"
+
+# Layers to buffer activations at
+# (at least Q-pooling layers needed)
+_C.MVIT.REV.BUFFER_LAYERS = []
+
+# 'conv' or 'max' operator for the respath in Qpooling
+_C.MVIT.REV.RES_PATH = "conv"
+
+# Method to merge hidden states before Qpoolinglayers
+_C.MVIT.REV.PRE_Q_FUSION = "avg"
 
 # -----------------------------------------------------------------------------
 # SlowFast options

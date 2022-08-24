@@ -12,6 +12,7 @@
 | SlowFast | R50 | 3 x 10 | 4 x 16 | 75.6 | 92.0 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_4x16_R50.pkl) | Kinetics/c2/SLOWFAST_4x16_R50 | K400 |
 | SlowFast | R50 | 3 x 10 | 8 x 8 | 77.0 | 92.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | Kinetics/c2/SLOWFAST_8x8_R50 | K400 |
 | MViTv1 | B-Conv | 1 x 5 | 16 x 4 | 78.4 | 93.5 | [`link`](https://drive.google.com/file/d/194gJinVejq6A1FmySNKQ8vAN5-FOY-QL/view?usp=sharing) | Kinetics/MVIT_B_16x4_CONV | K400 |
+| rev-MViT | B-Conv | 1 x 5 | 16 x 4 | 78.4 | 93.4 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/rev/REV_MVIT_B_16x4.pyth) | Kinetics/REV_MVIT_B_16x4_CONV | K400 |
 | MViTv1 | B-Conv | 1 x 5 | 32 x 3 | 80.4 | 94.8 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k400.pyth) | Kinetics/MVIT_B_32x3_CONV | K400 |
 | MViTv1 | B-Conv | 1 x 5 | 32 x 3 | 83.9 | 96.5 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvit/k600.pyth) | Kinetics/MVIT_B_32x3_CONV_K600 | K600 |
 | MViTv2 | S | 1 x 5 | 16 x 4 | 81.0 | 94.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_k400_f302660347.pyth) | Kinetics/MVITv2_S_16x4 | K400 |
@@ -70,8 +71,11 @@ We also release the imagenet pretrained model if finetuning from ImageNet is pre
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
 | ResNet | R50 | 76.4 | 93.2 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/R50_IN1K.pyth) | ImageNet/RES_R50 |
 | MVIT | B-16-Conv | 82.9 | 96.3 | [`link`](https://drive.google.com/file/d/1dYYqUB-3DSgBVc9d6o-rW8ojtVsrFLgp/view?usp=sharing) | ImageNet/MVIT_B_16_CONV |
+| rev-VIT | Small | 79.9 | 94.9 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/rev/REV_VIT_S.pyth) | ImageNet/REV_VIT_S.yaml |
+| rev-VIT | Base |  81.8 | 95.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/rev/REV_VIT_B.pyth) | ImageNet/REV_VIT_B.yaml |
+| rev-MVIT | Base |  82.9* | 96.3 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/rev/REV_MVIT_B.pyth) | ImageNet/REV_MVIT_B_16_CONV.yaml |
 
-
+*please refer to [Reversible Model Zoo](projects/rev/README.md).
 
 ## PyTorchVideo
 
