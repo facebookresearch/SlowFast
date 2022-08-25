@@ -274,6 +274,10 @@ def train_epoch(
         torch.cuda.synchronize()
         train_meter.iter_tic()
     del inputs
+
+    # in case of fragmented memory
+    torch.cuda.empty_cache()
+
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)
     train_meter.reset()

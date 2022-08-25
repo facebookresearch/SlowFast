@@ -546,6 +546,7 @@ def load_checkpoint(
             missing_keys, unexpected_keys = ms.load_state_dict(
                 pre_train_dict_match, strict=False
             )
+
             print("missing keys: {}".format(missing_keys))
             print("unexpected keys: {}".format(unexpected_keys))
             epoch = -1

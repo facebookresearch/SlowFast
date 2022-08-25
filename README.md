@@ -11,6 +11,7 @@ PySlowFast is an open source video understanding codebase from FAIR that provide
 - [MViTv2: Improved Multiscale Vision Transformers for Classification and Detection](https://arxiv.org/abs/2112.01526)
 - [Masked Feature Prediction for Self-Supervised Visual Pre-Training](https://arxiv.org/abs/2112.09133)
 - [Masked Autoencoders As Spatiotemporal Learners](https://arxiv.org/abs/2205.09113)
+- [Reversible Vision Transformers](https://openaccess.thecvf.com/content/CVPR2022/papers/Mangalam_Reversible_Vision_Transformers_CVPR_2022_paper.pdf)
 
 <div align="center">
   <img src="demo/ava_demo.gif" width="600px"/>
@@ -27,8 +28,10 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - Non-local Network
 - X3D
 - MViTv1 and MViTv2
+- Rev-ViT and Rev-MViT
 
 ## Updates
+ - We now [Reversible Vision Transformers](https://openaccess.thecvf.com/content/CVPR2022/papers/Mangalam_Reversible_Vision_Transformers_CVPR_2022_paper.pdf). Both Reversible ViT and MViT models released. See [`projects/rev`](./projects/rev/README.md).
  - We now support [MAE for Video](https://arxiv.org/abs/2104.11227.pdf). See [`projects/mae`](./projects/mae/README.md) for more information.
  - We now support [MaskFeat](https://arxiv.org/abs/2112.09133). See [`projects/maskfeat`](./projects/maskfeat/README.md) for more information.
  - We now support [MViTv2](https://arxiv.org/abs/2104.11227.pdf) in PySlowFast. See [`projects/mvitv2`](./projects/mvitv2/README.md) for more information.

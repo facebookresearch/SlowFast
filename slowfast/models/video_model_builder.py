@@ -14,6 +14,8 @@ import slowfast.utils.logging as logging
 import slowfast.utils.weight_init_helper as init_helper
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
+from slowfast.models.common import TwoStreamFusion
+from slowfast.models.reversible_mvit import ReversibleMViT
 from slowfast.models.utils import (
     calc_mvit_feature_geometry,
     get_3d_sincos_pos_embed,
@@ -28,6 +30,7 @@ try:
     from fairscale.nn.checkpoint import checkpoint_wrapper
 except ImportError:
     checkpoint_wrapper = None
+
 
 logger = logging.get_logger(__name__)
 
@@ -828,6 +831,7 @@ class MViT(nn.Module):
         in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
         self.use_2d_patch = cfg.MVIT.PATCH_2D
         self.enable_detection = cfg.DETECTION.ENABLE
+        self.enable_rev = cfg.MVIT.REV.ENABLE
         self.patch_stride = cfg.MVIT.PATCH_STRIDE
         if self.use_2d_patch:
             self.patch_stride = [1] + self.patch_stride
@@ -964,65 +968,90 @@ class MViT(nn.Module):
                     for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
                 ]
 
+        self.pool_q = pool_q
+        self.pool_kv = pool_kv
+        self.stride_q = stride_q
+        self.stride_kv = stride_kv
+
         self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
 
         input_size = self.patch_dims
-        self.blocks = nn.ModuleList()
 
-        if cfg.MODEL.ACT_CHECKPOINT:
-            validate_checkpoint_wrapper_import(checkpoint_wrapper)
+        if self.enable_rev:
 
-        for i in range(depth):
-            num_heads = round_width(num_heads, head_mul[i])
-            if cfg.MVIT.DIM_MUL_IN_ATT:
-                dim_out = round_width(
-                    embed_dim,
-                    dim_mul[i],
-                    divisor=round_width(num_heads, head_mul[i]),
-                )
-            else:
-                dim_out = round_width(
-                    embed_dim,
-                    dim_mul[i + 1],
-                    divisor=round_width(num_heads, head_mul[i + 1]),
-                )
-            attention_block = MultiScaleBlock(
-                dim=embed_dim,
-                dim_out=dim_out,
-                num_heads=num_heads,
-                input_size=input_size,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                drop_rate=self.drop_rate,
-                drop_path=dpr[i],
-                layer_scale_init_value=layer_scale_init_value,
-                norm_layer=norm_layer,
-                kernel_q=pool_q[i] if len(pool_q) > i else [],
-                kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
-                stride_q=stride_q[i] if len(stride_q) > i else [],
-                stride_kv=stride_kv[i] if len(stride_kv) > i else [],
-                mode=mode,
-                has_cls_embed=self.cls_embed_on,
-                pool_first=pool_first,
-                rel_pos_spatial=self.rel_pos_spatial,
-                rel_pos_temporal=self.rel_pos_temporal,
-                rel_pos_zero_init=cfg.MVIT.REL_POS_ZERO_INIT,
-                residual_pooling=cfg.MVIT.RESIDUAL_POOLING,
-                dim_mul_in_att=cfg.MVIT.DIM_MUL_IN_ATT,
-                separate_qkv=cfg.MVIT.SEPARATE_QKV,
+            # rev does not allow cls token
+            assert not self.cls_embed_on
+
+            self.rev_backbone = ReversibleMViT(cfg, self)
+
+            embed_dim = round_width(
+                embed_dim, dim_mul.prod(), divisor=num_heads
             )
-            if cfg.MODEL.ACT_CHECKPOINT:
-                attention_block = checkpoint_wrapper(attention_block)
-            self.blocks.append(attention_block)
-            if len(stride_q[i]) > 0:
-                input_size = [
-                    size // stride
-                    for size, stride in zip(input_size, stride_q[i])
-                ]
 
-            embed_dim = dim_out
+            self.fuse = TwoStreamFusion(
+                cfg.MVIT.REV.RESPATH_FUSE, dim=2 * embed_dim
+            )
 
-        self.norm = norm_layer(embed_dim)
+            if "concat" in self.cfg.MVIT.REV.RESPATH_FUSE:
+                self.norm = norm_layer(2 * embed_dim)
+            else:
+                self.norm = norm_layer(embed_dim)
+
+        else:
+
+            self.blocks = nn.ModuleList()
+
+            for i in range(depth):
+                num_heads = round_width(num_heads, head_mul[i])
+                if cfg.MVIT.DIM_MUL_IN_ATT:
+                    dim_out = round_width(
+                        embed_dim,
+                        dim_mul[i],
+                        divisor=round_width(num_heads, head_mul[i]),
+                    )
+                else:
+                    dim_out = round_width(
+                        embed_dim,
+                        dim_mul[i + 1],
+                        divisor=round_width(num_heads, head_mul[i + 1]),
+                    )
+                attention_block = MultiScaleBlock(
+                    dim=embed_dim,
+                    dim_out=dim_out,
+                    num_heads=num_heads,
+                    input_size=input_size,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    drop_rate=self.drop_rate,
+                    drop_path=dpr[i],
+                    norm_layer=norm_layer,
+                    kernel_q=pool_q[i] if len(pool_q) > i else [],
+                    kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
+                    stride_q=stride_q[i] if len(stride_q) > i else [],
+                    stride_kv=stride_kv[i] if len(stride_kv) > i else [],
+                    mode=mode,
+                    has_cls_embed=self.cls_embed_on,
+                    pool_first=pool_first,
+                    rel_pos_spatial=self.rel_pos_spatial,
+                    rel_pos_temporal=self.rel_pos_temporal,
+                    rel_pos_zero_init=cfg.MVIT.REL_POS_ZERO_INIT,
+                    residual_pooling=cfg.MVIT.RESIDUAL_POOLING,
+                    dim_mul_in_att=cfg.MVIT.DIM_MUL_IN_ATT,
+                    separate_qkv=cfg.MVIT.SEPARATE_QKV,
+                )
+
+                if cfg.MODEL.ACT_CHECKPOINT:
+                    attention_block = checkpoint_wrapper(attention_block)
+                self.blocks.append(attention_block)
+                if len(stride_q[i]) > 0:
+                    input_size = [
+                        size // stride
+                        for size, stride in zip(input_size, stride_q[i])
+                    ]
+
+                embed_dim = dim_out
+
+            self.norm = norm_layer(embed_dim)
 
         if self.enable_detection:
             self.head = head_helper.ResNetRoIHead(
@@ -1037,7 +1066,9 @@ class MViT(nn.Module):
             )
         else:
             self.head = head_helper.TransformerBasicHead(
-                embed_dim,
+                2 * embed_dim
+                if ("concat" in cfg.MVIT.REV.RESPATH_FUSE and self.enable_rev)
+                else embed_dim,
                 num_classes,
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
@@ -1075,9 +1106,9 @@ class MViT(nn.Module):
         if isinstance(m, (nn.Linear, nn.Conv2d, nn.Conv3d)):
             nn.init.trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
+                nn.init.constant_(m.bias, 0.02)
         elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.bias, 0.02)
             nn.init.constant_(m.weight, 1.0)
 
     @torch.jit.ignore
@@ -1105,7 +1136,11 @@ class MViT(nn.Module):
         return names
 
     def _get_pos_embed(self, pos_embed, bcthw):
-        t, h, w = bcthw[-3], bcthw[-2], bcthw[-1]
+
+        if len(bcthw) == 4:
+            t, h, w = 1, bcthw[-2], bcthw[-1]
+        else:
+            t, h, w = bcthw[-3], bcthw[-2], bcthw[-1]
         if self.cls_embed_on:
             cls_pos_embed = pos_embed[:, 0:1, :]
             pos_embed = pos_embed[:, 1:]
@@ -1127,6 +1162,29 @@ class MViT(nn.Module):
             pos_embed = torch.cat((cls_pos_embed, pos_embed), dim=1)
 
         return pos_embed
+
+    def _forward_reversible(self, x):
+        """
+        Reversible specific code for forward computation.
+        """
+        # rev does not support cls token or detection
+        assert not self.cls_embed_on
+        assert not self.enable_detection
+
+        x = self.rev_backbone(x)
+
+        if self.use_mean_pooling:
+            x = self.fuse(x)
+            x = x.mean(1)
+            x = self.norm(x)
+        else:
+            x = self.norm(x)
+            x = self.fuse(x)
+            x = x.mean(1)
+
+        x = self.head(x)
+
+        return x
 
     def forward(self, x, bboxes=None, return_attn=False):
         x = x[0]
@@ -1172,30 +1230,38 @@ class MViT(nn.Module):
             x = self.norm_stem(x)
 
         thw = [T, H, W]
-        for i, blk in enumerate(self.blocks):
-            x, thw = blk(x, thw)
 
-        if self.enable_detection:
-            x = self.norm(x)
-            if self.cls_embed_on:
-                x = x[:, 1:]
+        if self.enable_rev:
+            x = self._forward_reversible(x)
 
-            B, _, C = x.shape
-            x = x.transpose(1, 2).reshape(B, C, thw[0], thw[1], thw[2])
-
-            x = self.head([x], bboxes)
         else:
-            if self.use_mean_pooling:
+            for blk in self.blocks:
+                x, thw = blk(x, thw)
+
+            if self.enable_detection:
+                assert not self.enable_rev
+
+                x = self.norm(x)
                 if self.cls_embed_on:
                     x = x[:, 1:]
-                x = x.mean(1)
-                x = self.norm(x)
-            elif self.cls_embed_on:
-                x = self.norm(x)
-                x = x[:, 0]
-            else:  # this is default, [norm->mean]
-                x = self.norm(x)
-                x = x.mean(1)
-            x = self.head(x)
+
+                B, _, C = x.shape
+                x = x.transpose(1, 2).reshape(B, C, thw[0], thw[1], thw[2])
+
+                x = self.head([x], bboxes)
+
+            else:
+                if self.use_mean_pooling:
+                    if self.cls_embed_on:
+                        x = x[:, 1:]
+                    x = x.mean(1)
+                    x = self.norm(x)
+                elif self.cls_embed_on:
+                    x = self.norm(x)
+                    x = x[:, 0]
+                else:  # this is default, [norm->mean]
+                    x = self.norm(x)
+                    x = x.mean(1)
+                x = self.head(x)
 
         return x
