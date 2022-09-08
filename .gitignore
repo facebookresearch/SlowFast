@@ -1,0 +1,5 @@
+*.pyc
+*.log
+build/*
+slowfast.egg-info/*
+*.zip

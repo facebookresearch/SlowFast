@@ -136,6 +136,7 @@ def train_epoch(
                 preds, labels = model(inputs)
             else:
                 preds = model(inputs)
+            print("cur iteration ", cur_iter)
             if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 labels = torch.zeros(
                     preds.size(0), dtype=labels.dtype, device=labels.device
@@ -271,12 +272,12 @@ def train_epoch(
                 )
         train_meter.iter_toc()  # do measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
         train_meter.iter_tic()
     del inputs
 
     # in case of fragmented memory
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
 
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)

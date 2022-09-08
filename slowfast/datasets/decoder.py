@@ -3,8 +3,9 @@
 
 import logging
 import math
-import numpy as np
 import random
+
+import numpy as np
 import torch
 import torchvision.io as io
 
@@ -84,7 +85,7 @@ def get_multiple_start_end_idx(
     num_clips_uniform,
     min_delta=0,
     max_delta=math.inf,
-    use_offset=False,
+    use_offset=False
 ):
     """
     Sample a clip of size clip_size from a video of size video_size and
@@ -114,7 +115,7 @@ def get_multiple_start_end_idx(
         min_delta=0,
         max_delta=math.inf,
         num_retries=100,
-        use_offset=False,
+        use_offset=False
     ):
         se_inds = np.empty((0, 2))
         dt = np.empty((0))
@@ -125,15 +126,13 @@ def get_multiple_start_end_idx(
                 if clip_idx == -1:
                     # Random temporal sampling.
                     start_idx = random.uniform(0, max_start)
-                else:  # Uniformly sample the clip with the given index.
+                else: # Uniformly sample the clip with the given index.
                     if use_offset:
                         if num_clips_uniform == 1:
                             # Take the center clip if num_clips is 1.
                             start_idx = math.floor(max_start / 2)
                         else:
-                            start_idx = clip_idx * math.floor(
-                                max_start / (num_clips_uniform - 1)
-                            )
+                            start_idx = clip_idx * math.floor(max_start / (num_clips_uniform - 1))
                     else:
                         start_idx = max_start * clip_idx / num_clips_uniform
 
@@ -304,7 +303,10 @@ def torchvision_decode(
         decode_all_video = False  # try selective decoding
 
         clip_sizes = [
-            np.maximum(1.0, sampling_rate[i] * num_frames[i] / target_fps * fps)
+            np.maximum(
+                1.0,
+                sampling_rate[i] * num_frames[i] / target_fps * fps
+            )
             for i in range(len(sampling_rate))
         ]
         start_end_delta_time = get_multiple_start_end_idx(
@@ -381,6 +383,10 @@ def pyav_decode(
     num_clips_uniform=10,
     target_fps=30,
     use_offset=False,
+    modalities=("visual",),
+    max_spatial_scale=0,
+    min_delta=-math.inf,
+    max_delta=math.inf,
 ):
     """
     Convert the video from its original fps to the target_fps. If the video
@@ -388,7 +394,6 @@ def pyav_decode(
     the perform temporal selective decoding and sample a clip from the video
     with the PyAV decoder. If the video does not support selective decoding,
     decode the entire video.
-
     Args:
         container (container): pyav container.
         sampling_rate (int): frame sampling rate (interval between two sampled
@@ -418,38 +423,69 @@ def pyav_decode(
         # If failed to fetch the decoding information, decode the entire video.
         decode_all_video = True
         video_start_pts, video_end_pts = 0, math.inf
+        start_end_delta_time = None
+
+        frames = None
+        if container.streams.video:
+            video_frames, max_pts = pyav_decode_stream(
+                container,
+                video_start_pts,
+                video_end_pts,
+                container.streams.video[0],
+                {"video": 0},
+            )
+            container.close()
+
+            frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
+            frames = torch.as_tensor(np.stack(frames))
+        frames_out = [frames]
+
     else:
         # Perform selective decoding.
         decode_all_video = False
-        clip_size = np.maximum(
-            1.0, np.ceil(sampling_rate * (num_frames - 1) / target_fps * fps)
-        )
-        start_idx, end_idx, fraction = get_start_end_idx(
+        clip_sizes = [
+            np.maximum(
+                1.0,
+                np.ceil(
+                    sampling_rate[i] * (num_frames[i] - 1) / target_fps * fps
+                ),
+            )
+            for i in range(len(sampling_rate))
+        ]
+        start_end_delta_time = get_multiple_start_end_idx(
             frames_length,
-            clip_size,
+            clip_sizes,
             clip_idx,
             num_clips_uniform,
-            use_offset=use_offset,
+            min_delta=min_delta,
+            max_delta=max_delta,
         )
-        timebase = duration / frames_length
-        video_start_pts = int(start_idx * timebase)
-        video_end_pts = int(end_idx * timebase)
+        frames_out = [None] * len(num_frames)
+        for k in range(len(num_frames)):
+            start_idx = start_end_delta_time[k, 0]
+            end_idx = start_end_delta_time[k, 1]
+            timebase = duration / frames_length
+            video_start_pts = int(start_idx * timebase)
+            video_end_pts = int(end_idx * timebase)
 
-    frames = None
-    # If video stream was found, fetch video frames from the video.
-    if container.streams.video:
-        video_frames, max_pts = pyav_decode_stream(
-            container,
-            video_start_pts,
-            video_end_pts,
-            container.streams.video[0],
-            {"video": 0},
-        )
+            frames = None
+            # If video stream was found, fetch video frames from the video.
+            if container.streams.video:
+                video_frames, max_pts = pyav_decode_stream(
+                    container,
+                    video_start_pts,
+                    video_end_pts,
+                    container.streams.video[0],
+                    {"video": 0},
+                )
+
+                frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
+                frames = torch.as_tensor(np.stack(frames))
+
+            frames_out[k] = frames
         container.close()
 
-        frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
-        frames = torch.as_tensor(np.stack(frames))
-    return frames, fps, decode_all_video
+    return frames_out, fps, decode_all_video, start_end_delta_time
 
 
 def decode(
@@ -509,10 +545,9 @@ def decode(
         )  # clips come temporally ordered from decoder
     try:
         if backend == "pyav":
-            assert (
-                min_delta == -math.inf and max_delta == math.inf
-            ), "delta sampling not supported in pyav"
-            frames_decoded, fps, decode_all_video = pyav_decode(
+            assert min_delta == -math.inf and max_delta == math.inf, \
+                "delta sampling not supported in pyav"
+            frames_decoded, fps, decode_all_video, start_end_delta_time = pyav_decode(
                 container,
                 sampling_rate,
                 num_frames,
@@ -520,6 +555,10 @@ def decode(
                 num_clips_uniform,
                 target_fps,
                 use_offset=use_offset,
+                modalities=("visual",),
+                max_spatial_scale=max_spatial_scale,
+                min_delta=min_delta,
+                max_delta=max_delta,
             )
         elif backend == "torchvision":
             (
@@ -557,7 +596,10 @@ def decode(
         frames_decoded = [frames_decoded]
     num_decoded = len(frames_decoded)
     clip_sizes = [
-        np.maximum(1.0, sampling_rate[i] * num_frames[i] / target_fps * fps)
+        np.maximum(
+            1.0,
+            sampling_rate[i] * num_frames[i] / target_fps * fps
+        )
         for i in range(len(sampling_rate))
     ]
 
