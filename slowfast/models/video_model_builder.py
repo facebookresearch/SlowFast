@@ -1125,7 +1125,7 @@ class MViT(nn.Module):
                         ]
                     )
                 else:
-                    names.append(["pos_embed"])
+                    names.append("pos_embed")
             if self.rel_pos_spatial:
                 names.extend(["rel_pos_h", "rel_pos_w", "rel_pos_hw"])
             if self.rel_pos_temporal:
