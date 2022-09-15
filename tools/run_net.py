@@ -24,6 +24,7 @@ def main():
 
         # Perform training.
         if cfg.TRAIN.ENABLE:
+            print(cfg.NUM_GPUS)
             launch_job(cfg=cfg, init_method=args.init_method, func=train)
 
         # Perform multi-clip testing.
@@ -38,8 +39,7 @@ def main():
 
         # Perform model visualization.
         if cfg.TENSORBOARD.ENABLE and (
-            cfg.TENSORBOARD.MODEL_VIS.ENABLE
-            or cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE
+            cfg.TENSORBOARD.MODEL_VIS.ENABLE or cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE
         ):
             launch_job(cfg=cfg, init_method=args.init_method, func=visualize)
 

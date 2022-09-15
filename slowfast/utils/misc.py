@@ -189,9 +189,7 @@ def log_model_info(model, cfg, use_train_input=True):
     flops = get_model_stats(model, cfg, "flop", use_train_input)
     logger.info("Flops: {:,} G".format(flops))
     logger.info(
-        "Activations: {:,} M".format(
-            get_model_stats(model, cfg, "activation", use_train_input)
-        )
+        "Activations: {:,} M".format(get_model_stats(model, cfg, "activation", use_train_input))
     )
     logger.info("nvidia-smi")
     os.system("nvidia-smi")
@@ -213,9 +211,7 @@ def is_eval_epoch(cfg, cur_epoch, multigrid_schedule):
         prev_epoch = 0
         for s in multigrid_schedule:
             if cur_epoch < s[-1]:
-                period = max(
-                    (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
-                )
+                period = max((s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1)
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
@@ -298,14 +294,9 @@ def plot_input_normed(
             nrow = 1
         elif tensor.ndim == 5:
             nrow = tensor.shape[1]
-            tensor = tensor.reshape(
-                shape=(-1, tensor.shape[2], tensor.shape[3], tensor.shape[4])
-            )
+            tensor = tensor.reshape(shape=(-1, tensor.shape[2], tensor.shape[3], tensor.shape[4]))
         vis2 = (
-            make_grid(tensor, padding=8, pad_value=1.0, nrow=nrow)
-            .permute(1, 2, 0)
-            .cpu()
-            .numpy()
+            make_grid(tensor, padding=8, pad_value=1.0, nrow=nrow).permute(1, 2, 0).cpu().numpy()
         )
         plt.imsave(fname=path, arr=vis2, format="png")
     else:
@@ -339,18 +330,10 @@ def plot_input_normed(
                     if bboxes is not None and len(bboxes) > i:
                         for box in bboxes[i]:
                             x1, y1, x2, y2 = box
-                            ax[i].vlines(
-                                x1, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].vlines(
-                                x2, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y1, x1, x2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y2, x1, x2, colors="g", linestyles="solid"
-                            )
+                            ax[i].vlines(x1, y1, y2, colors="g", linestyles="solid")
+                            ax[i].vlines(x2, y1, y2, colors="g", linestyles="solid")
+                            ax[i].hlines(y1, x1, x2, colors="g", linestyles="solid")
+                            ax[i].hlines(y2, x1, x2, colors="g", linestyles="solid")
 
                     if texts is not None and len(texts) > i:
                         ax[i].text(0, 0, texts[i])
@@ -411,6 +394,7 @@ def launch_job(cfg, init_method, func, daemon=False):
         daemon (bool): The spawned processes’ daemon flag. If set to True,
             daemonic processes will be created
     """
+    print(f"num gpus: {cfg.NUM_GPUS}")
     if cfg.NUM_GPUS > 1:
         torch.multiprocessing.spawn(
             mpu.run,
@@ -468,17 +452,11 @@ def get_class_names(path, parent_path=None, subset_path=None):
             with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    parent_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(parent_path, err))
             return
         class_parent = {}
         for parent, children in d_parent.items():
-            indices = [
-                class2idx[c] for c in children if class2idx.get(c) is not None
-            ]
+            indices = [class2idx[c] for c in children if class2idx.get(c) is not None]
             class_parent[parent] = indices
 
     subset_ids = None
@@ -487,16 +465,10 @@ def get_class_names(path, parent_path=None, subset_path=None):
             with pathmgr.open(subset_path, "r") as f:
                 subset = f.read().split("\n")
                 subset_ids = [
-                    class2idx[name]
-                    for name in subset
-                    if class2idx.get(name) is not None
+                    class2idx[name] for name in subset if class2idx.get(name) is not None
                 ]
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    subset_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(subset_path, err))
             return
 
     return class_names, class_parent, subset_ids

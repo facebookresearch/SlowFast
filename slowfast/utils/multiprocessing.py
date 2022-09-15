@@ -56,6 +56,9 @@ def run(
     except Exception as e:
         raise e
 
+    print(local_rank)
+    assert local_rank <= 1, "local_rank is too big"
+
     torch.cuda.set_device(local_rank)
     ret = func(cfg)
     if output_queue is not None and local_rank == 0:

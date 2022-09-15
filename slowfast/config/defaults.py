@@ -721,7 +721,7 @@ _C.DATA.TARGET_FPS = 30
 _C.DATA.TRAIN_JITTER_FPS = 0.0
 
 # Decoding backend, options include `pyav` or `torchvision`
-_C.DATA.DECODING_BACKEND = "torchvision"
+_C.DATA.DECODING_BACKEND = "pyav"
 
 # Decoding resize to short size (set to native size for best speed)
 _C.DATA.DECODING_SHORT_SIZE = 256
@@ -796,7 +796,7 @@ _C.DATA.IN22K_TRAINVAL = False
 _C.DATA.IN22k_VAL_IN1K = ""
 
 # Large resolution models may use different crop ratios
-_C.DATA.IN_VAL_CROP_RATIO = 0.875 # 224/256 = 0.875
+_C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 
 # don't use real video for kinetics.py
 _C.DATA.DUMMY_LOAD = False
@@ -966,14 +966,10 @@ _C.AVA = CfgNode()
 _C.AVA.FRAME_DIR = "/mnt/fair-flash3-east/ava_trainval_frames.img/"
 
 # Directory path for files of frame lists.
-_C.AVA.FRAME_LIST_DIR = (
-    "/mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/"
-)
+_C.AVA.FRAME_LIST_DIR = "/mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/"
 
 # Directory path for annotation files.
-_C.AVA.ANNOTATION_DIR = (
-    "/mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/"
-)
+_C.AVA.ANNOTATION_DIR = "/mnt/vol/gfsai-flash3-east/ai-group/users/haoqifan/ava/frame_list/"
 
 # Filenames of training samples list files.
 _C.AVA.TRAIN_LISTS = ["train.csv"]
@@ -1193,7 +1189,9 @@ _C.DEMO.DISPLAY_HEIGHT = 0
 # only used for detection tasks.
 _C.DEMO.DETECTRON2_CFG = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
 # Path to Detectron2 object detection model pre-trained weights.
-_C.DEMO.DETECTRON2_WEIGHTS = "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+_C.DEMO.DETECTRON2_WEIGHTS = (
+    "detectron2://COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+)
 # Threshold for choosing predicted bounding boxes by Detectron2.
 _C.DEMO.DETECTRON2_THRESH = 0.9
 # Number of overlapping frames between 2 consecutive clips.

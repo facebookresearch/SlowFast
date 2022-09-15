@@ -108,8 +108,46 @@ def file_cpy_arranger(split: str):
             copy2(src_path, target_dir)
 
 
+def pbyol_custom_csv(input_dir: str, split: str, num_list: list):
+    src_fpath = os.path.join(input_dir, f"{split}.csv")
+    trgt_fpath = os.path.join(input_dir, f"pbyol_{split}.csv")
+
+    with open(src_fpath, "r") as read_f:
+        rdr = csv.reader(read_f)
+        with open(trgt_fpath, "w") as wrt_f:
+            wrt = csv.writer(wrt_f)
+            for i, line in enumerate(rdr):
+                if i == 0:
+                    continue
+                mylabel = num_list.index(line[0])
+                in_format = f"/data/hong/k400/reduced/{split}/{line[1]}_{int(line[2]):06}_{int(line[3]):06}.mp4 {mylabel}"
+                # print(in_format)
+                wrt.writerow([in_format])
+
+
+def get_index_num(input_dir: str) -> list:
+    empty = []
+    for split in ["train", "test", "val"]:
+        src_fpath = os.path.join(input_dir, f"{split}.csv")
+        with open(src_fpath, "r") as read_f:
+            rdr = csv.reader(read_f)
+            for i, line in enumerate(rdr):
+                if i == 0:
+                    continue
+                if not line[0] in empty:
+                    empty.append(line[0])
+    print(f"length of empty is {len(empty)}")
+    return empty
+
+
 if __name__ == "__main__":
-    print("main")
+    # print("main")
+    aaa = f"/data/hong/k400/reduced/legacy_csv/"
+
+    num_list = get_index_num(aaa)
+    pbyol_custom_csv(aaa, "val", num_list)
+    pbyol_custom_csv(aaa, "train", num_list)
+    pbyol_custom_csv(aaa, "test", num_list)
     # remover()
     # csv_arranger()
     # file_cpy_arranger("train")

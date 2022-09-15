@@ -25,6 +25,7 @@ CONTRASTIVE:
   TYPE: byol # default mem
   PREDICTOR_DEPTHS: [2]
 DATA:
+  PATH_TO_DATA_DIR: "/data/hong/k400/reduced"
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
   # NUM_FRAMES: 16 # dont forget to change these parameters in linear & finetuning configs
@@ -47,7 +48,7 @@ BN:
   USE_PRECISE_STATS: False
   NUM_BATCHES_PRECISE: 200
   WEIGHT_DECAY: 0.0
-  NUM_SYNC_DEVICES: 8
+  NUM_SYNC_DEVICES: 1
   NORM_TYPE: "sync_batchnorm"
   # NORM_TYPE: "sync_batchnorm_apex"
 SOLVER:
@@ -56,7 +57,7 @@ SOLVER:
   LARS_ON: True
   BASE_LR_SCALE_NUM_SHARDS: True
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 2
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-6
   WARMUP_EPOCHS: 35.0
@@ -69,6 +70,6 @@ TEST:
 DATA_LOADER:
   NUM_WORKERS: 10
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .

@@ -33,9 +33,7 @@ def temporal_sampling(frames, start_idx, end_idx, num_samples):
     return frames
 
 
-def get_start_end_idx(
-    video_size, clip_size, clip_idx, num_clips_uniform, use_offset=False
-):
+def get_start_end_idx(video_size, clip_size, clip_idx, num_clips_uniform, use_offset=False):
     """
     Sample a clip of size clip_size from a video of size video_size and
     return the indices of the first and last frame of the clip. If clip_idx is
@@ -66,9 +64,7 @@ def get_start_end_idx(
                 start_idx = math.floor(delta / 2)
             else:
                 # Uniformly sample the clip with the given index.
-                start_idx = clip_idx * math.floor(
-                    delta / (num_clips_uniform - 1)
-                )
+                start_idx = clip_idx * math.floor(delta / (num_clips_uniform - 1))
         else:
             # Uniformly sample the clip with the given index.
             start_idx = delta * clip_idx / num_clips_uniform
@@ -131,9 +127,7 @@ def get_multiple_start_end_idx(
                             # Take the center clip if num_clips is 1.
                             start_idx = math.floor(max_start / 2)
                         else:
-                            start_idx = clip_idx * math.floor(
-                                max_start / (num_clips_uniform - 1)
-                            )
+                            start_idx = clip_idx * math.floor(max_start / (num_clips_uniform - 1))
                     else:
                         start_idx = max_start * clip_idx / num_clips_uniform
 
@@ -147,9 +141,7 @@ def get_multiple_start_end_idx(
                 se_inds_new = np.sort(se_inds_new, 0)
                 t_start, t_end = se_inds_new[:, 0], se_inds_new[:, 1]
                 dt = t_start[1:] - t_end[:-1]
-                if (
-                    any(dt < min_delta) or any(dt > max_delta)
-                ) and i_try < num_retries - 1:
+                if (any(dt < min_delta) or any(dt > max_delta)) and i_try < num_retries - 1:
                     continue  # there is overlap
                 else:
                     se_inds = se_inds_new
@@ -184,9 +176,7 @@ def get_multiple_start_end_idx(
     return start_end_delta_time
 
 
-def pyav_decode_stream(
-    container, start_pts, end_pts, stream, stream_name, buffer_size=0
-):
+def pyav_decode_stream(container, start_pts, end_pts, stream, stream_name, buffer_size=0):
     """
     Decode the video with PyAV decoder.
     Args:
@@ -318,9 +308,7 @@ def torchvision_decode(
         )
         frames_out = [None] * len(num_frames)
         for k in range(len(num_frames)):
-            pts_per_frame = (
-                video_meta["video_denominator"] / video_meta["video_fps"]
-            )
+            pts_per_frame = video_meta["video_denominator"] / video_meta["video_fps"]
             video_start_pts = int(start_end_delta_time[k, 0] * pts_per_frame)
             video_end_pts = int(start_end_delta_time[k, 1] * pts_per_frame)
 
@@ -381,6 +369,10 @@ def pyav_decode(
     num_clips_uniform=10,
     target_fps=30,
     use_offset=False,
+    modalities=("visual",),
+    max_spatial_scale=0,
+    min_delta=-math.inf,
+    max_delta=math.inf,
 ):
     """
     Convert the video from its original fps to the target_fps. If the video
@@ -421,35 +413,50 @@ def pyav_decode(
     else:
         # Perform selective decoding.
         decode_all_video = False
-        clip_size = np.maximum(
-            1.0, np.ceil(sampling_rate * (num_frames - 1) / target_fps * fps)
-        )
-        start_idx, end_idx, fraction = get_start_end_idx(
+        clip_sizes = [
+            np.maximum(
+                1.0,
+                np.ceil(sampling_rate[i] * (num_frames[i] - 1) / target_fps * fps),
+            )
+            for i in range(len(sampling_rate))
+        ]
+        start_end_delta_time = get_multiple_start_end_idx(
             frames_length,
-            clip_size,
+            clip_sizes,
             clip_idx,
             num_clips_uniform,
-            use_offset=use_offset,
+            min_delta=min_delta,
+            max_delta=max_delta,
         )
-        timebase = duration / frames_length
-        video_start_pts = int(start_idx * timebase)
-        video_end_pts = int(end_idx * timebase)
+        frames_out = [None] * len(num_frames)
+        for k in range(len(num_frames)):
+            start_idx = start_end_delta_time[k, 0]
+            end_idx = start_end_delta_time[k, 1]
+            timebase = duration / frames_length
+            video_start_pts = int(start_idx)
+            video_end_pts = int(end_idx)
 
-    frames = None
-    # If video stream was found, fetch video frames from the video.
-    if container.streams.video:
-        video_frames, max_pts = pyav_decode_stream(
-            container,
-            video_start_pts,
-            video_end_pts,
-            container.streams.video[0],
-            {"video": 0},
-        )
+            frames = None
+            # If video stream was found, fetch video frames from the video.
+            if container.streams.video:
+                video_frames, max_pts = pyav_decode_stream(
+                    container,
+                    video_start_pts,
+                    video_end_pts,
+                    container.streams.video[0],
+                    {"video": 0},
+                )
+
+                frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
+                frames = torch.as_tensor(np.stack(frames))
+
+            frames_out[k] = frames
         container.close()
+    return frames_out, fps, decode_all_video, start_end_delta_time
 
-        frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
-        frames = torch.as_tensor(np.stack(frames))
-    return frames, fps, decode_all_video
+    #     frames = [frame.to_rgb().to_ndarray() for frame in video_frames]
+    #     frames = torch.as_tensor(np.stack(frames))
+    # return frames, fps, decode_all_video
 
 
 def decode(
@@ -504,15 +511,14 @@ def decode(
         sampling_rate = [sampling_rate[i] for i in ind_clips]
         num_frames = [num_frames[i] for i in ind_clips]
     else:
-        ind_clips = np.arange(
-            num_decode
-        )  # clips come temporally ordered from decoder
+        ind_clips = np.arange(num_decode)  # clips come temporally ordered from decoder
     try:
         if backend == "pyav":
             assert (
                 min_delta == -math.inf and max_delta == math.inf
             ), "delta sampling not supported in pyav"
-            frames_decoded, fps, decode_all_video = pyav_decode(
+            # frames_decoded, fps, decode_all_video = pyav_decode(
+            frames_decoded, fps, decode_all_video, start_end_delta_time = pyav_decode(
                 container,
                 sampling_rate,
                 num_frames,
@@ -520,14 +526,13 @@ def decode(
                 num_clips_uniform,
                 target_fps,
                 use_offset=use_offset,
+                modalities=("visual",),
+                max_spatial_scale=max_spatial_scale,
+                min_delta=min_delta,
+                max_delta=max_delta,
             )
         elif backend == "torchvision":
-            (
-                frames_decoded,
-                fps,
-                decode_all_video,
-                start_end_delta_time,
-            ) = torchvision_decode(
+            (frames_decoded, fps, decode_all_video, start_end_delta_time,) = torchvision_decode(
                 container,
                 sampling_rate,
                 num_frames,
@@ -542,9 +547,7 @@ def decode(
                 max_delta=max_delta,
             )
         else:
-            raise NotImplementedError(
-                "Unknown decoding backend {}".format(backend)
-            )
+            raise NotImplementedError("Unknown decoding backend {}".format(backend))
     except Exception as e:
         print("Failed to decode by {} with exception: {}".format(backend, e))
         return None, None, None
@@ -616,9 +619,6 @@ def decode(
         frames_out = frames_out_
         start_end_delta_time = start_end_delta_time_
         time_diff_aug = time_diff_aug_
-        assert all(
-            frames_out[i].shape[0] == num_frames_orig[i]
-            for i in range(num_decode)
-        )
+        assert all(frames_out[i].shape[0] == num_frames_orig[i] for i in range(num_decode))
 
     return frames_out, start_end_delta_time, time_diff_aug
