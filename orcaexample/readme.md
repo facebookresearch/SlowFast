@@ -3,14 +3,7 @@
 We demonstrate how to easily run synchronous distributed Pytorch training using Pytorch Estimator of Project Orca in Bigdl. This is an example using [SlowFast](https://github.com/facebookresearch/SlowFast/tree/main/slowfast) to train on [ting-kinetic-400](https://github.com/Tramac/tiny-kinetics-400), a collection of video clips that cover 400 human action classes. We provide `bigdl` distributed PyTorch training backends for this example. You can run with either backend as you wish.
 
 ## Prepare the environment
-We recommend you to use [Anaconda](https://www.anaconda.com/distribution/#linux) to prepare the environment, especially if you want to run on a yarn cluster (yarn-client mode only).
-```
-conda create -n bigdl python=3.7  # "bigdl" is conda environment name, you can use any name you like.
-conda activate bigdl
 
-# install bigdl-orca
-pip install bigdl-orca[ray]
-```
 We strongly recommend you install slowfast **Requirements** according to our slowfast document [here](https://github.com/analytics-zoo/SlowFast/blob/main/INSTALL.md#requirements). You don't need to build or install slowfast itself for now.
 **Note**:
 1. You do **not** need to install pytorch from source like [FAIR suggested](https://github.com/facebookresearch/SlowFast/blob/main/INSTALL.md#pytorch).
@@ -118,6 +111,7 @@ python kinectic.py --backend bigdl
 ## Results
 
 **For "bigdl" backend**
+
 You can find the training results as:
 ```
 22-09-16 10:04:31 [Thread-3] INFO  DistriOptimizer$:432 - [Epoch 2 4/8][Iteration 3][Wall Clock 206.8350893s] Trained 4.0 records in 73.3313766 seconds. Throughput is 0.05454691 records/second. Loss is 29.229464. 
