@@ -30,12 +30,6 @@
     # You can find more details at https://github.com/facebookresearch/detectron2/blob/master/INSTALL.md
 ```
 
-## Pytorch
-Please follow PyTorch official instructions to install from source:
-```
-git clone --recursive https://github.com/pytorch/pytorch
-```
-
 ## PySlowFast
 
 Clone the PySlowFast Video Understanding repository.
@@ -43,12 +37,7 @@ Clone the PySlowFast Video Understanding repository.
 git clone https://github.com/facebookresearch/slowfast
 ```
 
-Add this repository to $PYTHONPATH.
-```
-export PYTHONPATH=/path/to/SlowFast/slowfast:$PYTHONPATH
-```
-
-### Build PySlowFast
+### Test PySlowFast
 
 After having the above dependencies, run:
 ```
@@ -59,5 +48,15 @@ python setup.py build develop
 
 Now the installation is finished, run the pipeline with:
 ```
-python tools/run_net.py --cfg configs/Kinetics/C2D_8x8_R50.yaml NUM_GPUS 1 TRAIN.BATCH_SIZE 8 SOLVER.BASE_LR 0.0125 DATA.PATH_TO_DATA_DIR path_to_your_data_folder
+python tools/run_net.py --cfg ./C2D_8x8_R50.yaml --opts NUM_GPUS 0 TRAIN.BATCH_SIZE 8 SOLVER.BASE_LR 0.0125 DATA.PATH_TO_DATA_DIR ./dataset/tiny-kinetics-400/data
+```
+### Build and Install PySlowFast
+```
+pip uninstall slowfast -y
+python setup.py build install
+```
+you will see slowfast in your site-packages
+```
+Using /home/usrname/anaconda3/envs/py37/lib/python3.7/site-packages
+Finished processing dependencies for slowfast==1.0
 ```
