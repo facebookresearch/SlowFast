@@ -375,6 +375,7 @@ def torchvision_decode(
     return frames_out, fps, decode_all_video, start_end_delta_time
 
 
+# refer to https://github.com/facebookresearch/SlowFast/issues/558#issuecomment-1184339447
 def pyav_decode(
     container,
     sampling_rate,

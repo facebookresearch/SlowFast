@@ -1,7 +1,7 @@
 TRAIN:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 16
+  BATCH_SIZE: 8
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
@@ -12,7 +12,7 @@ DATA:
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 256
   INPUT_CHANNEL_NUM: [3]
-  PATH_TO_DATA_DIR: dataset/tiny-kinetics-400/data
+  PATH_TO_DATA_DIR: /home/chriskafka/project/slowfast/dataset/tiny-kinetics-400/data
   DECODING_BACKEND: pyav
 RESNET:
   ZERO_INIT_FINAL_BN: True
