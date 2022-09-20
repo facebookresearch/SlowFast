@@ -1,8 +1,16 @@
 TASK: ssl
-TRAIN:
+MEMCHECK:
+  ENABLE: True
   DATASET: kinetics
-  EVAL_PERIOD: 2
-  CHECKPOINT_PERIOD: 5
+  BATCH_SIZE: 64
+  ONLY_FIRST_50: True
+TRAIN:
+  ENABLE: False
+  DATASET: kinetics
+  EVAL_ENABLE: False
+  EVAL_PERIOD: 10
+  CHECKPOINT_ENABLE: False
+  CHECKPOINT_PERIOD: 20
   AUTO_RESUME: True
   BATCH_SIZE: 128
 MODEL:
@@ -26,8 +34,7 @@ CONTRASTIVE:
   TYPE: byol # default mem
   PREDICTOR_DEPTHS: [2]
 DATA:
-  # PATH_TO_DATA_DIR: "/data/hong/k400/reduced/fake"
-  PATH_TO_DATA_DIR: "/data/hong/k400/reduced"
+  PATH_TO_DATA_DIR: "/home/hong/slowfast/index_files"
   DUMMY_LOAD: False
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
@@ -67,12 +74,15 @@ SOLVER:
   WARMUP_START_LR: 0.001
   OPTIMIZING_METHOD: sgd
 TEST:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 16
 DATA_LOADER:
   NUM_WORKERS: 15
   PIN_MEMORY: True
+
 NUM_GPUS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
+DALI_ENABLE: False
+DALI_FILE: "/home/hong/slowfast/data/dali"

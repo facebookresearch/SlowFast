@@ -123,6 +123,29 @@ _C.BN.NUM_SYNC_DEVICES = 1
 # CONTRASTIVE.BN_SYNC_MLP if appropriate.
 _C.BN.GLOBAL_SYNC = False
 
+# Start of Customization
+# ---------------------------------------------------------------------------- #
+# "Checking GPU memory of dataloaders" options.
+# ---------------------------------------------------------------------------- #
+_C.MEMCHECK = CfgNode()
+
+# If True Train the model, else skip training.
+_C.MEMCHECK.ENABLE = False
+
+# Kill training if loss explodes over this ratio from the previous 5 measurements.
+# Only enforced if > 0.0
+_C.MEMCHECK.KILL_LOSS_EXPLOSION_FACTOR = 0.0
+
+# Dataset.
+_C.MEMCHECK.DATASET = "kinetics"
+
+# Total mini-batch size.
+_C.MEMCHECK.BATCH_SIZE = 64
+
+_C.MEMCHECK.ONLY_FIRST_50 = False
+
+# End of Customization
+
 # ---------------------------------------------------------------------------- #
 # Training options.
 # ---------------------------------------------------------------------------- #
@@ -141,8 +164,14 @@ _C.TRAIN.DATASET = "kinetics"
 # Total mini-batch size.
 _C.TRAIN.BATCH_SIZE = 64
 
+# Custom settup
+_C.TRAIN.EVAL_ENABLE = True
+
 # Evaluate model on test data every eval period epochs.
 _C.TRAIN.EVAL_PERIOD = 10
+
+# Custom settup
+_C.TRAIN.CHECKPOINT_ENABLE = True
 
 # Save model checkpoint every checkpoint period epochs.
 _C.TRAIN.CHECKPOINT_PERIOD = 10
@@ -721,6 +750,7 @@ _C.DATA.TARGET_FPS = 30
 _C.DATA.TRAIN_JITTER_FPS = 0.0
 
 # Decoding backend, options include `pyav` or `torchvision`
+# _C.DATA.DECODING_BACKEND = "torchvision"
 _C.DATA.DECODING_BACKEND = "pyav"
 
 # Decoding resize to short size (set to native size for best speed)
@@ -799,6 +829,7 @@ _C.DATA.IN22k_VAL_IN1K = ""
 _C.DATA.IN_VAL_CROP_RATIO = 0.875  # 224/256 = 0.875
 
 # don't use real video for kinetics.py
+# _C.DATA.DUMMY_LOAD = True
 _C.DATA.DUMMY_LOAD = False
 
 # ---------------------------------------------------------------------------- #
@@ -880,6 +911,15 @@ _C.SOLVER.BETAS = (0.9, 0.999)
 # ---------------------------------------------------------------------------- #
 # Misc options
 # ---------------------------------------------------------------------------- #
+
+# Use NVIDIA DALI pipeline instead of pytorch dataloader
+_C.DALI_ENABLE = False
+
+# DALI dataset file
+_C.DALI_FILE = "dali_dataset_texts"
+
+# sequence_length (int) – Length of sequence to load for each sample.
+_C.DALI_FRAME = 8
 
 # The name of the current task; e.g. "ssl"/"sl" for (self)supervised learning
 _C.TASK = ""

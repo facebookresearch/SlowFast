@@ -5,13 +5,7 @@ cd $WORK_SPACE
 # cd "$HOME/dataset/"
 echo $PWD
 
-# variables for config
-DATASET_PATH=/data/hong/k400/reduced
-BATCH_SIZE=16
-NUM_WORKERS=10
 
-python tools/run_net.py \
-    --cfg configs/contrastive_ssl/BYOL_SlowR50_8x8.yaml \
-	DATA.PATH_TO_DATA_DIR $DATASET_PATH \
+python tools/run_net.py --cfg configs/contrastive_ssl/custom_BYOL_SlowR50_8x8.yaml
 
 # check another metrics for this such as epochs, num_workers, batch_size, and learning_rate.

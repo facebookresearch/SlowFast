@@ -15,7 +15,10 @@ from torch.utils.data.sampler import RandomSampler, Sampler
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 
 from . import utils as utils
+from . import custom_dali as dali
 from .build import build_dataset
+
+# dali dataloader is here
 
 
 def multiple_samples_collate(batch, fold=False):
@@ -67,17 +70,13 @@ def detection_collate(batch):
         if key == "boxes" or key == "ori_boxes":
             # Append idx info to the bboxes before concatenating them.
             bboxes = [
-                np.concatenate(
-                    [np.full((data[i].shape[0], 1), float(i)), data[i]], axis=1
-                )
+                np.concatenate([np.full((data[i].shape[0], 1), float(i)), data[i]], axis=1)
                 for i in range(len(data))
             ]
             bboxes = np.concatenate(bboxes, axis=0)
             collated_extra_data[key] = torch.tensor(bboxes).float()
         elif key == "metadata":
-            collated_extra_data[key] = torch.tensor(
-                list(itertools.chain(*data))
-            ).view(-1, 2)
+            collated_extra_data[key] = torch.tensor(list(itertools.chain(*data))).view(-1, 2)
         else:
             collated_extra_data[key] = default_collate(data)
 
@@ -93,7 +92,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
         split (str): the split of the data loader. Options include `train`,
             `val`, and `test`.
     """
-    assert split in ["train", "val", "test"]
+    assert split in ["train", "val", "test", "memcheck", "dali"]
     if split in ["train"]:
         dataset_name = cfg.TRAIN.DATASET
         batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
@@ -109,6 +108,23 @@ def construct_loader(cfg, split, is_precise_bn=False):
         batch_size = int(cfg.TEST.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = False
         drop_last = False
+    elif split in ["memcheck"]:
+        split = "test"
+        dataset_name = cfg.MEMCHECK.DATASET
+        batch_size = int(cfg.MEMCHECK.BATCH_SIZE / max(1, cfg.NUM_GPUS))
+        shuffle = False
+        drop_last = False
+    elif split in ["dali"]:
+        dataset_name = cfg.MEMCHECK.DATASET
+        batch_size = int(cfg.MEMCHECK.BATCH_SIZE / max(1, cfg.NUM_GPUS))
+        shuffle = False
+        drop_last = False
+
+    # When cfg.DALI_ENABLE is True, loader should be the dali pipelined loader
+    if cfg.DALI_ENABLE:
+        frames = 8
+        loader = dali.DALILoader(batch_size, cfg.DALI_FILE, frames, cfg.DATA.TRAIN_CROP_SIZE)
+        return loader
 
     # Construct the dataset
     dataset = build_dataset(dataset_name, cfg, split)
@@ -124,11 +140,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
             worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
     else:
-        if (
-            cfg.MULTIGRID.SHORT_CYCLE
-            and split in ["train"]
-            and not is_precise_bn
-        ):
+        if cfg.MULTIGRID.SHORT_CYCLE and split in ["train"] and not is_precise_bn:
             # Create a sampler for multi-process training
             sampler = utils.create_sampler(dataset, shuffle, cfg)
             batch_sampler = ShortCycleBatchSampler(
@@ -157,9 +169,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
                 and split in ["train"]
                 and not cfg.MODEL.MODEL_NAME == "ContrastiveModel"
             ):
-                collate_func = partial(
-                    multiple_samples_collate, fold="imagenet" in dataset_name
-                )
+                collate_func = partial(multiple_samples_collate, fold="imagenet" in dataset_name)
             else:
                 collate_func = None
             loader = torch.utils.data.DataLoader(
@@ -183,16 +193,11 @@ def shuffle_dataset(loader, cur_epoch):
         loader (loader): data loader to perform shuffle.
         cur_epoch (int): number of the current epoch.
     """
-    if (
-        loader._dataset_kind
-        == torch.utils.data.dataloader._DatasetKind.Iterable
-    ):
+    if loader._dataset_kind == torch.utils.data.dataloader._DatasetKind.Iterable:
         if hasattr(loader.dataset, "sampler"):
             sampler = loader.dataset.sampler
         else:
-            raise RuntimeError(
-                "Unknown sampler for IterableDataset when shuffling dataset"
-            )
+            raise RuntimeError("Unknown sampler for IterableDataset when shuffling dataset")
     else:
         sampler = (
             loader.batch_sampler.sampler

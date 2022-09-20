@@ -9,6 +9,9 @@ from slowfast.utils.parser import load_config, parse_args
 from demo_net import demo
 from test_net import test
 from train_net import train
+
+# from memchecker import test
+from memchecker import memcheck
 from visualization import visualize
 
 
@@ -21,6 +24,9 @@ def main():
     for path_to_config in args.cfg_files:
         cfg = load_config(args, path_to_config)
         cfg = assert_and_infer_cfg(cfg)
+
+        if cfg.MEMCHECK.ENABLE:
+            launch_job(cfg=cfg, init_method=args.init_method, func=memcheck)
 
         # Perform training.
         if cfg.TRAIN.ENABLE:
