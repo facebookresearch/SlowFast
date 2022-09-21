@@ -28,6 +28,7 @@ CONTRASTIVE:
   BN_MLP: True
   BN_SYNC_MLP: True
   MLP_DIM: 4096
+  # SEQUENTIAL: False  # def fault
   SEQUENTIAL: True  # def fault
   MOMENTUM: 0.996 # default 0.5
   MOMENTUM_ANNEALING: True # default false

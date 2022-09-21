@@ -92,7 +92,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
         split (str): the split of the data loader. Options include `train`,
             `val`, and `test`.
     """
-    assert split in ["train", "val", "test", "memcheck", "dali"]
+    assert split in ["train", "val", "test", "memcheck"]
     if split in ["train"]:
         dataset_name = cfg.TRAIN.DATASET
         batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
@@ -110,11 +110,6 @@ def construct_loader(cfg, split, is_precise_bn=False):
         drop_last = False
     elif split in ["memcheck"]:
         split = "test"
-        dataset_name = cfg.MEMCHECK.DATASET
-        batch_size = int(cfg.MEMCHECK.BATCH_SIZE / max(1, cfg.NUM_GPUS))
-        shuffle = False
-        drop_last = False
-    elif split in ["dali"]:
         dataset_name = cfg.MEMCHECK.DATASET
         batch_size = int(cfg.MEMCHECK.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = False

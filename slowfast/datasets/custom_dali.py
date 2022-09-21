@@ -78,6 +78,9 @@ class DALILoader:
             auto_reset=True,
         )
 
+        # ["data", "label", "frame_num", "crop_pos_x", "crop_pos_y"],
+        # ["data", "labels", "index", "time", "meta"]
+
     def __len__(self):
         return int(self.epoch_size)
 
@@ -88,5 +91,20 @@ class DALILoader:
         return self.dali_iterator.__next__()
 
 
-# output format of dataloader
+# 1. Output format of dataloader
 # => for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
+
+# 2. Usage of daliloader
+"""
+loader = DALILoader(args.batchsize, args.file_list, args.frames, args.crop_size)
+    batches = len(loader)
+
+    for batch in loader:
+        print(batch[0]["data"].shape)
+        # print(batch[0]["label"])
+        # print(batch[0]["frame_num"])
+        # print(batch[0]["crop_pos_x"])
+        # print(batch[0]["crop_pos_y"])
+        # print
+    # batch = next(loader)
+"""
