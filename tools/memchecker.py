@@ -34,35 +34,70 @@ def perform_check(mcheck_loader, cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
-    for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
-        if cur_iter > 50:
-            logger.info(f"cur_iter is over 50, iteration will be terminated.")
-            break
-        # Transfer the data to the current GPU device.
-        if cfg.NUM_GPUS:
-            if isinstance(inputs, (list,)):
-                for i in range(len(inputs)):
-                    if isinstance(inputs[i], (list,)):
-                        for j in range(len(inputs[i])):
-                            inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
-                    else:
-                        inputs[i] = inputs[i].cuda(non_blocking=True)
-            else:
-                inputs = inputs.cuda(non_blocking=True)
-            if not isinstance(labels, list):
-                labels = labels.cuda(non_blocking=True)
-                index = index.cuda(non_blocking=True)
-                time = time.cuda(non_blocking=True)
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+    # DALI case
+    if cfg.DALI_ENABLE:
+        print("DALI iteration is running")
+        for cur_iter, batch in enumerate(mcheck_loader):
+
+            if cur_iter > 50:
+                logger.info(f"cur_iter is over 50, iteration will be terminated.")
+                break
+            # Transfer the data to the current GPU device.
+            if cfg.NUM_GPUS:
+                batch_size = batch[0]["data"].size(0)
+                inputs = [batch[0]["data"]]
+                # inputs = [[batch[0]["data1"]], [batch[0]["data2"]]]
+                labels = batch[0]["label"].squeeze(dim=-1)
+                # dummy index, this is same as "index = torch.ones(batch_size)"
+                index = batch[0]["index"].squeeze(dim=-1)
+                # dummy time data
+                cur_zero = torch.zeros(cfg.MEMCHECK.BATCH_SIZE, 1).to("cuda")
+                time_temp = batch[0]["timestamp"].squeeze(dim=-1)
+                time_temp = torch.cat([time_temp, cur_zero], dim=1)
+                time_that = time_temp[:, [0, 7, 8]]
+                time = time_that.unsqueeze(1)
+                time = torch.cat([time, time], dim=1)
+                meta = None
+
+                if cur_iter % 10 == 0:
+                    print(len(inputs))
+                    # print(inputs[0][0].shape)
+                    print(labels.shape)
+                    print(index.shape)
+                    print(time.shape)
+
+    else:
+        for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
+            if cur_iter > 50:
+                logger.info(f"cur_iter is over 50, iteration will be terminated.")
+                break
+            # Transfer the data to the current GPU device.
+            if cfg.NUM_GPUS:
+                if isinstance(inputs, (list,)):
+                    for i in range(len(inputs)):
+                        if isinstance(inputs[i], (list,)):
+                            for j in range(len(inputs[i])):
+                                inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
+                        else:
+                            inputs[i] = inputs[i].cuda(non_blocking=True)
                 else:
-                    meta[key] = val.cuda(non_blocking=True)
-            if cur_iter % 10 == 0:
-                print(
-                    f"{cur_iter} Memory Usage GPU: {misc.gpu_mem_usage()}, CPU: {misc.cpu_mem_usage()[0]}"
-                )
+                    inputs = inputs.cuda(non_blocking=True)
+                if not isinstance(labels, list):
+                    labels = labels.cuda(non_blocking=True)
+                    index = index.cuda(non_blocking=True)
+                    time = time.cuda(non_blocking=True)
+                for key, val in meta.items():
+                    if isinstance(val, (list,)):
+                        for i in range(len(val)):
+                            val[i] = val[i].cuda(non_blocking=True)
+                    else:
+                        meta[key] = val.cuda(non_blocking=True)
+                if cur_iter % 10 == 0:
+                    print(len(inputs))
+                    # print(inputs[0][0].shape)
+                    print(labels.shape)
+                    print(index.shape)
+                    print(time.shape)
     return "done"
 
 

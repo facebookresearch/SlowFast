@@ -117,8 +117,11 @@ def construct_loader(cfg, split, is_precise_bn=False):
 
     # When cfg.DALI_ENABLE is True, loader should be the dali pipelined loader
     if cfg.DALI_ENABLE:
+        assert cfg.NUM_GPUS <= 1, "DALI enabled when num_GPUs > 1"
+        print(split)
         frames = 8
-        loader = dali.DALILoader(batch_size, cfg.DALI_FILE, frames, cfg.DATA.TRAIN_CROP_SIZE)
+        crop_size = [cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE]
+        loader = dali.DALILoader(batch_size, cfg.DALI_FILE, frames, crop_size, split)
         return loader
 
     # Construct the dataset
