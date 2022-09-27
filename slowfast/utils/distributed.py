@@ -15,9 +15,12 @@ from pytorchvideo.layers.distributed import (  # noqa
     get_local_rank,
     get_local_size,
     get_world_size,
-    init_distributed_training,
+    init_distributed_training as _init_distributed_training,
 )
 
+
+def init_distributed_training(cfg):
+    return _init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
 
 def all_gather(tensors):
     """
