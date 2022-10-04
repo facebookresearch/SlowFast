@@ -3,6 +3,7 @@
 *.qdrep
 memory_log/
 log/
+local_files/
 
 __pycache__/
 *.py[cod]

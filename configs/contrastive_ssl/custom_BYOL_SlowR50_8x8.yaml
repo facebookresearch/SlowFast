@@ -12,7 +12,7 @@ TRAIN:
   CHECKPOINT_ENABLE: False
   CHECKPOINT_PERIOD: 20
   AUTO_RESUME: True
-  BATCH_SIZE: 16
+  BATCH_SIZE: 4
 MODEL:
   NUM_CLASSES: 256
   MODEL_NAME: ContrastiveModel
@@ -37,7 +37,7 @@ CONTRASTIVE:
   # KNN_ON: False
 DATA:
   PATH_TO_DATA_DIR: "/home/hong/slowfast/index_files"
-  DUMMY_LOAD: False
+  DUMMY_LOAD: True
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
   # NUM_FRAMES: 16 # dont forget to change these parameters in linear & finetuning configs
@@ -52,8 +52,8 @@ DATA:
   SSL_COLOR_HUE: 0.15
   SSL_COLOR_BRI_CON_SAT: [0.6, 0.6, 0.6] # default [0.4, 0.4, 0.4]
   TRAIN_JITTER_SCALES: [256, 320]
-  TRAIN_CROP_SIZE: 96
-  TEST_CROP_SIZE: 96
+  TRAIN_CROP_SIZE: 224
+  TEST_CROP_SIZE: 224
   INPUT_CHANNEL_NUM: [3]
   PATH_LABEL_SEPARATOR: " "
 BN:
@@ -78,7 +78,7 @@ SOLVER:
 TEST:
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 64
+  BATCH_SIZE: 128
 DATA_LOADER:
   NUM_WORKERS: 24
   PIN_MEMORY: True

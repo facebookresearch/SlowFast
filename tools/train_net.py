@@ -274,7 +274,7 @@ def train_epoch(
     else:
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
-            # print(f"'train_epoch inputs length: {len(inputs)}")
+            print(f"cur_iter {cur_iter}")
             if cfg.NUM_GPUS:
                 if isinstance(inputs, (list,)):
                     for i in range(len(inputs)):
@@ -295,7 +295,7 @@ def train_epoch(
                             val[i] = val[i].cuda(non_blocking=True)
                     else:
                         meta[key] = val.cuda(non_blocking=True)
-            print(len(inputs), len(inputs[0]), len(inputs[0][0]))
+            
 
             batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
             # Update the learning rate.
@@ -308,6 +308,7 @@ def train_epoch(
                 samples, labels = mixup_fn(inputs[0], labels)
                 inputs[0] = samples
 
+            print(len(inputs), len(inputs[0]), len(inputs[0][0]))
             with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
 
                 # Explicitly declare reduction to mean.
@@ -432,7 +433,7 @@ def train_epoch(
                         top1_err.item(),
                         top5_err.item(),
                     )
-
+                
                 # Update and log stats.
                 train_meter.update_stats(
                     top1_err,

@@ -138,7 +138,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     else:
 
         for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
-
+            # logger.info(f"cur_iter: {cur_iter}")
             if cfg.NUM_GPUS:
                 # Transfer the data to the current GPU device.
                 if isinstance(inputs, (list,)):
