@@ -27,6 +27,8 @@ from slowfast.models.contrastive import (
 from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 
+import nvtx
+
 logger = logging.get_logger(__name__)
 
 
@@ -38,6 +40,7 @@ def train_epoch(
     train_meter,
     cur_epoch,
     cfg,
+    idx_dict,
     writer=None,
 ):
     """
@@ -73,6 +76,8 @@ def train_epoch(
         misc.frozen_bn_stats(model)
     # Explicitly declare reduction to mean.
     loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)(reduction="mean")
+
+    import time as TT
 
     if cfg.DALI_ENABLE:
         print("DALI loader for training")
@@ -272,9 +277,41 @@ def train_epoch(
             train_meter.iter_tic()
 
     else:
+        stimer = TT.time()
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
-            print(f"cur_iter {cur_iter}")
+            print(len(inputs), inputs[0][0].shape)
+            etimer = TT.time()
+            print(etimer-stimer)
+            stimer = etimer
+            # for k, u_idx in enumerate(index.tolist()):
+            #     # time(pts) info sample
+            #     for u_start_n_end in time[k]:
+            #         start_pts, end_pts, delta = u_start_n_end
+            #         key_pts = start_pts
+
+            #         if u_idx in idx_dict:
+            #             if key_pts in idx_dict[u_idx]:
+            #                 idx_dict[u_idx][key_pts] += 1
+            #             else:
+            #                 idx_dict[u_idx][key_pts] = 1
+            #         else:
+            #             idx_dict[u_idx] = {key_pts: 1}
+            #         # change here
+            # # if cur_iter % 50 == 0:
+            # #     print(f"idx_dict len: {len(idx_dict)}")
+            # #     for idx_key in idx_dict:
+            # #         if len(idx_dict[idx_key]) > 2:
+            # #             print(idx_dict[idx_key])
+            # #         for pts_key in idx_dict[idx_key]:
+            # #             if idx_dict[idx_key][pts_key] > 1:
+            # #                 print(f"----------> redudant")
+
+            # # print(f" {time.shape} {time[0][0]} {time[1][0]} {time[2][0]} {time[3][0]} ")
+            # # print(f" {time.shape} {time[0][1]} {time[1][1]} {time[2][1]} {time[3][1]} ")
+            # # mydict[index]
+            # my_flag = 0
+
             if cfg.NUM_GPUS:
                 if isinstance(inputs, (list,)):
                     for i in range(len(inputs)):
@@ -296,6 +333,7 @@ def train_epoch(
                     else:
                         meta[key] = val.cuda(non_blocking=True)
             
+            continue
 
             batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
             # Update the learning rate.
@@ -308,30 +346,27 @@ def train_epoch(
                 samples, labels = mixup_fn(inputs[0], labels)
                 inputs[0] = samples
 
-            print(len(inputs), len(inputs[0]), len(inputs[0][0]))
             with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
 
                 # Explicitly declare reduction to mean.
-                perform_backward = True
-                optimizer.zero_grad()
+                with nvtx.annotate("train"):
+                    perform_backward = True
+                    optimizer.zero_grad()
 
-                if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                    (
-                        model,
-                        preds,
-                        partial_loss,
-                        perform_backward,
-                    ) = contrastive_forward(model, cfg, inputs, index, time, epoch_exact, scaler)
-                elif cfg.DETECTION.ENABLE:
-                    # Compute the predictions.
-                    preds = model(inputs, meta["boxes"])
-                elif cfg.MASK.ENABLE:
-                    preds, labels = model(inputs)
-                else:
-                    preds = model(inputs)
+                    if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
+                        (model, preds, partial_loss, perform_backward,) = contrastive_forward(
+                            model, cfg, inputs, index, time, epoch_exact, scaler
+                        )
+                    elif cfg.DETECTION.ENABLE:
+                        # Compute the predictions.
+                        preds = model(inputs, meta["boxes"])
+                    elif cfg.MASK.ENABLE:
+                        preds, labels = model(inputs)
+                    else:
+                        preds = model(inputs)
                 if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                     labels = torch.zeros(preds.size(0), dtype=labels.dtype, device=labels.device)
-
+                # with nvtx.annotate("loss"):
                 if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                     loss = partial_loss
                 else:
@@ -433,7 +468,7 @@ def train_epoch(
                         top1_err.item(),
                         top5_err.item(),
                     )
-                
+
                 # Update and log stats.
                 train_meter.update_stats(
                     top1_err,
@@ -458,8 +493,13 @@ def train_epoch(
                         },
                         global_step=data_size * cur_epoch + cur_iter,
                     )
+
+            etime = TT.time()
+            print(etime - stimer)
+            stimer = etime
+
             train_meter.iter_toc()  # do measure allreduce for this meter
-            train_meter.log_iter_stats(cur_epoch, cur_iter)
+            # train_meter.log_iter_stats(cur_epoch, cur_iter)
             torch.cuda.synchronize()
             train_meter.iter_tic()
 
@@ -469,7 +509,7 @@ def train_epoch(
     torch.cuda.empty_cache()
 
     # Log epoch stats.
-    train_meter.log_epoch_stats(cur_epoch)
+    # train_meter.log_epoch_stats(cur_epoch)
     train_meter.reset()
 
 
@@ -761,7 +801,7 @@ def train(cfg):
         start_epoch = checkpoint_epoch + 1
     else:
         start_epoch = 0
-
+    start_epoch = 0
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
     val_loader = loader.construct_loader(cfg, "val")
@@ -795,6 +835,7 @@ def train(cfg):
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
     epoch_timer = EpochTimer()
+    idx_dict = {}
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
 
         if cur_epoch > 0 and cfg.DATA.LOADER_CHUNK_SIZE > 0:
@@ -836,6 +877,7 @@ def train(cfg):
                 train_loader.dataset._set_epoch_num(cur_epoch)
         # Train for one epoch.
         epoch_timer.epoch_tic()
+        hit_cnt = 0
         train_epoch(
             train_loader,
             model,
@@ -844,8 +886,19 @@ def train(cfg):
             train_meter,
             cur_epoch,
             cfg,
+            idx_dict,
             writer,
         )
+
+        # # print dictionary information
+        # print(f"idx_dict len: {len(idx_dict)}")
+        # for idx_key in idx_dict:
+        #     if len(idx_dict[idx_key]) > 2:
+        #         print(len(idx_dict[idx_key]))
+        #     for pts_key in idx_dict[idx_key]:
+        #         if idx_dict[idx_key][pts_key] > 1:
+        #             print(f"----------> redudant")
+
         epoch_timer.epoch_toc()
         logger.info(
             f"Epoch {cur_epoch} takes {epoch_timer.last_epoch_time():.2f}s. Epochs "

@@ -5,14 +5,14 @@ MEMCHECK:
   BATCH_SIZE: 8
   ONLY_FIRST_50: True
 TRAIN:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
   EVAL_ENABLE: False
   EVAL_PERIOD: 10
   CHECKPOINT_ENABLE: False
   CHECKPOINT_PERIOD: 20
   AUTO_RESUME: True
-  BATCH_SIZE: 4
+  BATCH_SIZE: 64
 MODEL:
   NUM_CLASSES: 256
   MODEL_NAME: ContrastiveModel
@@ -37,7 +37,7 @@ CONTRASTIVE:
   # KNN_ON: False
 DATA:
   PATH_TO_DATA_DIR: "/home/hong/slowfast/index_files"
-  DUMMY_LOAD: True
+  DUMMY_LOAD: False
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
   # NUM_FRAMES: 16 # dont forget to change these parameters in linear & finetuning configs
@@ -52,8 +52,8 @@ DATA:
   SSL_COLOR_HUE: 0.15
   SSL_COLOR_BRI_CON_SAT: [0.6, 0.6, 0.6] # default [0.4, 0.4, 0.4]
   TRAIN_JITTER_SCALES: [256, 320]
-  TRAIN_CROP_SIZE: 224
-  TEST_CROP_SIZE: 224
+  TRAIN_CROP_SIZE: 96
+  TEST_CROP_SIZE: 96
   INPUT_CHANNEL_NUM: [3]
   PATH_LABEL_SEPARATOR: " "
 BN:
@@ -76,9 +76,9 @@ SOLVER:
   WARMUP_START_LR: 0.001
   OPTIMIZING_METHOD: sgd
 TEST:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
-  BATCH_SIZE: 128
+  BATCH_SIZE: 16
 DATA_LOADER:
   NUM_WORKERS: 24
   PIN_MEMORY: True
@@ -89,3 +89,4 @@ OUTPUT_DIR: .
 DALI_ENABLE: False
 # DALI_FILE: "/home/hong/slowfast/index_files/dali/bigone.txt"
 DALI_FILE: "/home/hong/slowfast/index_files/dali/test.txt"
+LOG_PERIOD: 100
