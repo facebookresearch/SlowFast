@@ -324,6 +324,8 @@ class Kinetics(torch.utils.data.Dataset):
             )
             frames_decoded = frames
             time_idx_decoded = time_idx
+            # print(time_idx_decoded)
+            # print(frames_decoded[0].shape, len(time_idx_decoded))
 
             # If decoding failed (wrong format, video is too short, and etc),
             # select another video.
@@ -333,9 +335,11 @@ class Kinetics(torch.utils.data.Dataset):
                         index, self._path_to_videos[index], i_try
                     )
                 )
-                if self.mode not in ["test"] and (i_try % (self._num_retries // 8)) == 0:
-                    # let's try another one
-                    index = random.randint(0, len(self._path_to_videos) - 1)
+                print(f"num_retries: {self._num_retries}")
+                index = random.randint(0, len(self._path_to_videos) - 1)
+                # if self.mode not in ["test"] and (i_try % (self._num_retries // 8)) == 0:
+                #     # let's try another one
+                #     index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
 
             num_aug = (

@@ -133,11 +133,16 @@ class ContrastiveModel(nn.Module):
     @torch.no_grad()
     def init_knn_labels(self, train_loader):
         logger.info("initializing knn labels")
-        # self.num_imgs = len(train_loader.dataset._labels)
-        self.num_imgs = 2282
+        # conment out under 1 line when dali feature is enabled(use 2282 for test dataset)
+        self.num_imgs = len(train_loader.dataset._labels)
+        # self.num_imgs = 2282
+
         self.train_labels = np.zeros((self.num_imgs,), dtype=np.int32)
-        # for i in range(self.num_imgs):
-        #     self.train_labels[i] = train_loader.dataset._labels[i]
+
+        # comment out under 2 lines when dali feature is enabled
+        for i in range(self.num_imgs):
+            self.train_labels[i] = train_loader.dataset._labels[i]
+
         self.train_labels = torch.LongTensor(self.train_labels).cuda()
         if self.length != self.num_imgs:
             logger.error(
