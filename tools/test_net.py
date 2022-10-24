@@ -48,96 +48,12 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     test_meter.iter_tic()
 
     if cfg.DALI_ENABLE:
-        print("DALI iteration is running")
-        for cur_iter, batch in enumerate(test_loader):
-
-            if cur_iter > 50:
-                logger.info(f"cur_iter is over 50, iteration will be terminated.")
-                break
-            # Transfer the data to the current GPU device.
-            if cfg.NUM_GPUS:
-                batch_size = batch[0]["data"].size(0)
-                inputs = [batch[0]["data"]]
-                # inputs = [[batch[0]["data1"]], [batch[0]["data2"]]]
-                labels = batch[0]["label"].squeeze(dim=-1)
-                # dummy index, this is same as "index = torch.ones(batch_size)"
-                video_idx = batch[0]["index"].squeeze(dim=-1)
-                # dummy time data
-                cur_zero = torch.zeros(cfg.TEST.BATCH_SIZE, 1).to("cuda")
-                time_temp = batch[0]["timestamp"].squeeze(dim=-1)
-                time_temp = torch.cat([time_temp, cur_zero], dim=1)
-                time_that = time_temp[:, [0, 7, 8]]
-                time = time_that.unsqueeze(1)
-                time = torch.cat([time, time], dim=1)
-                meta = None
-
-            test_meter.data_toc()
-
-            if cfg.DETECTION.ENABLE:
-                # Compute the predictions.
-                preds = model(inputs, meta["boxes"])
-                ori_boxes = meta["ori_boxes"]
-                metadata = meta["metadata"]
-
-                preds = preds.detach().cpu() if cfg.NUM_GPUS else preds.detach()
-                ori_boxes = ori_boxes.detach().cpu() if cfg.NUM_GPUS else ori_boxes.detach()
-                metadata = metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
-
-                if cfg.NUM_GPUS > 1:
-                    preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
-                    ori_boxes = torch.cat(du.all_gather_unaligned(ori_boxes), dim=0)
-                    metadata = torch.cat(du.all_gather_unaligned(metadata), dim=0)
-
-                test_meter.iter_toc()
-                # Update and log stats.
-                test_meter.update_stats(preds, ori_boxes, metadata)
-                test_meter.log_iter_stats(None, cur_iter)
-            elif cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                if not cfg.CONTRASTIVE.KNN_ON:
-                    test_meter.finalize_metrics()
-                    return test_meter
-                # preds = model(inputs, video_idx, time)
-                train_labels = (
-                    model.module.train_labels if hasattr(model, "module") else model.train_labels
-                )
-                with nvtx.annotate("run"):
-                    yd, yi = model(inputs, video_idx, time)
-                batchSize = yi.shape[0]
-                K = yi.shape[1]
-                C = cfg.CONTRASTIVE.NUM_CLASSES_DOWNSTREAM  # eg 400 for Kinetics400
-                candidates = train_labels.view(1, -1).expand(batchSize, -1)
-                retrieval = torch.gather(candidates, 1, yi)
-                retrieval_one_hot = torch.zeros((batchSize * K, C)).cuda()
-                retrieval_one_hot.scatter_(1, retrieval.view(-1, 1), 1)
-                yd_transform = yd.clone().div_(cfg.CONTRASTIVE.T).exp_()
-                probs = torch.mul(
-                    retrieval_one_hot.view(batchSize, -1, C),
-                    yd_transform.view(batchSize, -1, 1),
-                )
-                preds = torch.sum(probs, 1)
-            else:
-                # Perform the forward pass.
-                preds = model(inputs)
-            # Gather all the predictions across all the devices to perform ensemble.
-            if cfg.NUM_GPUS > 1:
-                preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
-            if cfg.NUM_GPUS:
-                preds = preds.cpu()
-                labels = labels.cpu()
-                video_idx = video_idx.cpu()
-
-            test_meter.iter_toc()
-
-            if not cfg.VIS_MASK.ENABLE:
-                # Update and log stats.
-                test_meter.update_stats(preds.detach(), labels.detach(), video_idx.detach())
-            test_meter.log_iter_stats(cur_iter)
-
-            test_meter.iter_tic()
+        print("DALI iteration is running -> EXIT")
+        return
 
     else:
-    # working position
-    # 
+        # working position
+        #
 
         for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
             # logger.info(f"cur_iter: {cur_iter}")

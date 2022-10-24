@@ -15,7 +15,8 @@ from torch.utils.data.sampler import RandomSampler, Sampler
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 
 from . import utils as utils
-from . import custom_dali as dali
+
+# from . import custom_dali as dali
 from .build import build_dataset
 
 # dali dataloader is here
@@ -119,10 +120,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
     if cfg.DALI_ENABLE:
         assert cfg.NUM_GPUS <= 1, "DALI enabled when num_GPUs > 1"
         print(split)
-        frames = 8
-        crop_size = [cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE]
-        loader = dali.DALILoader(batch_size, cfg.DALI_FILE, frames, crop_size, split)
-        return loader
+        return
 
     # Construct the dataset
     dataset = build_dataset(dataset_name, cfg, split)
