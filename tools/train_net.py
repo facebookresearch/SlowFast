@@ -87,6 +87,8 @@ def train_epoch(
         stimer = TT.time()
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
+            if cur_iter > 10:
+                break
             print(len(inputs), inputs[0][0].shape)
             etimer = TT.time()
             print(etimer - stimer)

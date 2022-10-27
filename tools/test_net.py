@@ -74,8 +74,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                             val[i] = val[i].cuda(non_blocking=True)
                     else:
                         meta[key] = val.cuda(non_blocking=True)
-            test_meter.data_toc()
+            # test_meter.data_toc()
 
+            continue
             if cfg.DETECTION.ENABLE:
                 # Compute the predictions.
                 preds = model(inputs, meta["boxes"])
@@ -175,7 +176,7 @@ def test(cfg):
             slowfast/config/defaults.py
     """
     # Set up environment.
-    du.init_distributed_training(cfg)
+    du.init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
