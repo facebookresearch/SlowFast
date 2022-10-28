@@ -133,7 +133,7 @@ class ContrastiveModel(nn.Module):
     @torch.no_grad()
     def init_knn_labels(self, train_loader):
         logger.info("initializing knn labels")
-        # conment out under 1 line when dali feature is enabled(use 2282 for test dataset)
+        # comment out under 1 line when dali feature is enabled(use 2282 for test dataset)
         self.num_imgs = len(train_loader.dataset._labels)
         # self.num_imgs = 2282
 

@@ -80,209 +80,18 @@ def train_epoch(
     import time as TT
 
     if cfg.DALI_ENABLE:
-        print("DALI loader for training")
-        for cur_iter, batch in enumerate(train_loader):
-            if cur_iter > 50:
-                logger.info(f"cur_iter is over 50, iteration will be terminated.")
-                break
-            # Transfer the data to the current GPU device. It is done by dali automatically.
-            if cfg.NUM_GPUS:
-                batch_size = batch[0]["data1"].size(0)
-                inputs = [[batch[0]["data1"]], [batch[0]["data2"]]]
-                labels = batch[0]["label"].squeeze(dim=-1)
-                # dummy index, this is same as "index = torch.ones(batch_size)"
-                index = batch[0]["index"].squeeze(dim=-1)
-                # dummy time data
-                cur_zero = torch.zeros(cfg.TRAIN.BATCH_SIZE, 1).to("cuda")
-                time_temp = batch[0]["timestamp"].squeeze(dim=-1)
-                time_temp = torch.cat([time_temp, cur_zero], dim=1)
-                time_that = time_temp[:, [0, 7, 8]]
-                time = time_that.unsqueeze(1)
-                time = torch.cat([time, time], dim=1)
-                meta = None
-
-            if isinstance(inputs, (list,)):
-                for i in range(len(inputs)):
-                    if isinstance(inputs[i], (list,)):
-                        for j in range(len(inputs[i])):
-                            inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
-                    else:
-                        inputs[i] = inputs[i].cuda(non_blocking=True)
-            else:
-                inputs = inputs.cuda(non_blocking=True)
-
-            print(len(inputs), len(inputs[0]), len(inputs[0][0]))
-            # Update the learning rate.
-            epoch_exact = cur_epoch + float(cur_iter) / data_size
-            lr = optim.get_epoch_lr(epoch_exact, cfg)
-            optim.set_lr(optimizer, lr)
-
-            train_meter.data_toc()
-            if cfg.MIXUP.ENABLE:
-                samples, labels = mixup_fn(inputs[0], labels)
-                inputs[0] = samples
-
-            # below process shows how the
-            with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-                # Explicitly declare reduction to mean.
-                perform_backward = True
-                optimizer.zero_grad()
-
-                if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                    (
-                        model,
-                        preds,
-                        partial_loss,
-                        perform_backward,
-                    ) = contrastive_forward(model, cfg, inputs, index, time, epoch_exact, scaler)
-                elif cfg.DETECTION.ENABLE:
-                    # Compute the predictions.
-                    preds = model(inputs, meta["boxes"])
-                elif cfg.MASK.ENABLE:
-                    preds, labels = model(inputs)
-                else:
-                    preds = model(inputs)
-                if cfg.TASK == "ssl" and cfg.MODEL.MODEL_NAME == "ContrastiveModel":
-                    labels = torch.zeros(preds.size(0), dtype=labels.dtype, device=labels.device)
-
-                if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
-                    loss = partial_loss
-                else:
-                    # Compute the loss.
-                    loss = loss_fun(preds, labels)
-
-            loss_extra = None
-            if isinstance(loss, (list, tuple)):
-                loss, loss_extra = loss
-
-            # check Nan Loss.
-            misc.check_nan_losses(loss)
-            if perform_backward:
-                scaler.scale(loss).backward()
-            # Unscales the gradients of optimizer's assigned params in-place
-            scaler.unscale_(optimizer)
-            # Clip gradients if necessary
-            if cfg.SOLVER.CLIP_GRAD_VAL:
-                grad_norm = torch.nn.utils.clip_grad_value_(
-                    model.parameters(), cfg.SOLVER.CLIP_GRAD_VAL
-                )
-            elif cfg.SOLVER.CLIP_GRAD_L2NORM:
-                grad_norm = torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), cfg.SOLVER.CLIP_GRAD_L2NORM
-                )
-            else:
-                grad_norm = optim.get_grad_norm_(model.parameters())
-            # Update the parameters. (defaults to True)
-            model, update_param = contrastive_parameter_surgery(model, cfg, epoch_exact, cur_iter)
-            if update_param:
-                scaler.step(optimizer)
-            scaler.update()
-
-            if cfg.MIXUP.ENABLE:
-                _top_max_k_vals, top_max_k_inds = torch.topk(
-                    labels, 2, dim=1, largest=True, sorted=True
-                )
-                idx_top1 = torch.arange(labels.shape[0]), top_max_k_inds[:, 0]
-                idx_top2 = torch.arange(labels.shape[0]), top_max_k_inds[:, 1]
-                preds = preds.detach()
-                preds[idx_top1] += preds[idx_top2]
-                preds[idx_top2] = 0.0
-                labels = top_max_k_inds[:, 0]
-
-            if cfg.DETECTION.ENABLE:
-                if cfg.NUM_GPUS > 1:
-                    loss = du.all_reduce([loss])[0]
-                loss = loss.item()
-
-                # Update and log stats.
-                train_meter.update_stats(None, None, None, loss, lr)
-                # write to tensorboard format if available.
-                if writer is not None:
-                    writer.add_scalars(
-                        {"Train/loss": loss, "Train/lr": lr},
-                        global_step=data_size * cur_epoch + cur_iter,
-                    )
-
-            else:
-                top1_err, top5_err = None, None
-                if cfg.DATA.MULTI_LABEL:
-                    # Gather all the predictions across all the devices.
-                    if cfg.NUM_GPUS > 1:
-                        loss, grad_norm = du.all_reduce([loss, grad_norm])
-                    loss, grad_norm = (
-                        loss.item(),
-                        grad_norm.item(),
-                    )
-                elif cfg.MASK.ENABLE:
-                    # Gather all the predictions across all the devices.
-                    if cfg.NUM_GPUS > 1:
-                        loss, grad_norm = du.all_reduce([loss, grad_norm])
-                        if loss_extra:
-                            loss_extra = du.all_reduce(loss_extra)
-                    loss, grad_norm, top1_err, top5_err = (
-                        loss.item(),
-                        grad_norm.item(),
-                        0.0,
-                        0.0,
-                    )
-                    if loss_extra:
-                        loss_extra = [one_loss.item() for one_loss in loss_extra]
-                else:
-                    # Compute the errors.
-                    num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
-                    top1_err, top5_err = [
-                        (1.0 - x / preds.size(0)) * 100.0 for x in num_topks_correct
-                    ]
-                    # Gather all the predictions across all the devices.
-                    if cfg.NUM_GPUS > 1:
-                        loss, grad_norm, top1_err, top5_err = du.all_reduce(
-                            [loss.detach(), grad_norm, top1_err, top5_err]
-                        )
-
-                    # Copy the stats from GPU to CPU (sync point).
-                    loss, grad_norm, top1_err, top5_err = (
-                        loss.item(),
-                        grad_norm.item(),
-                        top1_err.item(),
-                        top5_err.item(),
-                    )
-
-                # Update and log stats.
-                train_meter.update_stats(
-                    top1_err,
-                    top5_err,
-                    loss,
-                    lr,
-                    grad_norm,
-                    batch_size
-                    * max(
-                        cfg.NUM_GPUS, 1
-                    ),  # If running  on CPU (cfg.NUM_GPUS == 1), use 1 to represent 1 CPU.
-                    loss_extra,
-                )
-                # write to tensorboard format if available.
-                if writer is not None:
-                    writer.add_scalars(
-                        {
-                            "Train/loss": loss,
-                            "Train/lr": lr,
-                            "Train/Top1_err": top1_err,
-                            "Train/Top5_err": top5_err,
-                        },
-                        global_step=data_size * cur_epoch + cur_iter,
-                    )
-            train_meter.iter_toc()  # do measure allreduce for this meter
-            train_meter.log_iter_stats(cur_epoch, cur_iter)
-            torch.cuda.synchronize()
-            train_meter.iter_tic()
+        print("DALI loader for training -> EXIT")
+        return
 
     else:
         stimer = TT.time()
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
+            if cur_iter > 10:
+                break
             print(len(inputs), inputs[0][0].shape)
             etimer = TT.time()
-            print(etimer-stimer)
+            print(etimer - stimer)
             stimer = etimer
             # for k, u_idx in enumerate(index.tolist()):
             #     # time(pts) info sample
@@ -332,7 +141,7 @@ def train_epoch(
                             val[i] = val[i].cuda(non_blocking=True)
                     else:
                         meta[key] = val.cuda(non_blocking=True)
-            
+
             continue
 
             batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
@@ -727,7 +536,7 @@ def train(cfg):
             slowfast/config/defaults.py
     """
     # Set up environment.
-    du.init_distributed_training(cfg)
+    du.init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)

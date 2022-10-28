@@ -36,35 +36,8 @@ def perform_check(mcheck_loader, cfg):
     """
     # DALI case
     if cfg.DALI_ENABLE:
-        print("DALI iteration is running")
-        for cur_iter, batch in enumerate(mcheck_loader):
-
-            if cur_iter > 50:
-                logger.info(f"cur_iter is over 50, iteration will be terminated.")
-                break
-            # Transfer the data to the current GPU device.
-            if cfg.NUM_GPUS:
-                batch_size = batch[0]["data"].size(0)
-                inputs = [batch[0]["data"]]
-                # inputs = [[batch[0]["data1"]], [batch[0]["data2"]]]
-                labels = batch[0]["label"].squeeze(dim=-1)
-                # dummy index, this is same as "index = torch.ones(batch_size)"
-                index = batch[0]["index"].squeeze(dim=-1)
-                # dummy time data
-                cur_zero = torch.zeros(cfg.MEMCHECK.BATCH_SIZE, 1).to("cuda")
-                time_temp = batch[0]["timestamp"].squeeze(dim=-1)
-                time_temp = torch.cat([time_temp, cur_zero], dim=1)
-                time_that = time_temp[:, [0, 7, 8]]
-                time = time_that.unsqueeze(1)
-                time = torch.cat([time, time], dim=1)
-                meta = None
-
-                if cur_iter % 10 == 0:
-                    print(len(inputs))
-                    # print(inputs[0][0].shape)
-                    print(labels.shape)
-                    print(index.shape)
-                    print(time.shape)
+        print("DALI iteration is running -> EXIT")
+        return
 
     else:
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
