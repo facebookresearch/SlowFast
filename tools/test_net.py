@@ -57,6 +57,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
         for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
             # logger.info(f"cur_iter: {cur_iter}")
+           # if cur_iter > 100:
+                # break
             print(video_idx)
             if cfg.NUM_GPUS:
                 # Transfer the data to the current GPU device.
@@ -144,8 +146,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     import time
 
     test_meter.finalize_metrics()
-    time.sleep(10)
-    print("wait 10 sec")
+    time.sleep(3)
+    print("wait 3 sec")
     # Log epoch stats and print the final testing results.
     if not cfg.DETECTION.ENABLE:
         all_preds = test_meter.video_preds.clone().detach()

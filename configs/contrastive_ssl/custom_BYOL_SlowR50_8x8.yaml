@@ -5,7 +5,7 @@ MEMCHECK:
   BATCH_SIZE: 8
   ONLY_FIRST_50: True
 TRAIN:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
   EVAL_ENABLE: False
   EVAL_PERIOD: 10
@@ -14,11 +14,11 @@ TRAIN:
   AUTO_RESUME: True
   BATCH_SIZE: 32
 TEST:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
-  BATCH_SIZE: 16
+  BATCH_SIZE: 1
 DATA_LOADER:
-  NUM_WORKERS: 0
+  NUM_WORKERS: 12
   PIN_MEMORY: True
 MODEL:
   NUM_CLASSES: 256
@@ -76,7 +76,7 @@ SOLVER:
   LARS_ON: True
   BASE_LR_SCALE_NUM_SHARDS: True
   LR_POLICY: cosine
-  MAX_EPOCH: 1
+  MAX_EPOCH: 5
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-6
   WARMUP_EPOCHS: 35.0
@@ -86,6 +86,7 @@ SOLVER:
 NUM_GPUS: 1
 RNG_SEED: 0
 OUTPUT_DIR: .
+
 DALI_ENABLE: False
 # DALI_FILE: "/home/hong/slowfast/index_files/dali/bigone.txt"
 DALI_FILE: "/home/hong/slowfast/index_files/dali/test.txt"

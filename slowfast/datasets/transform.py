@@ -67,17 +67,13 @@ def random_short_side_scale_jitter(
             `num boxes` x 4.
     """
     if inverse_uniform_sampling:
-        size = int(
-            round(1.0 / np.random.uniform(1.0 / max_size, 1.0 / min_size))
-        )
+        size = int(round(1.0 / np.random.uniform(1.0 / max_size, 1.0 / min_size)))
     else:
         size = int(round(np.random.uniform(min_size, max_size)))
 
     height = images.shape[2]
     width = images.shape[3]
-    if (width <= height and width == size) or (
-        height <= width and height == size
-    ):
+    if (width <= height and width == size) or (height <= width and height == size):
         return images, boxes
     new_width = size
     new_height = size
@@ -145,13 +141,9 @@ def random_crop(images, size, boxes=None):
     x_offset = 0
     if width > size:
         x_offset = int(np.random.randint(0, width - size))
-    cropped = images[
-        :, :, y_offset : y_offset + size, x_offset : x_offset + size
-    ]
+    cropped = images[:, :, y_offset : y_offset + size, x_offset : x_offset + size]
 
-    cropped_boxes = (
-        crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
-    )
+    cropped_boxes = crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
 
     return cropped, cropped_boxes
 
@@ -243,12 +235,8 @@ def uniform_crop(images, size, spatial_idx, boxes=None, scale_size=None):
             x_offset = 0
         elif spatial_idx == 2:
             x_offset = width - size
-    cropped = images[
-        :, :, y_offset : y_offset + size, x_offset : x_offset + size
-    ]
-    cropped_boxes = (
-        crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
-    )
+    cropped = images[:, :, y_offset : y_offset + size, x_offset : x_offset + size]
+    cropped_boxes = crop_boxes(boxes, x_offset, y_offset) if boxes is not None else None
     if ndim == 3:
         cropped = cropped.squeeze(0)
     return cropped, cropped_boxes
@@ -267,12 +255,8 @@ def clip_boxes_to_image(boxes, height, width):
             `num boxes` x 4.
     """
     clipped_boxes = boxes.copy()
-    clipped_boxes[:, [0, 2]] = np.minimum(
-        width - 1.0, np.maximum(0.0, boxes[:, [0, 2]])
-    )
-    clipped_boxes[:, [1, 3]] = np.minimum(
-        height - 1.0, np.maximum(0.0, boxes[:, [1, 3]])
-    )
+    clipped_boxes[:, [0, 2]] = np.minimum(width - 1.0, np.maximum(0.0, boxes[:, [0, 2]]))
+    clipped_boxes[:, [1, 3]] = np.minimum(height - 1.0, np.maximum(0.0, boxes[:, [1, 3]]))
     return clipped_boxes
 
 
@@ -305,9 +289,7 @@ def grayscale(images):
     """
     # R -> 0.299, G -> 0.587, B -> 0.114.
     img_gray = torch.tensor(images)
-    gray_channel = (
-        0.299 * images[:, 2] + 0.587 * images[:, 1] + 0.114 * images[:, 0]
-    )
+    gray_channel = 0.299 * images[:, 2] + 0.587 * images[:, 1] + 0.114 * images[:, 0]
     img_gray[:, 0] = gray_channel
     img_gray[:, 1] = gray_channel
     img_gray[:, 2] = gray_channel
@@ -448,9 +430,7 @@ def lighting_jitter(images, alphastd, eigval, eigvec):
         elif len(images.shape) == 4:
             out_images[:, idx] = images[:, idx] + rgb[2 - idx]
         else:
-            raise NotImplementedError(
-                f"Unsupported dimension {len(images.shape)}"
-            )
+            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
 
     return out_images
 
@@ -469,19 +449,11 @@ def color_normalization(images, mean, stddev):
             `num frames` x `channel` x `height` x `width`.
     """
     if len(images.shape) == 3:
-        assert (
-            len(mean) == images.shape[0]
-        ), "channel mean not computed properly"
-        assert (
-            len(stddev) == images.shape[0]
-        ), "channel stddev not computed properly"
+        assert len(mean) == images.shape[0], "channel mean not computed properly"
+        assert len(stddev) == images.shape[0], "channel stddev not computed properly"
     elif len(images.shape) == 4:
-        assert (
-            len(mean) == images.shape[1]
-        ), "channel mean not computed properly"
-        assert (
-            len(stddev) == images.shape[1]
-        ), "channel stddev not computed properly"
+        assert len(mean) == images.shape[1], "channel mean not computed properly"
+        assert len(stddev) == images.shape[1], "channel stddev not computed properly"
     else:
         raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
 
@@ -493,9 +465,7 @@ def color_normalization(images, mean, stddev):
         elif len(images.shape) == 4:
             out_images[:, idx] = (images[:, idx] - mean[idx]) / stddev[idx]
         else:
-            raise NotImplementedError(
-                f"Unsupported dimension {len(images.shape)}"
-            )
+            raise NotImplementedError(f"Unsupported dimension {len(images.shape)}")
     return out_images
 
 
@@ -651,9 +621,7 @@ def create_random_augment(
         if interpolation and interpolation != "random":
             aa_params["interpolation"] = _pil_interp(interpolation)
         if auto_augment.startswith("rand"):
-            return transforms.Compose(
-                [rand_augment_transform(auto_augment, aa_params)]
-            )
+            return transforms.Compose([rand_augment_transform(auto_augment, aa_params)])
     raise NotImplementedError
 
 
@@ -667,9 +635,7 @@ def random_sized_crop_img(
     """
     Performs Inception-style cropping (used for training).
     """
-    assert (
-        len(im.shape) == 3
-    ), "Currently only support image for random_sized_crop"
+    assert len(im.shape) == 3, "Currently only support image for random_sized_crop"
     h, w = im.shape[1:3]
     i, j, h, w = _get_param_spatial_crop(
         scale=jitter_scale,
@@ -783,18 +749,12 @@ class RandomResizedCropAndInterpolation:
 
     def __repr__(self):
         if isinstance(self.interpolation, (tuple, list)):
-            interpolate_str = " ".join(
-                [_pil_interpolation_to_str[x] for x in self.interpolation]
-            )
+            interpolate_str = " ".join([_pil_interpolation_to_str[x] for x in self.interpolation])
         else:
             interpolate_str = _pil_interpolation_to_str[self.interpolation]
         format_string = self.__class__.__name__ + "(size={0}".format(self.size)
-        format_string += ", scale={0}".format(
-            tuple(round(s, 4) for s in self.scale)
-        )
-        format_string += ", ratio={0}".format(
-            tuple(round(r, 4) for r in self.ratio)
-        )
+        format_string += ", scale={0}".format(tuple(round(s, 4) for s in self.scale))
+        format_string += ", ratio={0}".format(tuple(round(r, 4) for r in self.ratio))
         format_string += ", interpolation={0})".format(interpolate_str)
         return format_string
 
@@ -831,9 +791,7 @@ class MaskingGenerator:
         self.num_masking_patches = num_masking_patches
 
         self.min_num_patches = min_num_patches
-        self.max_num_patches = (
-            num_masking_patches if max_num_patches is None else max_num_patches
-        )
+        self.max_num_patches = num_masking_patches if max_num_patches is None else max_num_patches
 
         max_aspect = max_aspect or 1 / min_aspect
         self.log_aspect_ratio = (math.log(min_aspect), math.log(max_aspect))
@@ -914,25 +872,20 @@ class MaskingGenerator3D:
         self.temporal, self.height, self.width = mask_window_size
         self.num_masking_patches = num_masking_patches
         self.min_num_patches = min_num_patches
-        self.max_num_patches = (
-            num_masking_patches if max_num_patches is None else max_num_patches
-        )
+        self.max_num_patches = num_masking_patches if max_num_patches is None else max_num_patches
         max_aspect = max_aspect or 1 / min_aspect
         self.log_aspect_ratio = (math.log(min_aspect), math.log(max_aspect))
 
     def __repr__(self):
-        repr_str = (
-            "Generator(%d, %d, %d -> [%d ~ %d], max = %d, %.3f ~ %.3f)"
-            % (
-                self.temporal,
-                self.height,
-                self.width,
-                self.min_num_patches,
-                self.max_num_patches,
-                self.num_masking_patches,
-                self.log_aspect_ratio[0],
-                self.log_aspect_ratio[1],
-            )
+        repr_str = "Generator(%d, %d, %d -> [%d ~ %d], max = %d, %.3f ~ %.3f)" % (
+            self.temporal,
+            self.height,
+            self.width,
+            self.min_num_patches,
+            self.max_num_patches,
+            self.num_masking_patches,
+            self.log_aspect_ratio[0],
+            self.log_aspect_ratio[1],
         )
         return repr_str
 
@@ -942,9 +895,7 @@ class MaskingGenerator3D:
     def _mask(self, mask, max_mask_patches):
         delta = 0
         for _ in range(100):
-            target_area = random.uniform(
-                self.min_num_patches, self.max_num_patches
-            )
+            target_area = random.uniform(self.min_num_patches, self.max_num_patches)
             aspect_ratio = math.exp(random.uniform(*self.log_aspect_ratio))
             h = int(round(math.sqrt(target_area * aspect_ratio)))
             w = int(round(math.sqrt(target_area / aspect_ratio)))
@@ -954,9 +905,7 @@ class MaskingGenerator3D:
                 left = random.randint(0, self.width - w)
                 front = random.randint(0, self.temporal - t)
 
-                num_masked = mask[
-                    front : front + t, top : top + h, left : left + w
-                ].sum()
+                num_masked = mask[front : front + t, top : top + h, left : left + w].sum()
                 # Overlap
                 if 0 < h * w * t - num_masked <= max_mask_patches:
                     for i in range(front, front + t):
@@ -1016,9 +965,7 @@ def transforms_imagenet_train(
         img_size = img_size
 
     scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
-    ratio = tuple(
-        ratio or (3.0 / 4.0, 4.0 / 3.0)
-    )  # default imagenet ratio range
+    ratio = tuple(ratio or (3.0 / 4.0, 4.0 / 3.0))  # default imagenet ratio range
     primary_tfl = [
         RandomResizedCropAndInterpolation(
             img_size, scale=scale, ratio=ratio, interpolation=interpolation
@@ -1092,9 +1039,7 @@ def temporal_difference(
     absolute=False,
 ):
     if use_grayscale:
-        gray_channel = (
-            0.299 * frames[2, :] + 0.587 * frames[1, :] + 0.114 * frames[0, :]
-        )
+        gray_channel = 0.299 * frames[2, :] + 0.587 * frames[1, :] + 0.114 * frames[0, :]
         frames[0, :] = gray_channel
         frames[1, :] = gray_channel
         frames[2, :] = gray_channel
@@ -1146,9 +1091,7 @@ def color_jitter_video_ssl(
             [
                 tv.transforms.ToPILImage(),
                 tv.transforms.RandomGrayscale(p=p_convert_gray),
-                tv.transforms.ColorJitter(
-                    bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue
-                ),
+                tv.transforms.ColorJitter(bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue),
                 tv.transforms.ToTensor(),
             ]
         )
@@ -1166,9 +1109,7 @@ def color_jitter_video_ssl(
 def augment_raw_frames(frames, time_diff_prob=0.0, gaussian_prob=0.0):
     frames = frames.float()
     if gaussian_prob > 0.0:
-        blur_trans = tv.transforms.RandomApply(
-            [GaussianBlurVideo()], p=gaussian_prob
-        )
+        blur_trans = tv.transforms.RandomApply([GaussianBlurVideo()], p=gaussian_prob)
         frames = blur_trans(frames)
 
     time_diff_out = False
@@ -1202,9 +1143,7 @@ class GaussianBlur(object):
 
 
 class GaussianBlurVideo(object):
-    def __init__(
-        self, sigma_min=[0.0, 0.1], sigma_max=[0.0, 2.0], use_PIL=False
-    ):
+    def __init__(self, sigma_min=[0.0, 0.1], sigma_max=[0.0, 2.0], use_PIL=False):
         self.sigma_min = sigma_min
         self.sigma_max = sigma_max
 

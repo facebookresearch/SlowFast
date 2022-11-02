@@ -87,12 +87,10 @@ def train_epoch(
         stimer = TT.time()
         for cur_iter, (inputs, labels, index, time, meta) in enumerate(train_loader):
             # Transfer the data to the current GPU device.
-            if cur_iter > 10:
-                break
+            batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
+            # if cur_iter > 400 // batch_size + 1:
+            #     break
             print(len(inputs), inputs[0][0].shape)
-            etimer = TT.time()
-            print(etimer - stimer)
-            stimer = etimer
             # for k, u_idx in enumerate(index.tolist()):
             #     # time(pts) info sample
             #     for u_start_n_end in time[k]:
@@ -142,9 +140,12 @@ def train_epoch(
                     else:
                         meta[key] = val.cuda(non_blocking=True)
 
+            etimer = TT.time()
+            print(etimer - stimer)
+            stimer = etimer
             continue
 
-            batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
+            # batch_size = inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
             # Update the learning rate.
             epoch_exact = cur_epoch + float(cur_iter) / data_size
             lr = optim.get_epoch_lr(epoch_exact, cfg)
