@@ -44,9 +44,7 @@ def _pil_interp(method):
 logger = logging.getLogger(__name__)
 
 
-def random_short_side_scale_jitter(
-    images, min_size, max_size, boxes=None, inverse_uniform_sampling=False
-):
+def random_short_side_scale_jitter(images, min_size, max_size, boxes=None, inverse_uniform_sampling=False):
     """
     Perform a spatial short scale jittering on the given images and
     corresponding boxes.
@@ -469,9 +467,7 @@ def color_normalization(images, mean, stddev):
     return out_images
 
 
-def _get_param_spatial_crop(
-    scale, ratio, height, width, num_repeat=10, log_scale=True, switch_hw=False
-):
+def _get_param_spatial_crop(scale, ratio, height, width, num_repeat=10, log_scale=True, switch_hw=False):
     """
     Given scale, ratio, height and width, return sampled coordinates of the videos.
     """
@@ -966,11 +962,7 @@ def transforms_imagenet_train(
 
     scale = tuple(scale or (0.08, 1.0))  # default imagenet scale range
     ratio = tuple(ratio or (3.0 / 4.0, 4.0 / 3.0))  # default imagenet ratio range
-    primary_tfl = [
-        RandomResizedCropAndInterpolation(
-            img_size, scale=scale, ratio=ratio, interpolation=interpolation
-        )
-    ]
+    primary_tfl = [RandomResizedCropAndInterpolation(img_size, scale=scale, ratio=ratio, interpolation=interpolation)]
     if hflip > 0.0:
         primary_tfl += [transforms.RandomHorizontalFlip(p=hflip)]
     if vflip > 0.0:
@@ -1073,14 +1065,14 @@ def color_jitter_video_ssl(
         color_jitter = tv.transforms.Compose(
             [
                 tv.transforms.ToPILImage(),
-                tv.transforms.RandomApply(
-                    [
-                        tv.transforms.ColorJitter(
-                            bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue
-                        )
-                    ],
-                    p=0.8,
-                ),
+                # tv.transforms.RandomApply(
+                #     [
+                #         tv.transforms.ColorJitter(
+                #             bri_con_sat[0], bri_con_sat[1], bri_con_sat[2], hue
+                #         )
+                #     ],
+                #     p=0.8,
+                # ),
                 tv.transforms.RandomGrayscale(p=p_convert_gray),
                 tv.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
                 tv.transforms.ToTensor(),

@@ -13,6 +13,7 @@ import slowfast.utils.misc as misc
 from slowfast.datasets import loader
 
 logger = logging.get_logger(__name__)
+import time as TT
 
 
 @torch.no_grad()
@@ -38,39 +39,39 @@ def perform_check(mcheck_loader, cfg):
     if cfg.DALI_ENABLE:
         print("DALI iteration is running -> EXIT")
         return
-
-    else:
-        for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
-            if cur_iter > 50:
-                logger.info(f"cur_iter is over 50, iteration will be terminated.")
-                break
-            # Transfer the data to the current GPU device.
-            if cfg.NUM_GPUS:
-                if isinstance(inputs, (list,)):
-                    for i in range(len(inputs)):
-                        if isinstance(inputs[i], (list,)):
-                            for j in range(len(inputs[i])):
-                                inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
-                        else:
-                            inputs[i] = inputs[i].cuda(non_blocking=True)
-                else:
-                    inputs = inputs.cuda(non_blocking=True)
-                if not isinstance(labels, list):
-                    labels = labels.cuda(non_blocking=True)
-                    index = index.cuda(non_blocking=True)
-                    time = time.cuda(non_blocking=True)
-                for key, val in meta.items():
-                    if isinstance(val, (list,)):
-                        for i in range(len(val)):
-                            val[i] = val[i].cuda(non_blocking=True)
+    start_T = TT.time()
+    for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
+        end_T = TT.time()
+        # print(f"iter{cur_iter}, time differene: {end_T-start_T}")
+        start_T = end_T
+        # Transfer the data to the current GPU device.
+        # continue
+        if cfg.NUM_GPUS:
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    if isinstance(inputs[i], (list,)):
+                        for j in range(len(inputs[i])):
+                            inputs[i][j] = inputs[i][j].cuda(non_blocking=True)
                     else:
-                        meta[key] = val.cuda(non_blocking=True)
-                if cur_iter % 10 == 0:
-                    print(len(inputs))
-                    # print(inputs[0][0].shape)
-                    print(labels.shape)
-                    print(index.shape)
-                    print(time.shape)
+                        inputs[i] = inputs[i].cuda(non_blocking=True)
+            else:
+                inputs = inputs.cuda(non_blocking=True)
+            if not isinstance(labels, list):
+                labels = labels.cuda(non_blocking=True)
+                index = index.cuda(non_blocking=True)
+                time = time.cuda(non_blocking=True)
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        val[i] = val[i].cuda(non_blocking=True)
+                else:
+                    meta[key] = val.cuda(non_blocking=True)
+        # print(len(inputs))
+        # print(inputs[0][0].shape)
+        # print(labels.shape)
+        # print(index.shape)
+        # print(time.shape)
+    # print("one epoch done")
     return "done"
 
 
@@ -82,7 +83,7 @@ def memcheck(cfg):
             slowfast/config/defaults.py
     """
     # Set up environment.
-    du.init_distributed_training(cfg)
+    du.init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
     # Set random seed from configs.
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
@@ -96,14 +97,18 @@ def memcheck(cfg):
     # logger.info(cfg)
 
     # Create video testing loaders.
-    logger.info(f"'MEMCHECK.ONLY_FIRST_50' is {cfg.MEMCHECK.ONLY_FIRST_50}.")
-    # logger.info(f"Dataloaer Split will be changed from 'memcheck' to 'test'.")
+    # logger.info(f"Dataloaer Split will be changed from 'memcheck' to 'train'.")
     memcheck_loader = loader.construct_loader(cfg, "memcheck")
-
     logger.info("Memory check model for {} iterations".format(len(memcheck_loader)))
-
     # # Perform memory checkiong on the entire dataset.
-    performed_return = perform_check(memcheck_loader, cfg)
+
+    start_epoch = 0
+    start_epoch_time = TT.time()
+    for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
+        performed_return = perform_check(memcheck_loader, cfg)
+        end_epoch_time = TT.time()
+        print(f"{cur_epoch}, {end_epoch_time-start_epoch_time}")
+        start_epoch_time = TT.time()
 
     # put the gpu_mem_usage() return in dataloader
     # misc.gpu_mem_usage(),
