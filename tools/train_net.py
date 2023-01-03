@@ -754,7 +754,7 @@ def train(cfg):
                 train_loader,
                 writer,
             )
-    if start_epoch == cfg.SOLVER.MAX_EPOCH: # eval if we loaded the final checkpoint
+    if start_epoch == cfg.SOLVER.MAX_EPOCH and not cfg.MASK.ENABLE: # final checkpoint load
         eval_epoch(val_loader, model, val_meter, start_epoch, cfg, train_loader, writer)
     if writer is not None:
         writer.close()
