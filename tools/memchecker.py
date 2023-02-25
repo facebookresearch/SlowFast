@@ -42,7 +42,7 @@ def perform_check(mcheck_loader, cfg):
     start_T = TT.time()
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(mcheck_loader):
         end_T = TT.time()
-        # print(f"iter{cur_iter}, time differene: {end_T-start_T}")
+        print(f"iter{cur_iter}, time differene: {end_T-start_T}")
         start_T = end_T
         # Transfer the data to the current GPU device.
         # continue

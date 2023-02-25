@@ -1,11 +1,11 @@
 TASK: ssl
 MEMCHECK:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
-  BATCH_SIZE: 8
+  BATCH_SIZE: 32
   # ONLY_FIRST_50: True
 TRAIN:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
   EVAL_ENABLE: False
   EVAL_PERIOD: 10
@@ -18,8 +18,8 @@ TEST:
   DATASET: kinetics
   BATCH_SIZE: 1
 DATA_LOADER:
-  NUM_WORKERS: 8
-  PIN_MEMORY: False
+  NUM_WORKERS: 0
+  PIN_MEMORY: True
 MODEL:
   NUM_CLASSES: 256
   MODEL_NAME: ContrastiveModel
