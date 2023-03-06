@@ -3,13 +3,34 @@
 
 from setuptools import find_packages, setup
 
+
+# Check dependencies
+import torchvision
+import cv2
+import detectron2
+torchvision_ver = [int(x) for x in torchvision.__version__.split(".")][:3]
+assert torchvision >= [0, 4, 2]
+
+
 setup(
     name="slowfast",
     version="1.0",
     author="FAIR",
-    url="unknown",
+    url="https://github.com/facebookresearch/SlowFast",
     description="SlowFast Video Understanding",
     install_requires=[
+        # These dependencies are not pure-python.
+        # In general, avoid adding dependencies that are not pure-python because they are not
+        # guaranteed to be installable by `pip install` on all platforms.
+        "Pillow",  # or use pillow-simd for better performance
+        # Do not add opencv here. Just like pytorch, user should install
+        # opencv themselves, preferrably by OS's package manager, or by
+        # choosing the proper pypi package name at https://github.com/skvark/opencv-python
+        # Also, avoid adding dependencies that transitively depend on pytorch or opencv.
+        # ------------------------------------------------------------
+        # The following are pure-python dependencies that should be easily installable.
+        # But still be careful when adding more: fewer people are able to use the software
+        # with every new dependency added.
         "yacs>=0.1.6",
         "pyyaml>=5.1",
         "av",
@@ -19,11 +40,7 @@ setup(
         "tqdm",
         "psutil",
         "matplotlib",
-        "detectron2",
-        "opencv-python",
         "pandas",
-        "torchvision>=0.4.2",
-        "PIL",
         "sklearn",
         "tensorboard",
         "fairscale",
