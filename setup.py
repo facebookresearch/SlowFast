@@ -2,14 +2,14 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 from setuptools import find_packages, setup
-
+import re
 
 # Check dependencies
 import torchvision
 import cv2
 import detectron2
-torchvision_ver = [int(x) for x in torchvision.__version__.split(".")][:3]
-assert torchvision >= [0, 4, 2]
+torchvision_ver = re.match(r'(?:\d+!)?([\.\d]+)', torchvision.__version__)[1]
+assert [int(x) for x in torchvision_ver.split(".")] >= [0, 4, 2]
 
 
 setup(
