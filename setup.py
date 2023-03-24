@@ -41,7 +41,7 @@ setup(
         "psutil",
         "matplotlib",
         "pandas",
-        "sklearn",
+        "scikit-learn",
         "tensorboard",
         "fairscale",
     ],
