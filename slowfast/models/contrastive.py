@@ -615,7 +615,7 @@ class ContrastiveModel(nn.Module):
                 # uses official code of SwAV from
                 # https://github.com/facebookresearch/swav/blob/master/main_swav.py
                 with torch.no_grad():
-                    m = self.module if hasattr(self, "module") else self
+                    m = getattr(self, "module", self)
                     w = m.swav_prototypes.weight.data.clone()
                     w = nn.functional.normalize(w, dim=1, p=2)
                     m.swav_prototypes.weight.copy_(w)
@@ -1119,7 +1119,7 @@ def contrastive_parameter_surgery(model, cfg, epoch_exact, cur_iter):
 def contrastive_forward(model, cfg, inputs, index, time, epoch_exact, scaler):
     if cfg.CONTRASTIVE.SEQUENTIAL:
         perform_backward = False
-        mdl = model.module if hasattr(model, "module") else model
+        mdl = getattr(model, "module", model)
         keys = (
             mdl.compute_key_feat(
                 inputs,
