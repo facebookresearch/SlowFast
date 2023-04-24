@@ -346,21 +346,21 @@ class MultiScaleAttention(nn.Module):
             self.pool_q,
             thw_shape,
             has_cls_embed=self.has_cls_embed,
-            norm=self.norm_q if hasattr(self, "norm_q") else None,
+            norm=getattr(self, "norm_q", None),
         )
         k, k_shape = attention_pool(
             k,
             self.pool_k,
             thw_shape,
             has_cls_embed=self.has_cls_embed,
-            norm=self.norm_k if hasattr(self, "norm_k") else None,
+            norm=getattr(self, "norm_k", None),
         )
         v, v_shape = attention_pool(
             v,
             self.pool_v,
             thw_shape,
             has_cls_embed=self.has_cls_embed,
-            norm=self.norm_v if hasattr(self, "norm_v") else None,
+            norm=getattr(self, "norm_v", None),
         )
 
         if self.pool_first:
