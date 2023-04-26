@@ -2,9 +2,9 @@
 
 ## Introduction
 
-[PyTorchVideo](https://pytorchvideo.org/) is a new deeplearning library with a focus on video understanding work, which provides reusable, modular and efficient components for video understanding. In PySlowFast, we add the support to incorporate PyTorchVideo components, including standard video datasets and state-of-the-art video models. Thus, we could use standard PySlowFast workflow to train and test PyTorchVideo datasets and models.
+[PyTorchVideo](https://pytorchvideo.org/) is a new deep learning library with a focus on video understanding work, which provides reusable, modular and efficient components for video understanding. In PySlowFast, we add the support to incorporate PyTorchVideo components, including standard video datasets and state-of-the-art video models. Thus, we could use standard PySlowFast workflow to train and test PyTorchVideo datasets and models.
 
-We add PySlowFast wrapper for different PyTorchVideo models and datasets. So we can easily construct PyTorchVideo datasets and models using PySlowFast config system. Right now, the supported [PyTorchVideo models](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/models/ptv_model_builder.py) includes:
+We add PySlowFast wrapper for different PyTorchVideo models and datasets. So we can easily construct PyTorchVideo datasets and models using PySlowFast config system. Right now, the supported [PyTorchVideo models](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/models/ptv_model_builder.py) include:
   * [I3D](https://arxiv.org/pdf/1705.07750.pdf)
   * [C2D](https://arxiv.org/pdf/1711.07971.pdf)
   * [R(2+1)D](https://openaccess.thecvf.com/content_cvpr_2018/papers/Tran_A_Closer_Look_CVPR_2018_paper.pdf)
@@ -12,7 +12,7 @@ We add PySlowFast wrapper for different PyTorchVideo models and datasets. So we 
   * [Slow, SlowFast](https://arxiv.org/pdf/1812.03982.pdf)
   * [X3D](https://arxiv.org/pdf/2004.04730.pdf)
 
-The supported [PyTorchVideo datasets](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/datasets/ptv_datasets.py) includes:
+The supported [PyTorchVideo datasets](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/datasets/ptv_datasets.py) include:
   * Kinetics
   * Charades
   * Something-something v2
@@ -57,5 +57,5 @@ We also provide a comprehensive PyTorchVideo Model Zoo using standard PySlowFast
 | SlowFast | R50   | Kinetics 400 | 8x8              | 37.24 | 66.60 x 3 x 10    | 34.00      | [link](https://dl.fbaipublicfiles.com/pytorchvideo/pysf_model_zoo/ssv2/SLOWFAST_8x8_R50.pyth) | Charades/pytorchvideo/SLOWFAST_8x8_R50 |
 
 Notes:
-* The above model weights has slightly difference with these in [PyTorchVideo official model zoo](https://github.com/facebookresearch/pytorchvideo/blob/master/docs/source/model_zoo.md). The layer names of above model weights will contain the additional prefix of `model.` due to the [model wrapper](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/models/ptv_model_builder.py) in PySlowFast.
+* The above model weights have slightly difference with those in [PyTorchVideo official model zoo](https://github.com/facebookresearch/pytorchvideo/blob/master/docs/source/model_zoo.md). The layer names of above model weights will contain the additional prefix of `model.` due to the [model wrapper](https://github.com/facebookresearch/SlowFast/blob/master/slowfast/models/ptv_model_builder.py) in PySlowFast.
 * For `Flops x views` column, we report the inference cost with a single “view" × the number of views (FLOPs × space_views × time_views). For example, we take 3 spatial crops for 10 temporal clips on Kinetics.
