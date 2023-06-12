@@ -525,7 +525,7 @@ class Kinetics(torch.utils.data.Dataset):
             mask = masked_position_generator()
             mask = np.tile(mask, (8, 1, 1))
         elif self.cfg.AUG.MASK_FRAMES:
-            mask = np.zeros(shape=self.cfg.AUG.MASK_WINDOW_SIZE, dtype=np.int)
+            mask = np.zeros(shape=self.cfg.AUG.MASK_WINDOW_SIZE, dtype=int)
             n_mask = round(
                 self.cfg.AUG.MASK_WINDOW_SIZE[0] * self.cfg.AUG.MASK_RATIO
             )
