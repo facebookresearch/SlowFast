@@ -10,7 +10,7 @@ import slowfast.utils.logging as logging
 logger = logging.get_logger(__name__)
 
 
-class MultigridSchedule(object):
+class MultigridSchedule:
     """
     This class defines multigrid training schedule and update cfg accordingly.
     """

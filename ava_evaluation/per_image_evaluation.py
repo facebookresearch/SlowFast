@@ -36,7 +36,7 @@ from . import (
 )
 
 
-class PerImageEvaluation(object):
+class PerImageEvaluation:
     """Evaluate detection result of a single image."""
 
     def __init__(self, num_groundtruth_classes, matching_iou_threshold=0.5):

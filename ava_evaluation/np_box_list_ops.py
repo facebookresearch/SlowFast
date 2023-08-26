@@ -30,7 +30,7 @@ import numpy as np
 from . import np_box_list, np_box_ops
 
 
-class SortOrder(object):
+class SortOrder:
     """Enum class for sort order.
 
     Attributes:

@@ -17,7 +17,7 @@ logger = logging.get_logger(__name__)
 log.getLogger("matplotlib").setLevel(log.ERROR)
 
 
-class TensorboardWriter(object):
+class TensorboardWriter:
     """
     Helper class to log information to Tensorboard.
     """

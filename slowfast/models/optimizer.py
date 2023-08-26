@@ -266,7 +266,7 @@ def set_lr(optimizer, new_lr):
         param_group["lr"] = new_lr * param_group["layer_decay"]
 
 
-class LARS(object):
+class LARS:
     """
     this class is adapted from https://github.com/NVIDIA/apex/blob/master/apex/parallel/LARC.py to
      include ignoring LARS application specific parameters (e.g. 1D params)

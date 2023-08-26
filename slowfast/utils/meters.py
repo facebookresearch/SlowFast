@@ -43,7 +43,7 @@ def get_ava_mini_groundtruth(full_groundtruth):
     return ret
 
 
-class AVAMeter(object):
+class AVAMeter:
     """
     Measure the AVA train, val, and test stats.
     """
@@ -244,7 +244,7 @@ class AVAMeter(object):
             logging.log_json_stats(stats, self.output_dir)
 
 
-class TestMeter(object):
+class TestMeter:
     """
     Perform the multi-view ensemble for testing: each video with an unique index
     will be sampled with multiple clips, and the predictions of the clips will
@@ -421,7 +421,7 @@ class TestMeter(object):
         logging.log_json_stats(self.stats)
 
 
-class ScalarMeter(object):
+class ScalarMeter:
     """
     A scalar meter uses a deque to track a series of scaler values with a given
     window size. It supports calculating the median and average values of the
@@ -475,7 +475,7 @@ class ScalarMeter(object):
         return self.total / self.count
 
 
-class ListMeter(object):
+class ListMeter:
     def __init__(self, list_size):
         """
         Args:
@@ -511,7 +511,7 @@ class ListMeter(object):
         return self.total / self.count
 
 
-class TrainMeter(object):
+class TrainMeter:
     """
     Measure training stats.
     """
@@ -698,7 +698,7 @@ class TrainMeter(object):
         logging.log_json_stats(stats, self.output_dir)
 
 
-class ValMeter(object):
+class ValMeter:
     """
     Measures validation stats.
     """

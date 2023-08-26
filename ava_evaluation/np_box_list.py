@@ -24,7 +24,7 @@ from __future__ import (
 import numpy as np
 
 
-class BoxList(object):
+class BoxList:
     """Box collection.
 
     BoxList represents a list of bounding boxes as numpy array, where each

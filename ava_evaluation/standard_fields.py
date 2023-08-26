@@ -32,7 +32,7 @@ from __future__ import (
 )
 
 
-class InputDataFields(object):
+class InputDataFields:
     """Names for the input tensors.
 
     Holds the standard data field names to use for identifying input tensors. This
@@ -97,7 +97,7 @@ class InputDataFields(object):
     true_image_shape = "true_image_shape"
 
 
-class DetectionResultFields(object):
+class DetectionResultFields:
     """Naming conventions for storing the output of the detector.
 
     Attributes:
@@ -123,7 +123,7 @@ class DetectionResultFields(object):
     num_detections = "num_detections"
 
 
-class BoxListFields(object):
+class BoxListFields:
     """Naming conventions for BoxLists.
 
     Attributes:
@@ -149,7 +149,7 @@ class BoxListFields(object):
     keypoint_heatmaps = "keypoint_heatmaps"
 
 
-class TfExampleFields(object):
+class TfExampleFields:
     """TF-example proto feature names for object detection.
 
     Holds the standard feature names to load from an Example proto for object

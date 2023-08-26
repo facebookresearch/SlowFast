@@ -1186,7 +1186,7 @@ def augment_raw_frames(frames, time_diff_prob=0.0, gaussian_prob=0.0):
     return frames, time_diff_out
 
 
-class GaussianBlur(object):
+class GaussianBlur:
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
     def __init__(self, sigma=[0.1, 2.0]):
@@ -1201,7 +1201,7 @@ class GaussianBlur(object):
         return x
 
 
-class GaussianBlurVideo(object):
+class GaussianBlurVideo:
     def __init__(
         self, sigma_min=[0.0, 0.1], sigma_max=[0.0, 2.0], use_PIL=False
     ):

@@ -41,7 +41,7 @@ from abc import ABCMeta, abstractmethod
 from . import label_map_util, metrics, per_image_evaluation, standard_fields
 
 
-class DetectionEvaluator(object):
+class DetectionEvaluator:
     """Interface for object detection evalution classes.
 
     Example usage of the Evaluator:
@@ -531,7 +531,7 @@ ObjectDetectionEvalMetrics = collections.namedtuple(
 )
 
 
-class ObjectDetectionEvaluation(object):
+class ObjectDetectionEvaluation:
     """Internal implementation of Pascal object detection metrics."""
 
     def __init__(
