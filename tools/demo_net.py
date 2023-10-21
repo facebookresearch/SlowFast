@@ -5,15 +5,17 @@ import numpy as np
 import time
 import torch
 import tqdm
+import os
 
 from slowfast.utils import logging
 from slowfast.visualization.async_predictor import AsyncDemo, AsyncVis
 from slowfast.visualization.ava_demo_precomputed_boxes import (
     AVAVisualizerWithPrecomputedBox,
 )
+from slowfast.visualization.async_predictor import draw_predictions, log_predictions
 from slowfast.visualization.demo_loader import ThreadVideoManager, VideoManager
 from slowfast.visualization.predictor import ActionPredictor
-from slowfast.visualization.video_visualizer import VideoVisualizer
+from slowfast.visualization.video_visualizer import VideoVisualizer, VideoLogger
 
 logger = logging.get_logger(__name__)
 
@@ -42,7 +44,16 @@ def run_demo(cfg, frame_provider):
         else None
     )
 
-    video_vis = VideoVisualizer(
+    if not cfg.DEMO.OUTPUT_DISPLAY:
+        video_vis_cls = VideoLogger
+        pred_processor = log_predictions
+        pred_log = logging.get_logger("slowfast-predictions")
+        logging.setup_file_logger(pred_log, cfg.OUTPUT_DIR, "predictions.log")
+    else:
+        video_vis_cls = VideoVisualizer
+        pred_processor = draw_predictions
+
+    video_vis = video_vis_cls(
         num_classes=cfg.MODEL.NUM_CLASSES,
         class_names_path=cfg.DEMO.LABEL_FILE_PATH,
         top_k=cfg.TENSORBOARD.MODEL_VIS.TOPK_PREDS,
@@ -52,8 +63,11 @@ def run_demo(cfg, frame_provider):
         colormap=cfg.TENSORBOARD.MODEL_VIS.COLORMAP,
         mode=cfg.DEMO.VIS_MODE,
     )
-
-    async_vis = AsyncVis(video_vis, n_workers=cfg.DEMO.NUM_VIS_INSTANCES)
+    async_vis = AsyncVis(
+        video_vis,
+        n_workers=cfg.DEMO.NUM_VIS_INSTANCES,
+        prediction_processor=pred_processor,
+    )
 
     if cfg.NUM_GPUS <= 1:
         model = ActionPredictor(cfg=cfg, async_vis=async_vis)

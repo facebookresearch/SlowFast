@@ -13,6 +13,7 @@ from slowfast.utils.misc import get_class_names
 
 logger = logging.get_logger(__name__)
 log.getLogger("matplotlib").setLevel(log.ERROR)
+pred_log = logging.get_logger("slowfast-predictions")
 
 
 def _create_text_labels(classes, scores, class_names, ground_truth=False):
@@ -521,6 +522,7 @@ class VideoVisualizer:
         keyframe_idx=None,
         draw_range=None,
         repeat_frame=1,
+        task_id=None,
     ):
         """
         Draw predicted labels or ground truth classes to clip. Draw bouding boxes to clip
@@ -537,6 +539,7 @@ class VideoVisualizer:
             draw_range (Optional[list[ints]): only draw frames in range [start_idx, end_idx] inclusively in the clip.
                 If None, draw on the entire clip.
             repeat_frame (int): repeat each frame in draw_range for `repeat_frame` time for slow-motion effect.
+            task_id (int): reference index of the task where frames and predictions originated from.
         """
         if draw_range is None:
             draw_range = [0, len(frames) - 1]
@@ -675,3 +678,92 @@ class VideoVisualizer:
         )
         thres_array[common_class_ids] = self.thres
         self.thres = torch.from_numpy(thres_array)
+
+
+class VideoLogger(VideoVisualizer):
+    """
+    Log predictions to file instead of drawing onto output video frames.
+
+    Core is identical to `VideoVisualizer`. Override draw method to log.
+    """
+    def __init__(self, *_, **__):
+        super(VideoLogger, self).__init__(*_, **__)
+        self.clip_index = -1
+
+    def draw_clip_range(
+        self,
+        frames,
+        preds,
+        bboxes=None,
+        text_alpha=0.5,
+        ground_truth=False,
+        keyframe_idx=None,
+        draw_range=None,
+        repeat_frame=1,
+        task_id=None,
+    ):
+        self.clip_index = task_id or self.clip_index + 1
+        num_frames = len(frames)
+        start_frame = self.clip_index * num_frames
+        frame_range = [start_frame, start_frame + num_frames - 1]
+
+        if isinstance(preds, torch.Tensor):
+            if preds.ndim == 1:
+                preds = preds.unsqueeze(0)
+            n_instances = preds.shape[0]
+        elif isinstance(preds, list):
+            n_instances = len(preds)
+        else:
+            logger.error("Unsupported type of prediction input.")
+            return
+
+        if ground_truth:
+            method = "ground-truth"
+            top_scores, top_classes = [None] * n_instances, preds
+        elif self.mode == "top-k":
+            method = "top-k={}".format(self.top_k)
+            top_scores, top_classes = torch.topk(preds, k=self.top_k)
+            top_scores, top_classes = top_scores.tolist(), top_classes.tolist()
+        elif self.mode == "thres":
+            method = "thres>={}".format(self.thres)
+            top_scores, top_classes = [], []
+            for pred in preds:
+                mask = pred >= self.thres
+                top_scores.append(pred[mask].tolist())
+                top_class = torch.squeeze(torch.nonzero(mask), dim=-1).tolist()
+                top_classes.append(top_class)
+        else:
+            logger.error("Unknown mode: %s", self.mode)
+            return
+
+        text_labels = []
+        for i in range(n_instances):
+            text_labels.append(
+                _create_text_labels(
+                    top_classes[i],
+                    top_scores[i],
+                    self.class_names,
+                    ground_truth=ground_truth,
+                )
+            )
+
+        frames_info = "{:04d} [{:08d}, {:08d}]:".format(self.clip_index, frame_range[0], frame_range[1])
+        if bboxes is not None:
+            assert len(preds) == len(bboxes), \
+                "Encounter {} predictions and {} bounding boxes".format(len(preds), len(bboxes))
+            pred_log.info(frames_info)
+            for i, box in enumerate(bboxes):
+                top_labels = [self.class_names[i] for i in top_classes[i]]
+                txt_scores = [float("{:.4f}".format(float(score))) for score in top_scores[i]]
+                label = " labeled '{}'".format(text_labels[i]) if ground_truth else ""
+                text_box = "bbox: {},".format(list(float("{:04.2f}".format(float(c))) for c in list(box)))
+                pred_log.info("    %s%s is predicted to class %s, %s: %s, %s",
+                              text_box, label, text_labels[i][0], method, top_labels, txt_scores)
+        else:
+            label = " labeled '{}'".format(text_labels[0]) if ground_truth else ""
+            top_labels = [self.class_names[i] for i in top_classes[0]]
+            txt_scores = [float("{:.4f}".format(float(score))) for score in top_scores[0]]
+            pred_log.info("%s%s is predicted to class %s, %s: %s, %s",
+                          frames_info, label, text_labels[0], method, top_labels, txt_scores)
+
+        return []  # drop frames to speed up process (no writing)

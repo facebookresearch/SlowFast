@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+*.py[cod]
+
+configs/custom
+models

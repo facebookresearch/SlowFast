@@ -1201,6 +1201,9 @@ _C.DEMO.DETECTRON2_THRESH = 0.9
 # The number of overlapping frames cannot be larger than
 # half of the sequence length `cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE`
 _C.DEMO.BUFFER_SIZE = 0
+# Display the output prediction onto the input video
+# If disabled, output predictions will be logged instead of displaying the video
+_C.DEMO.OUTPUT_DISPLAY = True
 # If specified, the visualized outputs will be written this a video file of
 # this path. Otherwise, the visualized outputs will be displayed in a window.
 _C.DEMO.OUTPUT_FILE = ""
