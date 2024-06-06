@@ -4,14 +4,15 @@
 """Custom operators."""
 
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
-from slowfast.models.utils import get_gkern
-
 from pytorchvideo.layers.swish import Swish
+
+from slowfast.models.utils import get_gkern
 
 
 class SE(nn.Module):
@@ -31,9 +32,7 @@ class SE(nn.Module):
 
         width *= multiplier
         min_width = min_width or divisor
-        width_out = max(
-            min_width, int(width + divisor / 2) // divisor * divisor
-        )
+        width_out = max(min_width, int(width + divisor / 2) // divisor * divisor)
         if width_out < 0.9 * width:
             width_out += divisor
         return int(width_out)
@@ -84,20 +83,14 @@ class HOGLayerC(nn.Module):
     def forward(self, x):
         # input is RGB image with shape [B 3 H W]
         x = F.pad(x, pad=(1, 1, 1, 1), mode="reflect")
-        gx_rgb = F.conv2d(
-            x, self.weight_x, bias=None, stride=1, padding=0, groups=3
-        )
-        gy_rgb = F.conv2d(
-            x, self.weight_y, bias=None, stride=1, padding=0, groups=3
-        )
+        gx_rgb = F.conv2d(x, self.weight_x, bias=None, stride=1, padding=0, groups=3)
+        gy_rgb = F.conv2d(x, self.weight_y, bias=None, stride=1, padding=0, groups=3)
         norm_rgb = torch.stack([gx_rgb, gy_rgb], dim=-1).norm(dim=-1)
         phase = torch.atan2(gx_rgb, gy_rgb)
         phase = phase / self.pi * self.nbins  # [-9, 9]
 
         b, c, h, w = norm_rgb.shape
-        out = torch.zeros(
-            (b, c, self.nbins, h, w), dtype=torch.float, device=x.device
-        )
+        out = torch.zeros((b, c, self.nbins, h, w), dtype=torch.float, device=x.device)
         phase = phase.view(b, c, 1, h, w)
         norm_rgb = norm_rgb.view(b, c, 1, h, w)
         if self.gaussian_window:

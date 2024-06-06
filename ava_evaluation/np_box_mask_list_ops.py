@@ -19,12 +19,8 @@ Example box operations that are supported:
   * Areas: compute bounding box areas
   * IOU: pairwise intersection-over-union scores
 """
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy as np
 
 from . import np_box_list_ops, np_box_mask_list, np_mask_ops
@@ -91,9 +87,7 @@ def iou(box_mask_list1, box_mask_list2):
     Returns:
       a numpy array with shape [N, M] representing pairwise iou scores.
     """
-    return np_mask_ops.iou(
-        box_mask_list1.get_masks(), box_mask_list2.get_masks()
-    )
+    return np_mask_ops.iou(box_mask_list1.get_masks(), box_mask_list2.get_masks())
 
 
 def ioa(box_mask_list1, box_mask_list2):
@@ -110,9 +104,7 @@ def ioa(box_mask_list1, box_mask_list2):
     Returns:
       a numpy array with shape [N, M] representing pairwise ioa scores.
     """
-    return np_mask_ops.ioa(
-        box_mask_list1.get_masks(), box_mask_list2.get_masks()
-    )
+    return np_mask_ops.ioa(box_mask_list1.get_masks(), box_mask_list2.get_masks())
 
 
 def gather(box_mask_list, indices, fields=None):
@@ -142,15 +134,11 @@ def gather(box_mask_list, indices, fields=None):
         if "masks" not in fields:
             fields.append("masks")
     return box_list_to_box_mask_list(
-        np_box_list_ops.gather(
-            boxlist=box_mask_list, indices=indices, fields=fields
-        )
+        np_box_list_ops.gather(boxlist=box_mask_list, indices=indices, fields=fields)
     )
 
 
-def sort_by_field(
-    box_mask_list, field, order=np_box_list_ops.SortOrder.DESCEND
-):
+def sort_by_field(box_mask_list, field, order=np_box_list_ops.SortOrder.DESCEND):
     """Sort boxes and associated fields according to a scalar field.
 
     A common use case is reordering the boxes according to descending scores.
@@ -165,9 +153,7 @@ def sort_by_field(
         order.
     """
     return box_list_to_box_mask_list(
-        np_box_list_ops.sort_by_field(
-            boxlist=box_mask_list, field=field, order=order
-        )
+        np_box_list_ops.sort_by_field(boxlist=box_mask_list, field=field, order=order)
     )
 
 
@@ -350,12 +336,8 @@ def prune_non_overlapping_masks(box_mask_list1, box_mask_list2, minoverlap=0.0):
     Returns:
       A pruned box_mask_list with size [N', 4].
     """
-    intersection_over_area = ioa(
-        box_mask_list2, box_mask_list1
-    )  # [M, N] tensor
-    intersection_over_area = np.amax(
-        intersection_over_area, axis=0
-    )  # [N] tensor
+    intersection_over_area = ioa(box_mask_list2, box_mask_list1)  # [M, N] tensor
+    intersection_over_area = np.amax(intersection_over_area, axis=0)  # [N] tensor
     keep_bool = np.greater_equal(intersection_over_area, np.array(minoverlap))
     keep_inds = np.nonzero(keep_bool)[0]
     new_box_mask_list1 = gather(box_mask_list1, keep_inds)
@@ -419,10 +401,9 @@ def filter_scores_greater_than(box_mask_list, thresh):
         raise ValueError("Scores should have rank 1 or 2")
     if len(scores.shape) == 2 and scores.shape[1] != 1:
         raise ValueError(
-            "Scores should have rank 1 or have shape "
-            "consistent with [None, 1]"
+            "Scores should have rank 1 or have shape " "consistent with [None, 1]"
         )
-    high_score_indices = np.reshape(
-        np.where(np.greater(scores, thresh)), [-1]
-    ).astype(np.int32)
+    high_score_indices = np.reshape(np.where(np.greater(scores, thresh)), [-1]).astype(
+        np.int32
+    )
     return gather(box_mask_list, high_score_indices)

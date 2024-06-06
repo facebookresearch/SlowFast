@@ -6,6 +6,7 @@
 import functools
 import logging
 import pickle
+
 import torch
 import torch.distributed as dist
 
@@ -22,6 +23,7 @@ from pytorchvideo.layers.distributed import (  # noqa
 def init_distributed_training(cfg):
     return _init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
 
+
 def all_gather(tensors):
     """
     All gathers the provided tensors from all processes across machines.
@@ -34,9 +36,7 @@ def all_gather(tensors):
     output_tensor = []
     world_size = dist.get_world_size()
     for tensor in tensors:
-        tensor_placeholder = [
-            torch.ones_like(tensor) for _ in range(world_size)
-        ]
+        tensor_placeholder = [torch.ones_like(tensor) for _ in range(world_size)]
         dist.all_gather(tensor_placeholder, tensor, async_op=False)
         gather_list.append(tensor_placeholder)
     for gathered_tensor in gather_list:
@@ -203,9 +203,7 @@ def _pad_to_largest_tensor(tensor, group):
     assert (
         world_size >= 1
     ), "comm.gather/all_gather must be called from ranks within the given group!"
-    local_size = torch.tensor(
-        [tensor.numel()], dtype=torch.int64, device=tensor.device
-    )
+    local_size = torch.tensor([tensor.numel()], dtype=torch.int64, device=tensor.device)
     size_list = [
         torch.zeros([1], dtype=torch.int64, device=tensor.device)
         for _ in range(world_size)

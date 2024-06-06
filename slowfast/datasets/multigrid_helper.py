@@ -49,10 +49,7 @@ class ShortCycleBatchSampler(Sampler):
         bs_factor = [
             int(
                 round(
-                    (
-                        float(cfg.DATA.TRAIN_CROP_SIZE)
-                        / (s * cfg.MULTIGRID.DEFAULT_S)
-                    )
+                    (float(cfg.DATA.TRAIN_CROP_SIZE) / (s * cfg.MULTIGRID.DEFAULT_S))
                     ** 2
                 )
             )

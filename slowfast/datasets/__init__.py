@@ -2,7 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 from .ava_dataset import Ava  # noqa
-from .build import DATASET_REGISTRY, build_dataset  # noqa
+from .build import build_dataset, DATASET_REGISTRY  # noqa
 from .charades import Charades  # noqa
 from .imagenet import Imagenet  # noqa
 from .kinetics import Kinetics  # noqa

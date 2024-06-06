@@ -188,9 +188,7 @@ class ResNetBasicStem(nn.Module):
             padding=self.padding,
             bias=False,
         )
-        self.bn = norm_module(
-            num_features=dim_out, eps=self.eps, momentum=self.bn_mmt
-        )
+        self.bn = norm_module(num_features=dim_out, eps=self.eps, momentum=self.bn_mmt)
         self.relu = nn.ReLU(self.inplace_relu)
         self.pool_layer = nn.MaxPool3d(
             kernel_size=[1, 3, 3], stride=[1, 2, 2], padding=[0, 1, 1]
@@ -277,9 +275,7 @@ class X3DStem(nn.Module):
             groups=dim_out,
         )
 
-        self.bn = norm_module(
-            num_features=dim_out, eps=self.eps, momentum=self.bn_mmt
-        )
+        self.bn = norm_module(num_features=dim_out, eps=self.eps, momentum=self.bn_mmt)
         self.relu = nn.ReLU(self.inplace_relu)
 
     def forward(self, x):

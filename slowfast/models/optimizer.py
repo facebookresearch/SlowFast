@@ -3,9 +3,8 @@
 
 """Optimizer."""
 
-import torch
-
 import slowfast.utils.lr_policy as lr_policy
+import torch
 
 
 def construct_optimizer(model, cfg):
@@ -100,9 +99,7 @@ def construct_optimizer(model, cfg):
         )
     else:
         raise ValueError(
-            "Layer decay should be in (0, 1], but is {}".format(
-                cfg.SOLVER.LAYER_DECAY
-            )
+            "Layer decay should be in (0, 1], but is {}".format(cfg.SOLVER.LAYER_DECAY)
         )
 
     if cfg.SOLVER.OPTIMIZING_METHOD == "sgd":
@@ -142,9 +139,7 @@ def construct_optimizer(model, cfg):
             "Does not support {} optimizer".format(cfg.SOLVER.OPTIMIZING_METHOD)
         )
     if cfg.SOLVER.LARS_ON:
-        optimizer = LARS(
-            optimizer=optimizer, trust_coefficient=0.001, clip=False
-        )
+        optimizer = LARS(optimizer=optimizer, trust_coefficient=0.001, clip=False)
     return optimizer
 
 
@@ -224,9 +219,7 @@ def get_param_groups(model, cfg):
     # Check all parameters will be passed into optimizer.
     assert (
         len(list(model.parameters()))
-        == non_bn_parameters_count
-        + zero_parameters_count
-        + no_grad_parameters_count
+        == non_bn_parameters_count + zero_parameters_count + no_grad_parameters_count
     ), "parameter size does not match: {} + {} + {} != {}".format(
         non_bn_parameters_count,
         zero_parameters_count,
@@ -330,13 +323,9 @@ class LARS:
             weight_decays = []
             for group in self.optim.param_groups:
                 # absorb weight decay control from optimizer
-                weight_decay = (
-                    group["weight_decay"] if "weight_decay" in group else 0
-                )
+                weight_decay = group["weight_decay"] if "weight_decay" in group else 0
                 weight_decays.append(weight_decay)
-                apply_LARS = (
-                    group["apply_LARS"] if "apply_LARS" in group else True
-                )
+                apply_LARS = group["apply_LARS"] if "apply_LARS" in group else True
                 if not apply_LARS:
                     continue
                 group["weight_decay"] = 0
@@ -379,16 +368,11 @@ def get_grad_norm_(parameters, norm_type=2.0):
         return torch.tensor(0.0)
     device = parameters[0].grad.device
     if norm_type == "inf":
-        total_norm = max(
-            p.grad.detach().abs().max().to(device) for p in parameters
-        )
+        total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
     else:
         total_norm = torch.norm(
             torch.stack(
-                [
-                    torch.norm(p.grad.detach(), norm_type).to(device)
-                    for p in parameters
-                ]
+                [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]
             ),
             norm_type,
         )

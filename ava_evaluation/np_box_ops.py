@@ -19,12 +19,8 @@ Example box operations that are supported:
   * Areas: compute bounding box areas
   * IOU: pairwise intersection-over-union scores
 """
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy as np
 
 
@@ -81,11 +77,7 @@ def iou(boxes1, boxes2):
     intersect = intersection(boxes1, boxes2)
     area1 = area(boxes1)
     area2 = area(boxes2)
-    union = (
-        np.expand_dims(area1, axis=1)
-        + np.expand_dims(area2, axis=0)
-        - intersect
-    )
+    union = np.expand_dims(area1, axis=1) + np.expand_dims(area2, axis=0) - intersect
     return intersect / union
 
 

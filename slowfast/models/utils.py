@@ -1,9 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import numpy as np
-import torch
 
 import slowfast.utils.logging as logging
+import torch
 
 logger = logging.get_logger(__name__)
 
@@ -71,15 +71,11 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
     grid = np.stack(grid, axis=0)
 
     grid = grid.reshape([2, 1, grid_size, grid_size])
-    pos_embed_spatial = get_2d_sincos_pos_embed_from_grid(
-        embed_dim_spatial, grid
-    )
+    pos_embed_spatial = get_2d_sincos_pos_embed_from_grid(embed_dim_spatial, grid)
 
     # temporal
     grid_t = np.arange(t_size, dtype=np.float32)
-    pos_embed_temporal = get_1d_sincos_pos_embed_from_grid(
-        embed_dim_temporal, grid_t
-    )
+    pos_embed_temporal = get_1d_sincos_pos_embed_from_grid(embed_dim_temporal, grid_t)
 
     # concate: [T, H, W] order
     pos_embed_temporal = pos_embed_temporal[:, np.newaxis, :]
@@ -95,9 +91,7 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
     pos_embed = pos_embed.reshape([-1, embed_dim])  # [T*H*W, D]
 
     if cls_token:
-        pos_embed = np.concatenate(
-            [np.zeros([1, embed_dim]), pos_embed], axis=0
-        )
+        pos_embed = np.concatenate([np.zeros([1, embed_dim]), pos_embed], axis=0)
     return pos_embed
 
 
@@ -115,9 +109,7 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
     grid = grid.reshape([2, 1, grid_size, grid_size])
     pos_embed = get_2d_sincos_pos_embed_from_grid(embed_dim, grid)
     if cls_token:
-        pos_embed = np.concatenate(
-            [np.zeros([1, embed_dim]), pos_embed], axis=0
-        )
+        pos_embed = np.concatenate([np.zeros([1, embed_dim]), pos_embed], axis=0)
     return pos_embed
 
 
@@ -125,12 +117,8 @@ def get_2d_sincos_pos_embed_from_grid(embed_dim, grid):
     assert embed_dim % 2 == 0
 
     # use half of dimensions to encode grid_h
-    emb_h = get_1d_sincos_pos_embed_from_grid(
-        embed_dim // 2, grid[0]
-    )  # (H*W, D/2)
-    emb_w = get_1d_sincos_pos_embed_from_grid(
-        embed_dim // 2, grid[1]
-    )  # (H*W, D/2)
+    emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[0])  # (H*W, D/2)
+    emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[1])  # (H*W, D/2)
 
     emb = np.concatenate([emb_h, emb_w], axis=1)  # (H*W, D)
     return emb
@@ -169,9 +157,7 @@ def interpolate_pos_embed(model, checkpoint_model):
         num_patches = model.patch_embed.num_patches
         num_extra_tokens = model.pos_embed.shape[-2] - num_patches
         # height (== width) for the checkpoint position embedding
-        orig_size = int(
-            (pos_embed_checkpoint.shape[-2] - num_extra_tokens) ** 0.5
-        )
+        orig_size = int((pos_embed_checkpoint.shape[-2] - num_extra_tokens) ** 0.5)
         # height (== width) for the new position embedding
         new_size = int(num_patches**0.5)
         # class_token and dist_token are kept unchanged
@@ -200,9 +186,11 @@ def interpolate_pos_embed(model, checkpoint_model):
 def calc_mvit_feature_geometry(cfg):
     feat_size = [
         [
-            cfg.DATA.NUM_FRAMES // cfg.MVIT.PATCH_STRIDE[0]
-            if len(cfg.MVIT.PATCH_STRIDE) > 2
-            else 1,
+            (
+                cfg.DATA.NUM_FRAMES // cfg.MVIT.PATCH_STRIDE[0]
+                if len(cfg.MVIT.PATCH_STRIDE) > 2
+                else 1
+            ),
             cfg.DATA.TRAIN_CROP_SIZE // cfg.MVIT.PATCH_STRIDE[-2],
             cfg.DATA.TRAIN_CROP_SIZE // cfg.MVIT.PATCH_STRIDE[-1],
         ]

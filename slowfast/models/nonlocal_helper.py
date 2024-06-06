@@ -54,9 +54,7 @@ class Nonlocal(nn.Module):
         self.pool_size = pool_size
         self.instantiation = instantiation
         self.use_pool = (
-            False
-            if pool_size is None
-            else any((size > 1 for size in pool_size))
+            False if pool_size is None else any((size > 1 for size in pool_size))
         )
         self.norm_eps = norm_eps
         self.norm_momentum = norm_momentum
@@ -133,9 +131,7 @@ class Nonlocal(nn.Module):
             spatial_temporal_dim = theta_phi.shape[2]
             theta_phi = theta_phi / spatial_temporal_dim
         else:
-            raise NotImplementedError(
-                "Unknown norm type {}".format(self.instantiation)
-            )
+            raise NotImplementedError("Unknown norm type {}".format(self.instantiation))
 
         # (N, TxHxW, TxHxW) * (N, C, TxHxW) => (N, C, TxHxW).
         theta_phi_g = torch.einsum("ntg,ncg->nct", (theta_phi, g))

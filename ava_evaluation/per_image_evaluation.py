@@ -20,20 +20,11 @@ detection is supported by default.
 Based on the settings, per image evaluation is either performed on boxes or
 on object masks.
 """
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy as np
 
-from . import (
-    np_box_list,
-    np_box_list_ops,
-    np_box_mask_list,
-    np_box_mask_list_ops,
-)
+from . import np_box_list, np_box_list_ops, np_box_mask_list, np_box_mask_list_ops
 
 
 class PerImageEvaluation:
@@ -185,12 +176,12 @@ class PerImageEvaluation:
         result_scores = []
         result_tp_fp_labels = []
         for i in range(self.num_groundtruth_classes):
-            groundtruth_is_difficult_list_at_ith_class = (
-                groundtruth_is_difficult_list[groundtruth_class_labels == i]
-            )
-            groundtruth_is_group_of_list_at_ith_class = (
-                groundtruth_is_group_of_list[groundtruth_class_labels == i]
-            )
+            groundtruth_is_difficult_list_at_ith_class = groundtruth_is_difficult_list[
+                groundtruth_class_labels == i
+            ]
+            groundtruth_is_group_of_list_at_ith_class = groundtruth_is_group_of_list[
+                groundtruth_class_labels == i
+            ]
             (
                 gt_boxes_at_ith_class,
                 gt_masks_at_ith_class,
@@ -329,9 +320,9 @@ class PerImageEvaluation:
 
         # Tp-fp evaluation for non-group of boxes (if any).
         if iou.shape[1] > 0:
-            groundtruth_nongroup_of_is_difficult_list = (
-                groundtruth_is_difficult_list[~groundtruth_is_group_of_list]
-            )
+            groundtruth_nongroup_of_is_difficult_list = groundtruth_is_difficult_list[
+                ~groundtruth_is_group_of_list
+            ]
             max_overlap_gt_ids = np.argmax(iou, axis=1)
             is_gt_box_detected = np.zeros(iou.shape[1], dtype=bool)
             for i in range(num_detected_boxes):
@@ -346,9 +337,7 @@ class PerImageEvaluation:
 
         return (
             scores[~is_matched_to_difficult_box & ~is_matched_to_group_of_box],
-            tp_fp_labels[
-                ~is_matched_to_difficult_box & ~is_matched_to_group_of_box
-            ],
+            tp_fp_labels[~is_matched_to_difficult_box & ~is_matched_to_group_of_box],
         )
 
     def _get_ith_class_arrays(

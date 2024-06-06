@@ -12,21 +12,18 @@ Hacked together by / Copyright 2020 Ross Wightman
 """
 import math
 import random
+
 import torch
 
 
-def _get_pixels(
-    per_pixel, rand_color, patch_size, dtype=torch.float32, device="cuda"
-):
+def _get_pixels(per_pixel, rand_color, patch_size, dtype=torch.float32, device="cuda"):
     # NOTE I've seen CUDA illegal memory access errors being caused by the normal_()
     # paths, flip the order so normal is run on CPU if this becomes a problem
     # Issue has been fixed in master https://github.com/pytorch/pytorch/issues/19508
     if per_pixel:
         return torch.empty(patch_size, dtype=dtype, device=device).normal_()
     elif rand_color:
-        return torch.empty(
-            (patch_size[0], 1, 1), dtype=dtype, device=device
-        ).normal_()
+        return torch.empty((patch_size[0], 1, 1), dtype=dtype, device=device).normal_()
     else:
         return torch.zeros((patch_size[0], 1, 1), dtype=dtype, device=device)
 
@@ -144,9 +141,7 @@ class RandomErasing:
                     left = random.randint(0, img_w - w)
                     for i in range(batch_start, batch_size):
                         img_instance = img[i]
-                        img_instance[
-                            :, top : top + h, left : left + w
-                        ] = _get_pixels(
+                        img_instance[:, top : top + h, left : left + w] = _get_pixels(
                             self.per_pixel,
                             self.rand_color,
                             (chan, h, w),
@@ -161,9 +156,7 @@ class RandomErasing:
         else:
             batch_size, chan, img_h, img_w = input.size()
             # skip first slice of batch if num_splits is set (for clean portion of samples)
-            batch_start = (
-                batch_size // self.num_splits if self.num_splits > 1 else 0
-            )
+            batch_start = batch_size // self.num_splits if self.num_splits > 1 else 0
             if self.cube:
                 self._erase_cube(
                     input,

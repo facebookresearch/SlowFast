@@ -19,12 +19,8 @@ Example mask operations that are supported:
   * Areas: compute mask areas
   * IOU: pairwise intersection-over-union scores
 """
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy as np
 
 EPSILON = 1e-7
@@ -70,9 +66,7 @@ def intersection(masks1, masks2):
     answer = np.zeros([n, m], dtype=np.float32)
     for i in np.arange(n):
         for j in np.arange(m):
-            answer[i, j] = np.sum(
-                np.minimum(masks1[i], masks2[j]), dtype=np.float32
-            )
+            answer[i, j] = np.sum(np.minimum(masks1[i], masks2[j]), dtype=np.float32)
     return answer
 
 
@@ -96,11 +90,7 @@ def iou(masks1, masks2):
     intersect = intersection(masks1, masks2)
     area1 = area(masks1)
     area2 = area(masks2)
-    union = (
-        np.expand_dims(area1, axis=1)
-        + np.expand_dims(area2, axis=0)
-        - intersect
-    )
+    union = np.expand_dims(area1, axis=1) + np.expand_dims(area2, axis=0) - intersect
     return intersect / np.maximum(union, EPSILON)
 
 

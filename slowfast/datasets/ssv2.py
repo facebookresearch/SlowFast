@@ -2,14 +2,15 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import json
-import numpy as np
 import os
 import random
 from itertools import chain as chain
-import torch
-import torch.utils.data
+
+import numpy as np
 
 import slowfast.utils.logging as logging
+import torch
+import torch.utils.data
 from slowfast.utils.env import pathmgr
 
 from . import utils as utils
@@ -63,9 +64,7 @@ class Ssv2(torch.utils.data.Dataset):
         if self.mode in ["train", "val"]:
             self._num_clips = 1
         elif self.mode in ["test"]:
-            self._num_clips = (
-                cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
-            )
+            self._num_clips = cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
 
         logger.info("Constructing Something-Something V2 {}...".format(mode))
         self._construct_loader()
@@ -119,9 +118,7 @@ class Ssv2(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert pathmgr.exists(path_to_file), "{} dir not found".format(
-            path_to_file
-        )
+        assert pathmgr.exists(path_to_file), "{} dir not found".format(path_to_file)
 
         self._path_to_videos, _ = utils.load_image_lists(
             path_to_file, self.cfg.DATA.PATH_PREFIX
@@ -144,26 +141,19 @@ class Ssv2(torch.utils.data.Dataset):
 
         # Extend self when self._num_clips > 1 (during testing).
         self._path_to_videos = list(
-            chain.from_iterable(
-                [[x] * self._num_clips for x in self._path_to_videos]
-            )
+            chain.from_iterable([[x] * self._num_clips for x in self._path_to_videos])
         )
         self._labels = list(
             chain.from_iterable([[x] * self._num_clips for x in self._labels])
         )
         self._spatial_temporal_idx = list(
             chain.from_iterable(
-                [
-                    range(self._num_clips)
-                    for _ in range(len(self._path_to_videos))
-                ]
+                [range(self._num_clips) for _ in range(len(self._path_to_videos))]
             )
         )
         logger.info(
             "Something-Something V2 dataloader constructed "
-            " (size: {}) from {}".format(
-                len(self._path_to_videos), path_to_file
-            )
+            " (size: {}) from {}".format(len(self._path_to_videos), path_to_file)
         )
 
     def get_seq_frames(self, index):
@@ -225,28 +215,21 @@ class Ssv2(torch.utils.data.Dataset):
                 # Decreasing the scale is equivalent to using a larger "span"
                 # in a sampling grid.
                 min_scale = int(
-                    round(
-                        float(min_scale)
-                        * crop_size
-                        / self.cfg.MULTIGRID.DEFAULT_S
-                    )
+                    round(float(min_scale) * crop_size / self.cfg.MULTIGRID.DEFAULT_S)
                 )
         elif self.mode in ["test"]:
             # spatial_sample_index is in [0, 1, 2]. Corresponding to left,
             # center, or right if width is larger than height, and top, middle,
             # or bottom if height is larger than width.
             spatial_sample_index = (
-                self._spatial_temporal_idx[index]
-                % self.cfg.TEST.NUM_SPATIAL_CROPS
+                self._spatial_temporal_idx[index] % self.cfg.TEST.NUM_SPATIAL_CROPS
             )
             min_scale, max_scale, crop_size = [self.cfg.DATA.TEST_CROP_SIZE] * 3
             # The testing is deterministic and no jitter should be performed.
             # min_scale, max_scale, and crop_size are expect to be the same.
             assert len({min_scale, max_scale, crop_size}) == 1
         else:
-            raise NotImplementedError(
-                "Does not support {} mode".format(self.mode)
-            )
+            raise NotImplementedError("Does not support {} mode".format(self.mode))
 
         label = self._labels[index]
 
@@ -280,7 +263,13 @@ class Ssv2(torch.utils.data.Dataset):
                     frame_list.append(new_frames)
                     label_list.append(label)
                     index_list.append(index)
-                return frame_list, label_list, index_list, [0] * self.cfg.AUG.NUM_SAMPLE, {}
+                return (
+                    frame_list,
+                    label_list,
+                    index_list,
+                    [0] * self.cfg.AUG.NUM_SAMPLE,
+                    {},
+                )
 
             else:
                 frames = utils.aug_frame(

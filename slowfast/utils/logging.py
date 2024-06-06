@@ -10,6 +10,7 @@ import functools
 import logging
 import os
 import sys
+
 import simplejson
 
 import slowfast.utils.distributed as du
@@ -30,9 +31,7 @@ def _suppress_print():
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
     # Use 1K buffer if writing to cloud storage.
-    io = pathmgr.open(
-        filename, "a", buffering=1024 if "://" in filename else -1
-    )
+    io = pathmgr.open(filename, "a", buffering=1024 if "://" in filename else -1)
     atexit.register(io.close)
     return io
 
@@ -105,6 +104,4 @@ def log_json_stats(stats, output_dir=None):
             ) as f:
                 f.write("json_stats: {:s}\n".format(json_stats))
         except Exception:
-            logger.info(
-                "Failed to write to json_stats.log: {}".format(json_stats)
-            )
+            logger.info("Failed to write to json_stats.log: {}".format(json_stats))

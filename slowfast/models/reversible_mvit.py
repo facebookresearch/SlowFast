@@ -1,12 +1,13 @@
 import sys
 from functools import partial
+
 import torch
+
+from slowfast.models.attention import attention_pool, MultiScaleAttention
+from slowfast.models.common import drop_path, Mlp, TwoStreamFusion
+from slowfast.models.utils import round_width
 from torch import nn
 from torch.autograd import Function as Function
-
-from slowfast.models.attention import MultiScaleAttention, attention_pool
-from slowfast.models.common import Mlp, TwoStreamFusion, drop_path
-from slowfast.models.utils import round_width
 
 
 class ReversibleMViT(nn.Module):
@@ -62,9 +63,7 @@ class ReversibleMViT(nn.Module):
         for i in range(len(self.cfg.MVIT.DIM_MUL)):
             dim_mul[self.cfg.MVIT.DIM_MUL[i][0]] = self.cfg.MVIT.DIM_MUL[i][1]
         for i in range(len(self.cfg.MVIT.HEAD_MUL)):
-            head_mul[self.cfg.MVIT.HEAD_MUL[i][0]] = self.cfg.MVIT.HEAD_MUL[i][
-                1
-            ]
+            head_mul[self.cfg.MVIT.HEAD_MUL[i][0]] = self.cfg.MVIT.HEAD_MUL[i][1]
 
         pool_q = model.pool_q
         pool_kv = model.pool_kv
@@ -122,8 +121,7 @@ class ReversibleMViT(nn.Module):
 
             if len(stride_q[i]) > 0:
                 input_size = [
-                    size // stride
-                    for size, stride in zip(input_size, stride_q[i])
+                    size // stride for size, stride in zip(input_size, stride_q[i])
                 ]
 
         embed_dim = dim_out
@@ -250,12 +248,8 @@ class RevBackProp(Function):
             if layer.layer_id in buffer_layers:
 
                 X_1, X_2, dX_1, dX_2 = layer.backward_pass(
-                    Y_1=int_tensors[
-                        buffer_layers.index(layer.layer_id) * 2 + 1
-                    ],
-                    Y_2=int_tensors[
-                        buffer_layers.index(layer.layer_id) * 2 + 2
-                    ],
+                    Y_1=int_tensors[buffer_layers.index(layer.layer_id) * 2 + 1],
+                    Y_2=int_tensors[buffer_layers.index(layer.layer_id) * 2 + 2],
                     dY_1=dX_1,
                     dY_2=dX_2,
                 )
@@ -390,9 +384,7 @@ class StageTransitionBlock(nn.Module):
                 fold_dim = self.F.attn.num_heads
 
             # Output is (B, N, L, C)
-            x_res = x_res.reshape(N, L, fold_dim, C // fold_dim).permute(
-                0, 2, 1, 3
-            )
+            x_res = x_res.reshape(N, L, fold_dim, C // fold_dim).permute(0, 2, 1, 3)
 
             x_res, _ = attention_pool(
                 x_res,
@@ -400,9 +392,7 @@ class StageTransitionBlock(nn.Module):
                 # thw_shape = self.attention.attn.thw,
                 thw_shape=self.F.thw,
                 has_cls_embed=self.has_cls_embed,
-                norm=self.F.attn.norm_q
-                if hasattr(self.F.attn, "norm_q")
-                else None,
+                norm=self.F.attn.norm_q if hasattr(self.F.attn, "norm_q") else None,
             )
             x_res = x_res.permute(0, 2, 1, 3).reshape(N, x_res.shape[2], C)
 

@@ -4,23 +4,24 @@
 import json
 import logging
 import math
-import numpy as np
 import os
 from datetime import datetime
+
+import numpy as np
 import psutil
+
+import slowfast.utils.logging as logging
+import slowfast.utils.multiprocessing as mpu
 import torch
 import torchvision.io as io
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
-from torch import nn
-from torchvision.utils import make_grid
-
-import slowfast.utils.logging as logging
-import slowfast.utils.multiprocessing as mpu
 from slowfast.datasets.utils import pack_pathway_output
 from slowfast.models.batchnorm_helper import SubBatchNorm3d
 from slowfast.utils.env import pathmgr
+from torch import nn
+from torchvision.utils import make_grid
 
 logger = logging.get_logger(__name__)
 
@@ -213,9 +214,7 @@ def is_eval_epoch(cfg, cur_epoch, multigrid_schedule):
         prev_epoch = 0
         for s in multigrid_schedule:
             if cur_epoch < s[-1]:
-                period = max(
-                    (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
-                )
+                period = max((s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1)
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
@@ -339,18 +338,10 @@ def plot_input_normed(
                     if bboxes is not None and len(bboxes) > i:
                         for box in bboxes[i]:
                             x1, y1, x2, y2 = box
-                            ax[i].vlines(
-                                x1, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].vlines(
-                                x2, y1, y2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y1, x1, x2, colors="g", linestyles="solid"
-                            )
-                            ax[i].hlines(
-                                y2, x1, x2, colors="g", linestyles="solid"
-                            )
+                            ax[i].vlines(x1, y1, y2, colors="g", linestyles="solid")
+                            ax[i].vlines(x2, y1, y2, colors="g", linestyles="solid")
+                            ax[i].hlines(y1, x1, x2, colors="g", linestyles="solid")
+                            ax[i].hlines(y2, x1, x2, colors="g", linestyles="solid")
 
                     if texts is not None and len(texts) > i:
                         ax[i].text(0, 0, texts[i])
@@ -468,17 +459,11 @@ def get_class_names(path, parent_path=None, subset_path=None):
             with pathmgr.open(parent_path, "r") as f:
                 d_parent = json.load(f)
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    parent_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(parent_path, err))
             return
         class_parent = {}
         for parent, children in d_parent.items():
-            indices = [
-                class2idx[c] for c in children if class2idx.get(c) is not None
-            ]
+            indices = [class2idx[c] for c in children if class2idx.get(c) is not None]
             class_parent[parent] = indices
 
     subset_ids = None
@@ -492,11 +477,7 @@ def get_class_names(path, parent_path=None, subset_path=None):
                     if class2idx.get(name) is not None
                 ]
         except EnvironmentError as err:
-            print(
-                "Fail to load file from {} with error {}".format(
-                    subset_path, err
-                )
-            )
+            print("Fail to load file from {} with error {}".format(subset_path, err))
             return
 
     return class_names, class_parent, subset_ids

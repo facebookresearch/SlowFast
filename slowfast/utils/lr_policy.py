@@ -19,9 +19,7 @@ def get_lr_at_epoch(cfg, cur_epoch):
     # Perform warm up.
     if cur_epoch < cfg.SOLVER.WARMUP_EPOCHS:
         lr_start = cfg.SOLVER.WARMUP_START_LR
-        lr_end = get_lr_func(cfg.SOLVER.LR_POLICY)(
-            cfg, cfg.SOLVER.WARMUP_EPOCHS
-        )
+        lr_end = get_lr_func(cfg.SOLVER.LR_POLICY)(cfg, cfg.SOLVER.WARMUP_EPOCHS)
         alpha = (lr_end - lr_start) / cfg.SOLVER.WARMUP_EPOCHS
         lr = cur_epoch * alpha + lr_start
     return lr
@@ -44,9 +42,7 @@ def lr_func_cosine(cfg, cur_epoch):
         cfg.SOLVER.COSINE_END_LR
         + (cfg.SOLVER.BASE_LR - cfg.SOLVER.COSINE_END_LR)
         * (
-            math.cos(
-                math.pi * (cur_epoch - offset) / (cfg.SOLVER.MAX_EPOCH - offset)
-            )
+            math.cos(math.pi * (cur_epoch - offset) / (cfg.SOLVER.MAX_EPOCH - offset))
             + 1.0
         )
         * 0.5

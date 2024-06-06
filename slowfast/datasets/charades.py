@@ -4,10 +4,10 @@
 import os
 import random
 from itertools import chain as chain
-import torch
-import torch.utils.data
 
 import slowfast.utils.logging as logging
+import torch
+import torch.utils.data
 from slowfast.utils.env import pathmgr
 
 from . import utils as utils
@@ -64,9 +64,7 @@ class Charades(torch.utils.data.Dataset):
         if self.mode in ["train", "val"]:
             self._num_clips = 1
         elif self.mode in ["test"]:
-            self._num_clips = (
-                cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
-            )
+            self._num_clips = cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
 
         logger.info("Constructing Charades {}...".format(mode))
         self._construct_loader()
@@ -79,9 +77,7 @@ class Charades(torch.utils.data.Dataset):
             self.cfg.DATA.PATH_TO_DATA_DIR,
             "{}.csv".format("train" if self.mode == "train" else "val"),
         )
-        assert pathmgr.exists(path_to_file), "{} dir not found".format(
-            path_to_file
-        )
+        assert pathmgr.exists(path_to_file), "{} dir not found".format(path_to_file)
         (self._path_to_videos, self._labels) = utils.load_image_lists(
             path_to_file, self.cfg.DATA.PATH_PREFIX, return_list=True
         )
@@ -91,9 +87,7 @@ class Charades(torch.utils.data.Dataset):
             self._labels = utils.convert_to_video_level_labels(self._labels)
 
         self._path_to_videos = list(
-            chain.from_iterable(
-                [[x] * self._num_clips for x in self._path_to_videos]
-            )
+            chain.from_iterable([[x] * self._num_clips for x in self._path_to_videos])
         )
         self._labels = list(
             chain.from_iterable([[x] * self._num_clips for x in self._labels])
@@ -121,8 +115,7 @@ class Charades(torch.utils.data.Dataset):
         temporal_sample_index = (
             -1
             if self.mode in ["train", "val"]
-            else self._spatial_temporal_idx[index]
-            // self.cfg.TEST.NUM_SPATIAL_CROPS
+            else self._spatial_temporal_idx[index] // self.cfg.TEST.NUM_SPATIAL_CROPS
         )
         num_frames = self.cfg.DATA.NUM_FRAMES
         sampling_rate = utils.get_random_sampling_rate(
@@ -189,28 +182,21 @@ class Charades(torch.utils.data.Dataset):
                 # Decreasing the scale is equivalent to using a larger "span"
                 # in a sampling grid.
                 min_scale = int(
-                    round(
-                        float(min_scale)
-                        * crop_size
-                        / self.cfg.MULTIGRID.DEFAULT_S
-                    )
+                    round(float(min_scale) * crop_size / self.cfg.MULTIGRID.DEFAULT_S)
                 )
         elif self.mode in ["test"]:
             # spatial_sample_index is in [0, 1, 2]. Corresponding to left,
             # center, or right if width is larger than height, and top, middle,
             # or bottom if height is larger than width.
             spatial_sample_index = (
-                self._spatial_temporal_idx[index]
-                % self.cfg.TEST.NUM_SPATIAL_CROPS
+                self._spatial_temporal_idx[index] % self.cfg.TEST.NUM_SPATIAL_CROPS
             )
             min_scale, max_scale, crop_size = [self.cfg.DATA.TEST_CROP_SIZE] * 3
             # The testing is deterministic and no jitter should be performed.
             # min_scale, max_scale, and crop_size are expect to be the same.
             assert len({min_scale, max_scale, crop_size}) == 1
         else:
-            raise NotImplementedError(
-                "Does not support {} mode".format(self.mode)
-            )
+            raise NotImplementedError("Does not support {} mode".format(self.mode))
 
         seq = self.get_seq_frames(index)
         frames = torch.as_tensor(
@@ -228,9 +214,7 @@ class Charades(torch.utils.data.Dataset):
         )
 
         # Perform color normalization.
-        frames = utils.tensor_normalize(
-            frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
-        )
+        frames = utils.tensor_normalize(frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD)
         # T H W C -> C T H W.
         frames = frames.permute(3, 0, 1, 2)
         # Perform data augmentation.

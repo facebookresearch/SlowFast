@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-import numpy as np
 import time
+
+import numpy as np
 import torch
 import tqdm
 
@@ -37,9 +38,7 @@ def run_demo(cfg, frame_provider):
     logger.info("Run demo with config:")
     logger.info(cfg)
     common_classes = (
-        cfg.DEMO.COMMON_CLASS_NAMES
-        if len(cfg.DEMO.LABEL_FILE_PATH) != 0
-        else None
+        cfg.DEMO.COMMON_CLASS_NAMES if len(cfg.DEMO.LABEL_FILE_PATH) != 0 else None
     )
 
     video_vis = VideoVisualizer(

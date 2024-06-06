@@ -188,7 +188,5 @@ class MixUp:
             lam = 1.0
         else:
             raise NotImplementedError
-        target = mixup_target(
-            target, self.num_classes, lam, self.label_smoothing
-        )
+        target = mixup_target(target, self.num_classes, lam, self.label_smoothing)
         return x, target

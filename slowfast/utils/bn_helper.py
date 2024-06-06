@@ -4,6 +4,7 @@
 """bn helper."""
 
 import itertools
+
 import torch
 
 
@@ -49,9 +50,7 @@ def compute_and_update_bn_stats(model, data_loader, num_batches=200):
     running_mean = [torch.zeros_like(bn.running_mean) for bn in bn_layers]
     running_square_mean = [torch.zeros_like(bn.running_var) for bn in bn_layers]
 
-    for ind, (inputs, _, _) in enumerate(
-        itertools.islice(data_loader, num_batches)
-    ):
+    for ind, (inputs, _, _) in enumerate(itertools.islice(data_loader, num_batches)):
         # Forwards the model to update the bn stats.
         if isinstance(inputs, (list,)):
             for i in range(len(inputs)):
@@ -65,9 +64,9 @@ def compute_and_update_bn_stats(model, data_loader, num_batches=200):
             running_mean[i] += (bn.running_mean - running_mean[i]) / (ind + 1)
             # $E(x^2) = Var(x) + E(x)^2$.
             cur_square_mean = bn.running_var + bn.running_mean**2
-            running_square_mean[i] += (
-                cur_square_mean - running_square_mean[i]
-            ) / (ind + 1)
+            running_square_mean[i] += (cur_square_mean - running_square_mean[i]) / (
+                ind + 1
+            )
 
     for i, bn in enumerate(bn_layers):
         bn.running_mean = running_mean[i]

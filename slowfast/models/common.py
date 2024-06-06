@@ -87,25 +87,17 @@ class TwoStreamFusion(nn.Module):
         super().__init__()
         self.mode = mode
         if mode == "add":
-            self.fuse_fn = lambda x: torch.stack(torch.chunk(x, 2, dim=2)).sum(
-                dim=0
-            )
+            self.fuse_fn = lambda x: torch.stack(torch.chunk(x, 2, dim=2)).sum(dim=0)
         elif mode == "max":
             self.fuse_fn = (
-                lambda x: torch.stack(torch.chunk(x, 2, dim=2))
-                .max(dim=0)
-                .values
+                lambda x: torch.stack(torch.chunk(x, 2, dim=2)).max(dim=0).values
             )
         elif mode == "min":
             self.fuse_fn = (
-                lambda x: torch.stack(torch.chunk(x, 2, dim=2))
-                .min(dim=0)
-                .values
+                lambda x: torch.stack(torch.chunk(x, 2, dim=2)).min(dim=0).values
             )
         elif mode == "avg":
-            self.fuse_fn = lambda x: torch.stack(torch.chunk(x, 2, dim=2)).mean(
-                dim=0
-            )
+            self.fuse_fn = lambda x: torch.stack(torch.chunk(x, 2, dim=2)).mean(dim=0)
         elif mode == "concat":
             # x itself is the channel concat version
             self.fuse_fn = lambda x: x

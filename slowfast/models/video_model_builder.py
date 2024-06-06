@@ -5,13 +5,12 @@
 
 import math
 from functools import partial
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.init import trunc_normal_
 
 import slowfast.utils.logging as logging
 import slowfast.utils.weight_init_helper as init_helper
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import get_norm
 from slowfast.models.common import TwoStreamFusion
@@ -22,6 +21,7 @@ from slowfast.models.utils import (
     round_width,
     validate_checkpoint_wrapper_import,
 )
+from torch.nn.init import trunc_normal_
 
 from . import head_helper, operators, resnet_helper, stem_helper  # noqa
 from .build import MODEL_REGISTRY
@@ -218,9 +218,7 @@ class SlowFast(nn.Module):
         num_groups = cfg.RESNET.NUM_GROUPS
         width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
-        out_dim_ratio = (
-            cfg.SLOWFAST.BETA_INV // cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO
-        )
+        out_dim_ratio = cfg.SLOWFAST.BETA_INV // cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
@@ -377,9 +375,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[
                     [
-                        cfg.DATA.NUM_FRAMES
-                        // cfg.SLOWFAST.ALPHA
-                        // pool_size[0][0],
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
                         1,
                         1,
                     ],
@@ -399,23 +395,25 @@ class SlowFast(nn.Module):
                     width_per_group * 32 // cfg.SLOWFAST.BETA_INV,
                 ],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[None, None]
-                if cfg.MULTIGRID.SHORT_CYCLE
-                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                else [
-                    [
-                        cfg.DATA.NUM_FRAMES
-                        // cfg.SLOWFAST.ALPHA
-                        // pool_size[0][0],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
-                    ],
-                    [
-                        cfg.DATA.NUM_FRAMES // pool_size[1][0],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
-                    ],
-                ],  # None for AdaptiveAvgPool3d((1, 1, 1))
+                pool_size=(
+                    [None, None]
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                    else [
+                        [
+                            cfg.DATA.NUM_FRAMES
+                            // cfg.SLOWFAST.ALPHA
+                            // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                        ],
+                        [
+                            cfg.DATA.NUM_FRAMES // pool_size[1][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[1][2],
+                        ],
+                    ]
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
@@ -626,16 +624,18 @@ class ResNet(nn.Module):
             self.head = head_helper.ResNetBasicHead(
                 dim_in=[width_per_group * 32],
                 num_classes=cfg.MODEL.NUM_CLASSES,
-                pool_size=[None]
-                if cfg.MULTIGRID.SHORT_CYCLE
-                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                else [
-                    [
-                        cfg.DATA.NUM_FRAMES // pool_size[0][0],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
-                        cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                pool_size=(
+                    [None]
+                    if cfg.MULTIGRID.SHORT_CYCLE
+                    or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                    else [
+                        [
+                            cfg.DATA.NUM_FRAMES // pool_size[0][0],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
+                            cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
+                        ]
                     ]
-                ],  # None for AdaptiveAvgPool3d((1, 1, 1))
+                ),  # None for AdaptiveAvgPool3d((1, 1, 1))
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 detach_final_fc=cfg.MODEL.DETACH_FINAL_FC,
@@ -755,9 +755,7 @@ class X3D(nn.Module):
             dim_inner = int(cfg.X3D.BOTTLENECK_FACTOR * dim_out)
 
             n_rep = self._round_repeats(block[0], d_mul)
-            prefix = "s{}".format(
-                stage + 2
-            )  # start w res2 to follow convention
+            prefix = "s{}".format(stage + 2)  # start w res2 to follow convention
 
             s = resnet_helper.ResStage(
                 dim_in=[dim_in],
@@ -766,9 +764,7 @@ class X3D(nn.Module):
                 temp_kernel_sizes=temp_kernel[1],
                 stride=[block[2]],
                 num_blocks=[n_rep],
-                num_groups=[dim_inner]
-                if cfg.X3D.CHANNELWISE_3x3x3
-                else [num_groups],
+                num_groups=[dim_inner] if cfg.X3D.CHANNELWISE_3x3x3 else [num_groups],
                 num_block_temp_kernel=[n_rep],
                 nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
                 nonlocal_group=cfg.NONLOCAL.GROUP[0],
@@ -896,17 +892,13 @@ class MViT(nn.Module):
         if self.use_abs_pos:
             if self.sep_pos_embed:
                 self.pos_embed_spatial = nn.Parameter(
-                    torch.zeros(
-                        1, self.patch_dims[1] * self.patch_dims[2], embed_dim
-                    )
+                    torch.zeros(1, self.patch_dims[1] * self.patch_dims[2], embed_dim)
                 )
                 self.pos_embed_temporal = nn.Parameter(
                     torch.zeros(1, self.patch_dims[0], embed_dim)
                 )
                 if self.cls_embed_on:
-                    self.pos_embed_class = nn.Parameter(
-                        torch.zeros(1, 1, embed_dim)
-                    )
+                    self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
             else:
                 self.pos_embed = nn.Parameter(
                     torch.zeros(
@@ -932,9 +924,7 @@ class MViT(nn.Module):
         stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
 
         for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
-            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
-                1:
-            ]
+            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][1:]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
                 pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
@@ -955,17 +945,12 @@ class MViT(nn.Module):
                 cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
 
         for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
-            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
-                i
-            ][1:]
+            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[i][1:]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_kv[
-                    cfg.MVIT.POOL_KV_STRIDE[i][0]
-                ] = cfg.MVIT.POOL_KVQ_KERNEL
+                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
                 pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
-                    s + 1 if s > 1 else s
-                    for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
+                    s + 1 if s > 1 else s for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
                 ]
 
         self.pool_q = pool_q
@@ -984,13 +969,9 @@ class MViT(nn.Module):
 
             self.rev_backbone = ReversibleMViT(cfg, self)
 
-            embed_dim = round_width(
-                embed_dim, dim_mul.prod(), divisor=num_heads
-            )
+            embed_dim = round_width(embed_dim, dim_mul.prod(), divisor=num_heads)
 
-            self.fuse = TwoStreamFusion(
-                cfg.MVIT.REV.RESPATH_FUSE, dim=2 * embed_dim
-            )
+            self.fuse = TwoStreamFusion(cfg.MVIT.REV.RESPATH_FUSE, dim=2 * embed_dim)
 
             if "concat" in self.cfg.MVIT.REV.RESPATH_FUSE:
                 self.norm = norm_layer(2 * embed_dim)
@@ -1045,8 +1026,7 @@ class MViT(nn.Module):
                 self.blocks.append(attention_block)
                 if len(stride_q[i]) > 0:
                     input_size = [
-                        size // stride
-                        for size, stride in zip(input_size, stride_q[i])
+                        size // stride for size, stride in zip(input_size, stride_q[i])
                     ]
 
                 embed_dim = dim_out
@@ -1066,9 +1046,11 @@ class MViT(nn.Module):
             )
         else:
             self.head = head_helper.TransformerBasicHead(
-                2 * embed_dim
-                if ("concat" in cfg.MVIT.REV.RESPATH_FUSE and self.enable_rev)
-                else embed_dim,
+                (
+                    2 * embed_dim
+                    if ("concat" in cfg.MVIT.REV.RESPATH_FUSE and self.enable_rev)
+                    else embed_dim
+                ),
                 num_classes,
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
@@ -1150,9 +1132,7 @@ class MViT(nn.Module):
 
         if (p_t, p_h, p_w) != (t, h, w):
             new_pos_embed = F.interpolate(
-                pos_embed[:, :, :]
-                .reshape(1, p_t, p_h, p_w, -1)
-                .permute(0, 4, 1, 2, 3),
+                pos_embed[:, :, :].reshape(1, p_t, p_h, p_w, -1).permute(0, 4, 1, 2, 3),
                 size=(t, h, w),
                 mode="trilinear",
             )

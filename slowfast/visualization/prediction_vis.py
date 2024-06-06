@@ -2,11 +2,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import numpy as np
-import torch
 
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.logging as logging
 import slowfast.visualization.tensorboard_vis as tb
+import torch
 from slowfast.utils.misc import get_class_names
 from slowfast.visualization.video_visualizer import VideoVisualizer
 
@@ -100,9 +100,7 @@ class WrongPredictionVis:
             vid = self.video_vis.draw_clip(vid, preds)
             vid = torch.from_numpy(np.array(vid)).permute(0, 3, 1, 2)
             vid = torch.unsqueeze(vid, dim=0)
-            self.writer.add_video(
-                vid, tag="{}: {}".format(tag, true_class_name)
-            )
+            self.writer.add_video(vid, tag="{}: {}".format(tag, true_class_name))
 
         mask = self._pick_wrong_preds(labels, preds)
         video_indices = torch.squeeze(mask.nonzero(), dim=-1)
@@ -113,8 +111,7 @@ class WrongPredictionVis:
                 add_video(
                     video_input[pathway][vid_idx],
                     preds=preds[vid_idx],
-                    tag=self.tag
-                    + "/Video {}, Pathway {}".format(cur_vid_idx, pathway),
+                    tag=self.tag + "/Video {}, Pathway {}".format(cur_vid_idx, pathway),
                     true_class_name=self.class_names[labels[vid_idx]],
                 )
 

@@ -29,9 +29,7 @@ def load_image_lists(cfg, is_train):
     """
     list_filenames = [
         os.path.join(cfg.AVA.FRAME_LIST_DIR, filename)
-        for filename in (
-            cfg.AVA.TRAIN_LISTS if is_train else cfg.AVA.TEST_LISTS
-        )
+        for filename in (cfg.AVA.TRAIN_LISTS if is_train else cfg.AVA.TEST_LISTS)
     ]
     image_paths = defaultdict(list)
     video_name_to_idx = {}
@@ -53,15 +51,11 @@ def load_image_lists(cfg, is_train):
 
                 data_key = video_name_to_idx[video_name]
 
-                image_paths[data_key].append(
-                    os.path.join(cfg.AVA.FRAME_DIR, row[3])
-                )
+                image_paths[data_key].append(os.path.join(cfg.AVA.FRAME_DIR, row[3]))
 
     image_paths = [image_paths[i] for i in range(len(image_paths))]
 
-    logger.info(
-        "Finished loading image paths from: %s" % ", ".join(list_filenames)
-    )
+    logger.info("Finished loading image paths from: %s" % ", ".join(list_filenames))
 
     return image_paths, video_idx_to_name
 
@@ -95,18 +89,14 @@ def load_boxes_and_labels(cfg, mode):
     detect_thresh = cfg.AVA.DETECTION_SCORE_THRESH
     # Only select frame_sec % 4 = 0 samples for validation if not
     # set FULL_TEST_ON_VAL.
-    boxes_sample_rate = (
-        4 if mode == "val" and not cfg.AVA.FULL_TEST_ON_VAL else 1
-    )
+    boxes_sample_rate = 4 if mode == "val" and not cfg.AVA.FULL_TEST_ON_VAL else 1
     all_boxes, count, unique_box_count = parse_bboxes_file(
         ann_filenames=ann_filenames,
         ann_is_gt_box=ann_is_gt_box,
         detect_thresh=detect_thresh,
         boxes_sample_rate=boxes_sample_rate,
     )
-    logger.info(
-        "Finished loading annotations from: %s" % ", ".join(ann_filenames)
-    )
+    logger.info("Finished loading annotations from: %s" % ", ".join(ann_filenames))
     logger.info("Detection threshold: {}".format(detect_thresh))
     logger.info("Number of unique boxes: %d" % unique_box_count)
     logger.info("Number of annotations: %d" % count)
@@ -147,9 +137,7 @@ def get_keyframe_data(boxes_and_labels):
                 continue
 
             if len(boxes_and_labels[video_idx][sec]) > 0:
-                keyframe_indices.append(
-                    (video_idx, sec_idx, sec, sec_to_frame(sec))
-                )
+                keyframe_indices.append((video_idx, sec_idx, sec, sec_to_frame(sec)))
                 keyframe_boxes_and_labels[video_idx].append(
                     boxes_and_labels[video_idx][sec]
                 )
@@ -179,9 +167,7 @@ def get_num_boxes_used(keyframe_indices, keyframe_boxes_and_labels):
     return count
 
 
-def parse_bboxes_file(
-    ann_filenames, ann_is_gt_box, detect_thresh, boxes_sample_rate=1
-):
+def parse_bboxes_file(ann_filenames, ann_is_gt_box, detect_thresh, boxes_sample_rate=1):
     """
     Parse AVA bounding boxes files.
     Args:

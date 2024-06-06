@@ -19,12 +19,8 @@ Example box operations that are supported:
   * Areas: compute bounding box areas
   * IOU: pairwise intersection-over-union scores
 """
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy as np
 
 from . import np_box_list, np_box_ops
@@ -239,9 +235,7 @@ def non_max_suppression(
     return gather(boxlist, np.array(selected_indices))
 
 
-def multi_class_non_max_suppression(
-    boxlist, score_thresh, iou_thresh, max_output_size
-):
+def multi_class_non_max_suppression(boxlist, score_thresh, iou_thresh, max_output_size):
     """Multi-class version of non maximum suppression.
 
     This op greedily selects a subset of detection bounding boxes, pruning
@@ -334,9 +328,7 @@ def scale(boxlist, y_scale, x_scale):
     y_max = y_scale * y_max
     x_min = x_scale * x_min
     x_max = x_scale * x_max
-    scaled_boxlist = np_box_list.BoxList(
-        np.hstack([y_min, x_min, y_max, x_max])
-    )
+    scaled_boxlist = np_box_list.BoxList(np.hstack([y_min, x_min, y_max, x_max]))
 
     fields = boxlist.get_extra_fields()
     for field in fields:
@@ -376,9 +368,9 @@ def clip_to_window(boxlist, window):
     )
     clipped = _copy_extra_fields(clipped, boxlist)
     areas = area(clipped)
-    nonzero_area_indices = np.reshape(
-        np.nonzero(np.greater(areas, 0.0)), [-1]
-    ).astype(np.int32)
+    nonzero_area_indices = np.reshape(np.nonzero(np.greater(areas, 0.0)), [-1]).astype(
+        np.int32
+    )
     return gather(clipped, nonzero_area_indices)
 
 
@@ -398,9 +390,7 @@ def prune_non_overlapping_boxes(boxlist1, boxlist2, minoverlap=0.0):
       A pruned boxlist with size [N', 4].
     """
     intersection_over_area = ioa(boxlist2, boxlist1)  # [M, N] tensor
-    intersection_over_area = np.amax(
-        intersection_over_area, axis=0
-    )  # [N] tensor
+    intersection_over_area = np.amax(intersection_over_area, axis=0)  # [N] tensor
     keep_bool = np.greater_equal(intersection_over_area, np.array(minoverlap))
     keep_inds = np.nonzero(keep_bool)[0]
     new_boxlist1 = gather(boxlist1, keep_inds)
@@ -472,9 +462,7 @@ def concatenate(boxlists, fields=None):
         raise ValueError("boxlists should have nonzero length")
     for boxlist in boxlists:
         if not isinstance(boxlist, np_box_list.BoxList):
-            raise ValueError(
-                "all elements of boxlists should be BoxList objects"
-            )
+            raise ValueError("all elements of boxlists should be BoxList objects")
     concatenated = np_box_list.BoxList(
         np.vstack([boxlist.get() for boxlist in boxlists])
     )
@@ -527,12 +515,11 @@ def filter_scores_greater_than(boxlist, thresh):
         raise ValueError("Scores should have rank 1 or 2")
     if len(scores.shape) == 2 and scores.shape[1] != 1:
         raise ValueError(
-            "Scores should have rank 1 or have shape "
-            "consistent with [None, 1]"
+            "Scores should have rank 1 or have shape " "consistent with [None, 1]"
         )
-    high_score_indices = np.reshape(
-        np.where(np.greater(scores, thresh)), [-1]
-    ).astype(np.int32)
+    high_score_indices = np.reshape(np.where(np.greater(scores, thresh)), [-1]).astype(
+        np.int32
+    )
     return gather(boxlist, high_score_indices)
 
 
@@ -580,9 +567,7 @@ def _copy_extra_fields(boxlist_to_copy_to, boxlist_to_copy_from):
       boxlist_to_copy_to with extra fields.
     """
     for field in boxlist_to_copy_from.get_extra_fields():
-        boxlist_to_copy_to.add_field(
-            field, boxlist_to_copy_from.get_field(field)
-        )
+        boxlist_to_copy_to.add_field(field, boxlist_to_copy_from.get_field(field))
     return boxlist_to_copy_to
 
 

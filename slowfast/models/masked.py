@@ -3,17 +3,17 @@
 
 import math
 from functools import partial
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.init import trunc_normal_
 
 import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from slowfast.models import head_helper
 from slowfast.models.attention import attention_pool
 from slowfast.models.utils import calc_mvit_feature_geometry
 from slowfast.models.video_model_builder import MViT
+from torch.nn.init import trunc_normal_
 
 from . import head_helper, operators, resnet_helper, stem_helper  # noqa
 from .build import MODEL_REGISTRY
@@ -37,9 +37,7 @@ class MaskMViT(MViT):
         if self.head_type[0] == "separate":
             if not cfg.MASK.PRED_HOG:
                 pred_t_sz = (
-                    1
-                    if self.cfg.MASK.TIME_STRIDE_LOSS
-                    else self.patch_stride[0]
+                    1 if self.cfg.MASK.TIME_STRIDE_LOSS else self.patch_stride[0]
                 )
                 num_classes = [
                     pred_t_sz * (self.feat_stride[depth][-1] ** 2) * 3
@@ -106,16 +104,12 @@ class MaskMViT(MViT):
                     self.decoder_pos_embed = nn.Parameter(
                         torch.zeros(
                             1,
-                            num_patches + 1
-                            if self.cls_embed_on
-                            else num_patches,
+                            num_patches + 1 if self.cls_embed_on else num_patches,
                             decoder_embed_dim,
                         )
                     )
         self.mask_token = nn.Parameter(
-            torch.zeros(
-                1, 1, decoder_embed_dim if cfg.MASK.MAE_ON else embed_dim
-            )
+            torch.zeros(1, 1, decoder_embed_dim if cfg.MASK.MAE_ON else embed_dim)
         )
         trunc_normal_(self.mask_token, std=0.02)
         if self.use_abs_pos and cfg.MASK.MAE_ON:
@@ -220,26 +214,20 @@ class MaskMViT(MViT):
         self, input_frames, output_masks, time_stride_loss=True, norm=True
     ):
         if time_stride_loss:
-            input_frames = input_frames[
-                :, :, :: self.cfg.MVIT.PATCH_STRIDE[0], :, :
-            ]
+            input_frames = input_frames[:, :, :: self.cfg.MVIT.PATCH_STRIDE[0], :, :]
         imgs = input_frames
         input_frames = input_frames.permute(0, 2, 3, 4, 1)
         labels = []
         for depth, output_mask in zip(self.pretrain_depth, output_masks):
             size = self.feat_stride[depth][-1]
-            label = self._patchify(
-                imgs, p=size, time_stride_loss=time_stride_loss
-            )
+            label = self._patchify(imgs, p=size, time_stride_loss=time_stride_loss)
             label = label[output_mask]
 
             if norm:  # self.norm_pix_loss:
                 mean = label.mean(dim=-1, keepdim=True)
                 var = label.var(dim=-1, keepdim=True)
                 label = (label - mean) / (var + 1.0e-6) ** 0.5
-            labels.append(
-                (label, self.pred_pixel_wt / len(self.pretrain_depth))
-            )
+            labels.append((label, self.pred_pixel_wt / len(self.pretrain_depth)))
         return labels
 
     def _get_hog_label_2d(self, input_frames, output_masks):
@@ -321,9 +309,7 @@ class MaskMViT(MViT):
         ids_restore = torch.argsort(ids_shuffle, dim=1)
         # keep the first subset
         ids_keep = ids_shuffle[:, :len_keep]
-        x_masked = torch.gather(
-            x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D)
-        )
+        x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
         # generate the binary mask: 0 is keep, 1 is remove
         mask = torch.ones([N, L], device=x.device)
         mask[:, :len_keep] = 0
@@ -373,16 +359,12 @@ class MaskMViT(MViT):
                 pos_embed = torch.gather(
                     pos_embed,
                     dim=1,
-                    index=ids_keep.unsqueeze(-1).repeat(
-                        1, 1, pos_embed.shape[2]
-                    ),
+                    index=ids_keep.unsqueeze(-1).repeat(1, 1, pos_embed.shape[2]),
                 )
                 if self.cls_embed_on:
                     pos_embed = torch.cat(
                         [
-                            self.pos_embed_class.expand(
-                                pos_embed.shape[0], -1, -1
-                            ),
+                            self.pos_embed_class.expand(pos_embed.shape[0], -1, -1),
                             pos_embed,
                         ],
                         1,
@@ -393,9 +375,7 @@ class MaskMViT(MViT):
                 pos_embed_sampled = torch.gather(
                     pos_embed[:, s:, :],
                     dim=1,
-                    index=ids_keep.unsqueeze(-1).repeat(
-                        1, 1, self.pos_embed.shape[2]
-                    ),
+                    index=ids_keep.unsqueeze(-1).repeat(1, 1, self.pos_embed.shape[2]),
                 )
                 if self.cls_embed_on:
                     pos_embed_sampled = torch.cat(
@@ -446,9 +426,7 @@ class MaskMViT(MViT):
             if self.cls_embed_on:
                 pos_embed = torch.cat(
                     [
-                        self.dec_pos_embed_class.expand(
-                            pos_embed.shape[0], -1, -1
-                        ),
+                        self.dec_pos_embed_class.expand(pos_embed.shape[0], -1, -1),
                         pos_embed,
                     ],
                     1,
@@ -489,13 +467,9 @@ class MaskMViT(MViT):
                 )
         if self.pred_hog_wt:
             if self.use_2d_patch:
-                labels += self._get_hog_label_2d(
-                    imgs.detach(), [mask.to(torch.bool)]
-                )
+                labels += self._get_hog_label_2d(imgs.detach(), [mask.to(torch.bool)])
             else:
-                labels += self._get_hog_label_3d(
-                    imgs.detach(), [mask.to(torch.bool)]
-                )
+                labels += self._get_hog_label_3d(imgs.detach(), [mask.to(torch.bool)])
 
         self.counter += 1
         if self.cfg.VIS_MASK.ENABLE:
@@ -511,15 +485,11 @@ class MaskMViT(MViT):
             im_viz = imgs
         reconstruct = self._unpatchify(
             pred * mask.reshape(N, t * h * w, 1)
-            + self._patchify(
-                im_viz, time_stride_loss=self.cfg.MASK.TIME_STRIDE_LOSS
-            )
+            + self._patchify(im_viz, time_stride_loss=self.cfg.MASK.TIME_STRIDE_LOSS)
             * (1 - mask.reshape(N, t * h * w, 1))
         )
         masked = self._unpatchify(
-            self._patchify(
-                im_viz, time_stride_loss=self.cfg.MASK.TIME_STRIDE_LOSS
-            )
+            self._patchify(im_viz, time_stride_loss=self.cfg.MASK.TIME_STRIDE_LOSS)
             * (1 - mask.reshape(N, t * h * w, 1))
         )
 
@@ -584,9 +554,7 @@ class MaskMViT(MViT):
             float_mask = mask.unsqueeze(-1)
         else:
             if self.use_2d_patch:
-                float_mask = F.interpolate(
-                    float_mask.unsqueeze(0), size=(H, W)
-                )[0]
+                float_mask = F.interpolate(float_mask.unsqueeze(0), size=(H, W))[0]
             else:
                 float_mask = F.interpolate(float_mask, size=(H, W))
             float_mask = float_mask.flatten(1).unsqueeze(-1)
@@ -651,8 +619,6 @@ class MaskMViT(MViT):
             x, mask = x[0], None
 
         if self.cfg.MASK.MAE_ON:
-            return self._mae_forward(
-                x, mask_ratio=self.cfg.AUG.MASK_RATIO, mask=mask
-            )
+            return self._mae_forward(x, mask_ratio=self.cfg.AUG.MASK_RATIO, mask=mask)
         else:
             return self._maskfeat_forward(x, mask, return_all)
