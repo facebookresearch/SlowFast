@@ -34,8 +34,11 @@ from collections import defaultdict
 import numpy as np
 
 import slowfast.utils.distributed as du
-from ava_evaluation import object_detection_evaluation, standard_fields
 from slowfast.utils.env import pathmgr
+from vision.fair.slowfast.ava_evaluation import (
+    object_detection_evaluation,
+    standard_fields,
+)
 
 logger = logging.getLogger(__name__)
 
