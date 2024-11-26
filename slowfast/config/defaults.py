@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Configs."""
+
 import math
 
 from fvcore.common.config import CfgNode

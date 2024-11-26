@@ -294,9 +294,7 @@ def visualize(cfg):
 
         if cfg.TENSORBOARD.MODEL_VIS.ENABLE:
             if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
-                assert (
-                    not cfg.DETECTION.ENABLE
-                ), "Detection task is currently not supported for Grad-CAM visualization."
+                assert not cfg.DETECTION.ENABLE, "Detection task is currently not supported for Grad-CAM visualization."
                 if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
                     assert (
                         len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1

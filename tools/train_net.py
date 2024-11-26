@@ -112,7 +112,6 @@ def train_epoch(
             inputs[0] = samples
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
-
             # Explicitly declare reduction to mean.
             perform_backward = True
             optimizer.zero_grad()
@@ -613,7 +612,6 @@ def train(cfg):
 
     epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
-
         if cur_epoch > 0 and cfg.DATA.LOADER_CHUNK_SIZE > 0:
             num_chunks = math.ceil(
                 cfg.DATA.LOADER_CHUNK_OVERALL_SIZE / cfg.DATA.LOADER_CHUNK_SIZE

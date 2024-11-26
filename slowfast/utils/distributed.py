@@ -293,7 +293,6 @@ class AllGatherWithGradient(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-
         reduction = torch.distributed.all_reduce(grad_output, async_op=True)
         reduction.wait()
 

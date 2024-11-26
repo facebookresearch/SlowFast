@@ -963,7 +963,6 @@ class MViT(nn.Module):
         input_size = self.patch_dims
 
         if self.enable_rev:
-
             # rev does not allow cls token
             assert not self.cls_embed_on
 
@@ -979,7 +978,6 @@ class MViT(nn.Module):
                 self.norm = norm_layer(embed_dim)
 
         else:
-
             self.blocks = nn.ModuleList()
 
             for i in range(depth):
@@ -1118,7 +1116,6 @@ class MViT(nn.Module):
         return names
 
     def _get_pos_embed(self, pos_embed, bcthw):
-
         if len(bcthw) == 4:
             t, h, w = 1, bcthw[-2], bcthw[-1]
         else:

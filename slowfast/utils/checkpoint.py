@@ -361,9 +361,7 @@ def load_checkpoint(
                         # pre_train_dict["patch_embed.proj.weight"] = pre_train_dict["patch_embed.proj.weight"][:, :, orig_shape[2]//2, :, :] # take center
                         pre_train_dict["patch_embed.proj.weight"] = pre_train_dict[
                             "patch_embed.proj.weight"
-                        ].sum(
-                            2
-                        )  # take avg
+                        ].sum(2)  # take avg
                         logger.info(
                             f"deflate patch_embed.proj.weight from {orig_shape} to {pre_train_dict['patch_embed.proj.weight'].shape}"
                         )

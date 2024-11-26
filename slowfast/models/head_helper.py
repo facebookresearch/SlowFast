@@ -411,7 +411,6 @@ class X3DHead(nn.Module):
         self._construct_head(dim_in, dim_inner, dim_out, norm_module)
 
     def _construct_head(self, dim_in, dim_inner, dim_out, norm_module):
-
         self.conv_5 = nn.Conv3d(
             dim_in,
             dim_inner,

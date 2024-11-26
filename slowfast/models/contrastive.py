@@ -1030,7 +1030,6 @@ class Memory1D(nn.Module):
 
 
 def contrastive_parameter_surgery(model, cfg, epoch_exact, cur_iter):
-
     # cancel some gradients in first epoch of SwAV
     if (
         cfg.MODEL.MODEL_NAME == "ContrastiveModel"

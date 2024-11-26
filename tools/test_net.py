@@ -48,7 +48,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     test_meter.iter_tic()
 
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
-
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -174,7 +173,6 @@ def test(cfg):
 
     test_meters = []
     for num_view in cfg.TEST.NUM_TEMPORAL_CLIPS:
-
         cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
 
         # Print config.
@@ -254,8 +252,7 @@ def test(cfg):
         result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
-            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
-            "".format(
+            "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}" "".format(
                 params / 1e6,
                 flops,
                 view,

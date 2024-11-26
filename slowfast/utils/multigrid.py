@@ -71,7 +71,6 @@ class MultigridSchedule:
         """
         base_b, base_t, base_s = get_current_long_cycle_shape(self.schedule, cur_epoch)
         if base_s != cfg.DATA.TRAIN_CROP_SIZE or base_t != cfg.DATA.NUM_FRAMES:
-
             cfg.DATA.NUM_FRAMES = base_t
             cfg.DATA.TRAIN_CROP_SIZE = base_s
             cfg.TRAIN.BATCH_SIZE = base_b * cfg.MULTIGRID.DEFAULT_B

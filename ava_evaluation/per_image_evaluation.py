@@ -20,6 +20,7 @@ detection is supported by default.
 Based on the settings, per image evaluation is either performed on boxes or
 on object masks.
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np

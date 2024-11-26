@@ -52,9 +52,7 @@ class TensorboardWriter:
         self.writer = SummaryWriter(log_dir=log_dir)
         logger.info(
             "To see logged results in Tensorboard, please launch using the command \
-            `tensorboard  --port=<port-number> --logdir {}`".format(
-                log_dir
-            )
+            `tensorboard  --port=<port-number> --logdir {}`".format(log_dir)
         )
 
         if cfg.TENSORBOARD.CLASS_NAMES_PATH != "":

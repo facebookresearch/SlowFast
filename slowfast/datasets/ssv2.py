@@ -244,7 +244,6 @@ class Ssv2(torch.utils.data.Dataset):
 
         if self.aug:
             if self.cfg.AUG.NUM_SAMPLE > 1:
-
                 frame_list = []
                 label_list = []
                 index_list = []

@@ -352,7 +352,6 @@ def plot_input_normed(
 
 
 def convert_normalized_images(tensor):
-
     tensor = tensor * 0.225
     tensor = tensor + 0.45
 

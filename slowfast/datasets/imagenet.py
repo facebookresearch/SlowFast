@@ -172,7 +172,6 @@ class Imagenet(torch.utils.data.Dataset):
                 im = im.convert("RGB")
 
         if self.mode in ["train", "val"]:
-
             depth = self.cfg.MASK.PRETRAIN_DEPTH[-1]
             assert depth == max(self.cfg.MASK.PRETRAIN_DEPTH)
             max_mask = self.cfg.AUG.MAX_MASK_PATCHES_PER_BLOCK

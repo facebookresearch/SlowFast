@@ -76,8 +76,8 @@ class GradCAM:
                 each corresponding input.
             preds (tensor): shape (n_instances, n_class). Model predictions for `inputs`.
         """
-        assert len(inputs) == len(
-            self.target_layers
+        assert (
+            len(inputs) == len(self.target_layers)
         ), "Must register the same number of target layers as the number of input pathways."
         input_clone = [inp.clone() for inp in inputs]
         preds = self.model(input_clone)

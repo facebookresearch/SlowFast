@@ -783,7 +783,6 @@ class MaskingGenerator:
         min_aspect=0.3,
         max_aspect=None,
     ):
-
         if not isinstance(
             mask_window_size,
             (
@@ -877,7 +876,6 @@ class MaskingGenerator3D:
         min_aspect=0.3,
         max_aspect=None,
     ):
-
         self.temporal, self.height, self.width = mask_window_size
         self.num_masking_patches = num_masking_patches
         self.min_num_patches = min_num_patches
