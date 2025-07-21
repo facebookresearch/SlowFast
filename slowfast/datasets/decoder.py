@@ -269,7 +269,8 @@ def torchvision_decode(
         decode_all_video (bool): if True, the entire video was decoded.
     """
     # Convert the bytes to a tensor.
-    video_tensor = torch.from_numpy(np.frombuffer(video_handle, dtype=np.uint8))
+    # Converted the video_handle into numpy array
+    video_tensor = torch.from_numpy(np.frombuffer(np.array(video_handle), dtype=np.uint8))
 
     decode_all_video = True
     video_start_pts, video_end_pts = 0, -1
@@ -418,6 +419,10 @@ def pyav_decode(
     else:
         # Perform selective decoding.
         decode_all_video = False
+        ## Changed the sampling rate code
+        sampling_rate = sampling_rate[0] if isinstance(sampling_rate, list) else sampling_rate
+        num_frames = num_frames[0] if isinstance(num_frames, list) else num_frames
+
         clip_size = np.maximum(
             1.0, np.ceil(sampling_rate * (num_frames - 1) / target_fps * fps)
         )
@@ -572,28 +577,20 @@ def decode(
         [None] * num_decode,
     )
     augment_vid = gaussian_prob > 0.0 or time_diff_prob > 0.0
+    ## Improved the decoding frames 
     for k in range(num_decode):
         T = num_frames[k]
-        # Perform temporal sampling from the decoded video.
 
         if decode_all_video:
-            frames = frames_decoded[0]
-            if augment_vid:
-                frames = frames.clone()
-            start_idx, end_idx = (
-                start_end_delta_time[k, 0],
-                start_end_delta_time[k, 1],
-            )
+            frames = frames_decoded[0].clone() if augment_vid else frames_decoded[0]
+            start_idx, end_idx = start_end_delta_time[k, 0], start_end_delta_time[k, 1]
         else:
             frames = frames_decoded[k]
-            # video is already trimmed so we just need subsampling
-            start_idx, end_idx, clip_position = get_start_end_idx(
-                frames.shape[0], clip_sizes[k], 0, 1
-            )
+            start_idx, end_idx, _ = get_start_end_idx(frames.shape[0], clip_sizes[k], 0, 1)
+
         if augment_vid:
-            frames, time_diff_aug[k] = transform.augment_raw_frames(
-                frames, time_diff_prob, gaussian_prob
-            )
+            frames, time_diff_aug[k] = transform.augment_raw_frames(frames, time_diff_prob, gaussian_prob)
+
         frames_k = temporal_sampling(frames, start_idx, end_idx, T)
         frames_out[k] = frames_k
 
