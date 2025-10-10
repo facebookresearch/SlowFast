@@ -14,6 +14,7 @@ import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
 import slowfast.visualization.tensorboard_vis as tb
 import torch
+import math
 from slowfast.datasets import loader
 from slowfast.models import build_model
 from slowfast.utils.env import pathmgr
@@ -159,6 +160,7 @@ def test(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    import numpy as np
     # Set up environment.
     du.init_distributed_training(cfg)
     # Set random seed from configs.
@@ -201,9 +203,12 @@ def test(cfg):
 
         cu.load_test_checkpoint(cfg, model)
 
+
         # Create video testing loaders.
         test_loader = loader.construct_loader(cfg, "test")
         logger.info("Testing model for {} iterations".format(len(test_loader)))
+
+        
 
         if cfg.DETECTION.ENABLE:
             assert cfg.NUM_GPUS == cfg.TEST.BATCH_SIZE or cfg.NUM_GPUS == 0
@@ -240,6 +245,148 @@ def test(cfg):
         test_meters.append(test_meter)
         if writer is not None:
             writer.close()
+
+        # --- Custom CSV output for predictions (names + indices, no GT, no time fields) ---
+        import re
+        import csv
+        import pandas as pd
+        import numpy as np
+
+        def path_only(s: str) -> str:
+          """
+          Accepts a line like '/path/file.mp4 214' or '/path/file.mp4'
+          Returns '/path/file.mp4'
+          """
+          if not s:
+              return s
+          # split on whitespace, keep the first token
+          return str(s).strip().split()[0]
+
+        def parse_youtube_id_from_path(p: str) -> str:
+            """
+            Extract youtube_id from '.../<youtube_id>_000107_000117.mp4'.
+            We capture everything before the last two '_######' chunks.
+            """
+            bn = os.path.basename(str(p))
+            m = re.match(r'^(?P<ytid>.+)_(\d{6})_(\d{6})\.mp4$', bn)
+            return m.group("ytid") if m else ""
+
+        def load_class_names(label_map_csv_path: str):
+            """
+            Expect CSV with columns: id,name
+            Returns a list where index is class id and value is class name.
+            """
+            if not label_map_csv_path or not os.path.isfile(label_map_csv_path):
+                return None
+            with open(label_map_csv_path, "r", encoding="utf-8") as f:
+                rdr = csv.DictReader(f)
+                id_name = [(int(r["id"]), r["name"]) for r in rdr]
+                id_name.sort(key=lambda x: x[0])
+                return [name for _, name in id_name]
+
+        def load_class_names(label_map_csv_path: str):
+          """
+          Expect CSV with columns: id,name
+          Returns a list where index is class id and value is class name.
+          """
+          if not label_map_csv_path or not os.path.isfile(label_map_csv_path):
+              return None
+          with open(label_map_csv_path, "r", encoding="utf-8") as f:
+              rdr = csv.DictReader(f)
+              id_name = [(int(r["id"]), r["name"]) for r in rdr]
+              id_name.sort(key=lambda x: x[0])
+              return [name for _, name in id_name]
+
+        # Load directly (no cfg dependency)
+        label_map_csv = "/content/drive/MyDrive/Mae/data/kinetics_400_mapping.csv"
+        class_names = load_class_names(label_map_csv)
+
+        all_preds = test_meter.video_preds.clone().detach().cpu().numpy()
+        ds = test_loader.dataset
+
+        rows = []
+        n = len(all_preds)
+
+        # Warn if counts mismatch (often happens with failed decodes)
+        if hasattr(ds, "_path_to_videos") and n != len(ds._path_to_videos):
+            logger.warning(
+                f"Predictions ({n}) != dataset paths ({len(ds._path_to_videos)}). "
+                "Some items may have been skipped/filtered."
+            )
+
+        seen_paths = set()
+
+        for i in range(n):
+            # Prefer dataset path; otherwise blank
+            #video_path = getattr(ds, "_path_to_videos", [""] * n)[i] if hasattr(ds, "_path_to_videos") else ""
+            
+            raw_path = getattr(ds, "_path_to_videos", [""] * n)[i] if hasattr(ds, "_path_to_videos") else ""
+            video_path = path_only(raw_path)
+            if not video_path:
+                # If for some reason the dataset path is missing, skip — we need a key
+                continue
+
+            # Dedup by full path (since you don't want time fields)
+            if video_path in seen_paths:
+                continue
+            seen_paths.add(video_path)
+
+            youtube_id = ""
+            # If dataset provides it, use it; else parse from filename
+            if hasattr(ds, "_youtube_ids"):
+                try:
+                    youtube_id = ds._youtube_ids[i]
+                except Exception:
+                    youtube_id = ""
+            if not youtube_id:
+                youtube_id = parse_youtube_id_from_path(video_path)
+
+            pred_scores = all_preds[i]
+            top5_idx = np.argsort(pred_scores)[::-1][:5].astype(int)
+            top1_idx = int(top5_idx[0])
+
+            if class_names is not None and top1_idx < len(class_names):
+                top1_lbl = class_names[top1_idx]
+                top5_lbls = [class_names[j] if j < len(class_names) else str(j) for j in top5_idx]
+            else:
+                # Fallback to indices if mapping missing
+                top1_lbl = str(top1_idx)
+                top5_lbls = [str(j) for j in top5_idx]
+
+            rows.append({
+                "youtube_id": youtube_id,
+                "video_path": str(video_path),
+                "pred_top1": top1_lbl,
+                "pred_top1_idx": top1_idx,                         # keep for reproducibility (optional)
+                "pred_top5": "|".join(top5_lbls),
+                "pred_top5_idx": "|".join(map(str, top5_idx)),     # keep for reproducibility (optional)
+            })
+
+        # Diagnostics: what the dataset intended to load vs what got predictions
+        all_paths = []
+        if hasattr(test_loader.dataset, "_path_to_videos"):
+            #all_paths = [str(p) for p in test_loader.dataset._path_to_videos]
+            all_paths = [path_only(p) for p in test_loader.dataset._path_to_videos]        
+        else:
+            # if your dataset uses a different attribute, add it here
+            pass
+
+        pred_paths = [r["video_path"] for r in rows]  # rows you’re about to write
+        missing = sorted(set(all_paths) - set(pred_paths))
+
+        logger.info(f"[DIAG] dataset listed: {len(all_paths)} paths; predicted: {len(pred_paths)}; missing: {len(missing)}")
+        if missing:
+            miss_csv = os.path.join(cfg.OUTPUT_DIR, "missing_predictions.csv")
+            import pandas as pd
+            pd.DataFrame({"video_path": list(missing)}).to_csv(miss_csv, index=False)
+            logger.info(f"[DIAG] wrote missing predictions list to: {miss_csv}")
+
+        output_csv = getattr(cfg.TEST, 'SAVE_RESULTS_CSV', None)
+        if output_csv:
+            output_csv_path = os.path.join(cfg.OUTPUT_DIR, output_csv)
+            pd.DataFrame(rows).to_csv(output_csv_path, index=False)
+            logger.info(f"Saved predictions to CSV: {output_csv_path}")
+
 
     result_string_views = "_p{:.2f}_f{:.2f}".format(params / 1e6, flops)
 

@@ -1,6 +1,6 @@
 TASK: ssl
 TRAIN:
-  ENABLE: True
+  ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 64
   EVAL_PERIOD: 100000
@@ -8,8 +8,9 @@ TRAIN:
   AUTO_RESUME: True
   KILL_LOSS_EXPLOSION_FACTOR: 2.0 # default 0.0 (not enforced)
 DATA:
+  PATH_TO_DATA_DIR: /content/drive/MyDrive/Mae/data/
   USE_OFFSET_SAMPLING: True
-  DECODING_BACKEND: torchvision
+  DECODING_BACKEND: pyav
   NUM_FRAMES: 16
   SAMPLING_RATE: 4
   TRAIN_JITTER_SCALES: [256, 320]
@@ -21,12 +22,11 @@ DATA:
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   TRAIN_CROP_NUM_TEMPORAL: 4  # default 1
 MVIT:
-  ZERO_DECAY_POS_CLS: False
-  SEP_POS_EMBED: True # default: False needs to be false for fixed sincos
-  PATCH_KERNEL: (2, 16, 16)
-  PATCH_STRIDE: (2, 16, 16)
-  PATCH_PADDING: (0, 0, 0)
-  EMBED_DIM: 768 # vit-B
+  SEP_POS_EMBED: True
+  PATCH_KERNEL: [2, 16, 16]
+  PATCH_STRIDE: [2, 16, 16]
+  PATCH_PADDING: [0, 0, 0]
+  EMBED_DIM: 768
   NUM_HEADS: 12
   MLP_RATIO: 4.0
   QKV_BIAS: True
@@ -35,16 +35,19 @@ MVIT:
   DROPPATH_RATE: 0.0
   MODE: "conv"
   CLS_EMBED_ON: True
+  # This must be TRUE to match the separate q, k, v keys in the checkpoint
+  SEPARATE_QKV: True
 MASK:
   ENABLE: True
   MAE_ON: True #  default False
   MAE_RND_MASK: True # default: false
+  TIME_STRIDE_LOSS: True 
   PRETRAIN_DEPTH: [11]
   HEAD_TYPE: "separate_xformer"
   DECODER_DEPTH: 4
   DECODER_EMBED_DIM: 512
 AUG:
-  ENABLE: True
+  ENABLE: False
   COLOR_JITTER: None
   AA_TYPE: ""
   RE_PROB: 0.0
@@ -72,15 +75,19 @@ MODEL:
   LOSS_FUNC: multi_mse
   DROPOUT_RATE: 0.0
 TEST:
-  ENABLE: False
+  ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 64
-  NUM_SPATIAL_CROPS: 1
+  BATCH_SIZE: 1
+  NUM_SPATIAL_CROPS: 3
+  NUM_TEMPORAL_CLIPS: [7]
+  CHECKPOINT_FILE_PATH: /content/drive/MyDrive/Mae/data/VIT_B_16x4_MAE_PT.pyth
+  SAVE_RESULTS_CSV: preds_part_0_pt.csv
+
 DATA_LOADER:
   NUM_WORKERS: 8
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0
-OUTPUT_DIR: .
-LOG_MODEL_INFO: False
+OUTPUT_DIR: /content/drive/MyDrive/Mae/output
+LOG_MODEL_INFO: True

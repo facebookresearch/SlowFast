@@ -285,6 +285,7 @@ _C.TEST.NUM_SPATIAL_CROPS = 3
 _C.TEST.CHECKPOINT_TYPE = "pytorch"
 # Path to saving prediction results file.
 _C.TEST.SAVE_RESULTS_PATH = ""
+_C.TEST.SAVE_RESULTS_CSV = ""
 
 _C.TEST.NUM_TEMPORAL_CLIPS = []
 # -----------------------------------------------------------------------------
@@ -723,7 +724,7 @@ _C.DATA.TARGET_FPS = 30
 _C.DATA.TRAIN_JITTER_FPS = 0.0
 
 # Decoding backend, options include `pyav` or `torchvision`
-_C.DATA.DECODING_BACKEND = "torchvision"
+_C.DATA.DECODING_BACKEND = "pyav"
 
 # Decoding resize to short size (set to native size for best speed)
 _C.DATA.DECODING_SHORT_SIZE = 256
