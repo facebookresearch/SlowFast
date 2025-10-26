@@ -594,7 +594,7 @@ class ContrastiveModel(nn.Module):
                 bs = clips[0][0].size(0)
                 output, embedding = [], []
 
-                for i, clip_q in enumerate(clips):
+                for clip_q in clips:
                     x = self.run_swav_orig_encoder_q(clip_q)
                     embedding.append(x[0])
                     output.append(x[1])
