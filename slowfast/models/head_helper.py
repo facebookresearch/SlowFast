@@ -288,7 +288,7 @@ class ResNetBasicHead(nn.Module):
 
         if cfg.CONTRASTIVE.PREDICTOR_DEPTHS:
             d_in = num_classes
-            for i, n_layers in enumerate(cfg.CONTRASTIVE.PREDICTOR_DEPTHS):
+            for n_layers in cfg.CONTRASTIVE.PREDICTOR_DEPTHS:
                 local_mlp = MLPHead(
                     d_in,
                     num_classes,
@@ -657,7 +657,7 @@ class MSSeparateHead(nn.Module):
     def forward(self, block_outputs, output_masks, return_all, thw):
         model_outputs = []
         for idx, x in enumerate(block_outputs):
-            for _, blk in enumerate(self.transforms[idx]):
+            for blk in self.transforms[idx]:
                 if isinstance(blk, MultiScaleBlock):
                     x, thw = blk(x, thw)
                 else:
