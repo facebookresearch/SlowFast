@@ -6,10 +6,10 @@
 from slowfast.config.defaults import assert_and_infer_cfg
 from slowfast.utils.misc import launch_job
 from slowfast.utils.parser import load_config, parse_args
-from vision.fair.slowfast.tools.demo_net import demo
-from vision.fair.slowfast.tools.test_net import test
-from vision.fair.slowfast.tools.train_net import train
-from vision.fair.slowfast.tools.visualization import visualize
+from demo_net import demo
+from test_net import test
+from train_net import train
+from visualization import visualize
 
 
 def main():
