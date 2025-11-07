@@ -159,12 +159,13 @@ class Kinetics(torch.utils.data.Dataset):
 
     def _get_chunk(self, path_to_file, chunksize):
         try:
-            for chunk in pandas.read_csv(
-                path_to_file,
-                chunksize=self.cfg.DATA.LOADER_CHUNK_SIZE,
-                skiprows=self.skip_rows,
-            ):
-                break
+            chunk = next(
+                pandas.read_csv(
+                    path_to_file,
+                    chunksize=self.cfg.DATA.LOADER_CHUNK_SIZE,
+                    skiprows=self.skip_rows,
+                )
+            )
         except Exception:
             self.skip_rows = 0
             return self._get_chunk(path_to_file, chunksize)
