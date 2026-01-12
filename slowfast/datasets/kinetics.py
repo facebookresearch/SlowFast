@@ -6,7 +6,6 @@ import random
 
 import numpy as np
 import pandas
-
 import slowfast.utils.logging as logging
 import torch
 import torch.utils.data
@@ -143,10 +142,10 @@ class Kinetics(torch.utils.data.Dataset):
                     self._labels.append(int(label))
                     self._spatial_temporal_idx.append(idx)
                     self._video_meta[clip_idx * self._num_clips + idx] = {}
-        assert (
-            len(self._path_to_videos) > 0
-        ), "Failed to load Kinetics split {} from {}".format(
-            self._split_idx, path_to_file
+        assert len(self._path_to_videos) > 0, (
+            "Failed to load Kinetics split {} from {}".format(
+                self._split_idx, path_to_file
+            )
         )
         logger.info(
             "Constructing kinetics dataloader (size: {} skip_rows {}) from {} ".format(

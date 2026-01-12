@@ -9,7 +9,6 @@ from typing import List
 
 import numpy as np
 import torch
-
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.distributed import DistributedSampler
@@ -193,9 +192,9 @@ def shuffle_dataset(loader, cur_epoch):
             if isinstance(loader.batch_sampler, ShortCycleBatchSampler)
             else loader.sampler
         )
-    assert isinstance(
-        sampler, (RandomSampler, DistributedSampler)
-    ), "Sampler type '{}' not supported".format(type(sampler))
+    assert isinstance(sampler, (RandomSampler, DistributedSampler)), (
+        "Sampler type '{}' not supported".format(type(sampler))
+    )
     # RandomSampler handles shuffling automatically
     if isinstance(sampler, DistributedSampler):
         # DistributedSampler shuffles data based on epoch

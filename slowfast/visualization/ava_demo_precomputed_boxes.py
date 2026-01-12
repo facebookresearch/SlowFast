@@ -5,7 +5,6 @@ import os
 
 import cv2
 import numpy as np
-
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.logging as logging
 import torch

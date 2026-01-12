@@ -5,7 +5,6 @@ import atexit
 import queue
 
 import numpy as np
-
 import slowfast.utils.logging as logging
 import torch
 import torch.multiprocessing as mp

@@ -6,7 +6,6 @@ import math
 import os
 
 import matplotlib.pyplot as plt
-
 import slowfast.utils.logging as logging
 import slowfast.visualization.utils as vis_utils
 import torch

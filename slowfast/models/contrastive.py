@@ -4,7 +4,6 @@
 import math
 
 import numpy as np
-
 import slowfast.models.losses as losses
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging

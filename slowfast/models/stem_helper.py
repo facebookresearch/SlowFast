@@ -12,9 +12,9 @@ def get_stem_func(name):
     Retrieves the stem module by name.
     """
     trans_funcs = {"x3d_stem": X3DStem, "basic_stem": ResNetBasicStem}
-    assert (
-        name in trans_funcs.keys()
-    ), "Transformation function '{}' not supported".format(name)
+    assert name in trans_funcs.keys(), (
+        "Transformation function '{}' not supported".format(name)
+    )
     return trans_funcs[name]
 
 
@@ -114,9 +114,9 @@ class VideoModelStem(nn.Module):
             self.add_module("pathway{}_stem".format(pathway), stem)
 
     def forward(self, x):
-        assert (
-            len(x) == self.num_pathways
-        ), "Input tensor does not contain {} pathway".format(self.num_pathways)
+        assert len(x) == self.num_pathways, (
+            "Input tensor does not contain {} pathway".format(self.num_pathways)
+        )
         # use a new list, don't modify in-place the x list, which is bad for activation checkpointing.
         y = []
         for pathway in range(len(x)):

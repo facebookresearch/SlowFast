@@ -4,7 +4,6 @@
 import queue
 
 import cv2
-
 import slowfast.utils.checkpoint as cu
 import torch
 from detectron2 import model_zoo

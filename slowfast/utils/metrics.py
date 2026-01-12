@@ -22,9 +22,9 @@ def topks_correct(preds, labels, ks):
         topks_correct (list): list of numbers, where the `i`-th entry
             corresponds to the number of top-`ks[i]` correct predictions.
     """
-    assert preds.size(0) == labels.size(
-        0
-    ), "Batch dim of predictions and labels must match"
+    assert preds.size(0) == labels.size(0), (
+        "Batch dim of predictions and labels must match"
+    )
     # Find the top max_k predictions for each sample
     _top_max_k_vals, top_max_k_inds = torch.topk(
         preds, max(ks), dim=1, largest=True, sorted=True

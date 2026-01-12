@@ -4,7 +4,6 @@
 import pickle
 
 import numpy as np
-
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -294,18 +293,20 @@ def visualize(cfg):
 
         if cfg.TENSORBOARD.MODEL_VIS.ENABLE:
             if cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.ENABLE:
-                assert not cfg.DETECTION.ENABLE, "Detection task is currently not supported for Grad-CAM visualization."
+                assert not cfg.DETECTION.ENABLE, (
+                    "Detection task is currently not supported for Grad-CAM visualization."
+                )
                 if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
-                    assert (
-                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1
-                    ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
-                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                    assert len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 1, (
+                        "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                            len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                        )
                     )
                 elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
-                    assert (
-                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 2
-                    ), "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
-                        len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                    assert len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST) == 2, (
+                        "The number of chosen CNN layers must be equal to the number of pathway(s), given {} layer(s).".format(
+                            len(cfg.TENSORBOARD.MODEL_VIS.GRAD_CAM.LAYER_LIST)
+                        )
                     )
                 else:
                     raise NotImplementedError(

@@ -5,7 +5,6 @@ import itertools
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 import slowfast.utils.logging as logging
 import torch
 from sklearn.metrics import confusion_matrix

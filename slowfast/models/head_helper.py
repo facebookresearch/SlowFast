@@ -76,9 +76,9 @@ class ResNetRoIHead(nn.Module):
             performance if ROIAlign is used together with conv layers.
         """
         super(ResNetRoIHead, self).__init__()
-        assert (
-            len({len(pool_size), len(dim_in)}) == 1
-        ), "pathway dimensions are not consistent."
+        assert len({len(pool_size), len(dim_in)}) == 1, (
+            "pathway dimensions are not consistent."
+        )
         self.num_pathways = len(pool_size)
         self.detach_final_fc = detach_final_fc
 
@@ -110,13 +110,13 @@ class ResNetRoIHead(nn.Module):
             self.act = nn.Sigmoid()
         else:
             raise NotImplementedError(
-                "{} is not supported as an activation" "function.".format(act_func)
+                "{} is not supported as an activationfunction.".format(act_func)
             )
 
     def forward(self, inputs, bboxes):
-        assert (
-            len(inputs) == self.num_pathways
-        ), "Input tensor does not contain {} pathway".format(self.num_pathways)
+        assert len(inputs) == self.num_pathways, (
+            "Input tensor does not contain {} pathway".format(self.num_pathways)
+        )
         pool_out = []
         for pathway in range(self.num_pathways):
             t_pool = getattr(self, "s{}_tpool".format(pathway))
@@ -238,9 +238,9 @@ class ResNetBasicHead(nn.Module):
             cfg (struct): The config for the current experiment.
         """
         super(ResNetBasicHead, self).__init__()
-        assert (
-            len({len(pool_size), len(dim_in)}) == 1
-        ), "pathway dimensions are not consistent."
+        assert len({len(pool_size), len(dim_in)}) == 1, (
+            "pathway dimensions are not consistent."
+        )
         self.num_pathways = len(pool_size)
         self.detach_final_fc = detach_final_fc
         self.cfg = cfg
@@ -283,7 +283,7 @@ class ResNetBasicHead(nn.Module):
             self.act = None
         else:
             raise NotImplementedError(
-                "{} is not supported as an activation" "function.".format(act_func)
+                "{} is not supported as an activationfunction.".format(act_func)
             )
 
         if cfg.CONTRASTIVE.PREDICTOR_DEPTHS:
@@ -304,9 +304,9 @@ class ResNetBasicHead(nn.Module):
                 self.predictors.append(local_mlp)
 
     def forward(self, inputs):
-        assert (
-            len(inputs) == self.num_pathways
-        ), "Input tensor does not contain {} pathway".format(self.num_pathways)
+        assert len(inputs) == self.num_pathways, (
+            "Input tensor does not contain {} pathway".format(self.num_pathways)
+        )
         pool_out = []
         for pathway in range(self.num_pathways):
             m = getattr(self, "pathway{}_avgpool".format(pathway))
@@ -456,7 +456,7 @@ class X3DHead(nn.Module):
             self.act = nn.Sigmoid()
         else:
             raise NotImplementedError(
-                "{} is not supported as an activation" "function.".format(self.act_func)
+                "{} is not supported as an activationfunction.".format(self.act_func)
             )
 
     def forward(self, inputs):
@@ -542,7 +542,7 @@ class TransformerBasicHead(nn.Module):
             self.act = None
         else:
             raise NotImplementedError(
-                "{} is not supported as an activation" "function.".format(act_func)
+                "{} is not supported as an activationfunction.".format(act_func)
             )
 
     def forward(self, x):

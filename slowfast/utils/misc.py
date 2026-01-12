@@ -9,7 +9,6 @@ from datetime import datetime
 
 import numpy as np
 import psutil
-
 import slowfast.utils.logging as logging
 import slowfast.utils.multiprocessing as mpu
 import torch

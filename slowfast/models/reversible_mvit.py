@@ -2,7 +2,6 @@ import sys
 from functools import partial
 
 import torch
-
 from slowfast.models.attention import attention_pool, MultiScaleAttention
 from slowfast.models.common import drop_path, Mlp, TwoStreamFusion
 from slowfast.models.utils import round_width

@@ -6,7 +6,6 @@ Functions for benchmarks.
 import pprint
 
 import numpy as np
-
 import slowfast.utils.logging as logging
 import slowfast.utils.misc as misc
 import torch

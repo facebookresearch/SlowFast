@@ -6,7 +6,6 @@ import random
 import re
 
 import numpy as np
-
 import slowfast.datasets.transform as transform
 import slowfast.utils.logging as logging
 import torch

@@ -7,7 +7,6 @@ import math
 import pprint
 
 import numpy as np
-
 import slowfast.models.losses as losses
 import slowfast.models.optimizer as optim
 import slowfast.utils.checkpoint as cu
@@ -674,9 +673,9 @@ def train(cfg):
         )
         logger.info(
             f"For epoch {cur_epoch}, each iteraction takes "
-            f"{epoch_timer.last_epoch_time()/len(train_loader):.2f}s in average. "
+            f"{epoch_timer.last_epoch_time() / len(train_loader):.2f}s in average. "
             f"From epoch {start_epoch} to {cur_epoch}, each iteraction takes "
-            f"{epoch_timer.avg_epoch_time()/len(train_loader):.2f}s in average."
+            f"{epoch_timer.avg_epoch_time() / len(train_loader):.2f}s in average."
         )
 
         is_checkp_epoch = (

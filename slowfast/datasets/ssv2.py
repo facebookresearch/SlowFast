@@ -7,7 +7,6 @@ import random
 from itertools import chain as chain
 
 import numpy as np
-
 import slowfast.utils.logging as logging
 import torch
 import torch.utils.data
@@ -152,8 +151,9 @@ class Ssv2(torch.utils.data.Dataset):
             )
         )
         logger.info(
-            "Something-Something V2 dataloader constructed "
-            " (size: {}) from {}".format(len(self._path_to_videos), path_to_file)
+            "Something-Something V2 dataloader constructed  (size: {}) from {}".format(
+                len(self._path_to_videos), path_to_file
+            )
         )
 
     def get_seq_frames(self, index):

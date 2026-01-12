@@ -2,7 +2,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import matplotlib.pyplot as plt
-
 import slowfast.datasets.utils as data_utils
 import torch
 import torch.nn.functional as F
@@ -76,9 +75,9 @@ class GradCAM:
                 each corresponding input.
             preds (tensor): shape (n_instances, n_class). Model predictions for `inputs`.
         """
-        assert (
-            len(inputs) == len(self.target_layers)
-        ), "Must register the same number of target layers as the number of input pathways."
+        assert len(inputs) == len(self.target_layers), (
+            "Must register the same number of target layers as the number of input pathways."
+        )
         input_clone = [inp.clone() for inp in inputs]
         preds = self.model(input_clone)
 

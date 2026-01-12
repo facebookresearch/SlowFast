@@ -6,7 +6,6 @@ import time
 import numpy as np
 import torch
 import tqdm
-
 from slowfast.utils import logging
 from slowfast.visualization.async_predictor import AsyncDemo, AsyncVis
 from slowfast.visualization.ava_demo_precomputed_boxes import (
@@ -61,9 +60,9 @@ def run_demo(cfg, frame_provider):
 
     seq_len = cfg.DATA.NUM_FRAMES * cfg.DATA.SAMPLING_RATE
 
-    assert (
-        cfg.DEMO.BUFFER_SIZE <= seq_len // 2
-    ), "Buffer size cannot be greater than half of sequence length."
+    assert cfg.DEMO.BUFFER_SIZE <= seq_len // 2, (
+        "Buffer size cannot be greater than half of sequence length."
+    )
     num_task = 0
     # Start reading frames.
     frame_provider.start()

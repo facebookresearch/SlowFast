@@ -105,7 +105,7 @@ def convert_label_map_to_categories(label_map, max_num_classes, use_display_name
     for item in label_map.item:
         if not 0 < item.id <= max_num_classes:
             logging.info(
-                "Ignore item %d since it falls outside of requested " "label range.",
+                "Ignore item %d since it falls outside of requested label range.",
                 item.id,
             )
             continue

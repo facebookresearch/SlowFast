@@ -9,14 +9,11 @@ from collections import defaultdict
 import cv2
 import numpy as np
 import torch
-
 from slowfast.utils.env import pathmgr
 from torch.utils.data.distributed import DistributedSampler
-
 from torchvision import transforms
 
 from . import transform as transform
-
 from .random_erasing import RandomErasing
 from .transform import create_random_augment
 

@@ -591,9 +591,9 @@ def random_sized_crop_list(images, size, crop_area_fraction=0.08):
             croppsed_images = []
             for image in images:
                 cropped = image[y_offset : y_offset + h, x_offset : x_offset + w, :]
-                assert (
-                    cropped.shape[0] == h and cropped.shape[1] == w
-                ), "Wrong crop size"
+                assert cropped.shape[0] == h and cropped.shape[1] == w, (
+                    "Wrong crop size"
+                )
                 cropped = cv2.resize(
                     cropped, (size, size), interpolation=cv2.INTER_LINEAR
                 )

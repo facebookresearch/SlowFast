@@ -6,7 +6,6 @@ from typing import Dict
 
 import slowfast.utils.logging as logging
 import torch
-
 from pytorchvideo.data import Charades, LabeledVideoDataset, make_clip_sampler, SSv2
 from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 from pytorchvideo.transforms import (

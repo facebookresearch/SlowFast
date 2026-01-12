@@ -8,7 +8,6 @@ import os
 from collections import defaultdict, deque
 
 import numpy as np
-
 import slowfast.datasets.ava_helper as ava_helper
 import slowfast.utils.logging as logging
 import slowfast.utils.metrics as metrics

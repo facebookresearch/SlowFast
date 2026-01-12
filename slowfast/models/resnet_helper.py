@@ -5,7 +5,6 @@
 
 import torch
 import torch.nn as nn
-
 from slowfast.models.common import drop_path
 from slowfast.models.nonlocal_helper import Nonlocal
 from slowfast.models.operators import SE, Swish
@@ -20,9 +19,9 @@ def get_trans_func(name):
         "basic_transform": BasicTransform,
         "x3d_transform": X3DTransform,
     }
-    assert (
-        name in trans_funcs.keys()
-    ), "Transformation function '{}' not supported".format(name)
+    assert name in trans_funcs.keys(), (
+        "Transformation function '{}' not supported".format(name)
+    )
     return trans_funcs[name]
 
 

@@ -2,7 +2,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 import numpy as np
-
 import slowfast.datasets.utils as data_utils
 import slowfast.utils.logging as logging
 import slowfast.visualization.tensorboard_vis as tb

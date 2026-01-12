@@ -284,7 +284,7 @@ def multi_class_non_max_suppression(
     elif len(scores.shape) == 2:
         if scores.shape[1] is None:
             raise ValueError(
-                "scores field must have statically defined second " "dimension"
+                "scores field must have statically defined second dimension"
             )
     else:
         raise ValueError("scores field must be of rank 1 or 2")
@@ -402,7 +402,7 @@ def filter_scores_greater_than(box_mask_list, thresh):
         raise ValueError("Scores should have rank 1 or 2")
     if len(scores.shape) == 2 and scores.shape[1] != 1:
         raise ValueError(
-            "Scores should have rank 1 or have shape " "consistent with [None, 1]"
+            "Scores should have rank 1 or have shape consistent with [None, 1]"
         )
     high_score_indices = np.reshape(np.where(np.greater(scores, thresh)), [-1]).astype(
         np.int32

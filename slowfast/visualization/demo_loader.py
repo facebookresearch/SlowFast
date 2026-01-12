@@ -8,7 +8,6 @@ import threading
 import time
 
 import cv2
-
 import slowfast.utils.logging as logging
 from slowfast.visualization.utils import TaskInfo
 
@@ -26,9 +25,9 @@ class VideoManager:
             cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
         """
-        assert (
-            cfg.DEMO.WEBCAM > -1 or cfg.DEMO.INPUT_VIDEO != ""
-        ), "Must specify a data source as input."
+        assert cfg.DEMO.WEBCAM > -1 or cfg.DEMO.INPUT_VIDEO != "", (
+            "Must specify a data source as input."
+        )
 
         self.source = cfg.DEMO.WEBCAM if cfg.DEMO.WEBCAM > -1 else cfg.DEMO.INPUT_VIDEO
 
@@ -155,9 +154,9 @@ class ThreadVideoManager:
             cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
         """
-        assert (
-            cfg.DEMO.WEBCAM > -1 or cfg.DEMO.INPUT_VIDEO != ""
-        ), "Must specify a data source as input."
+        assert cfg.DEMO.WEBCAM > -1 or cfg.DEMO.INPUT_VIDEO != "", (
+            "Must specify a data source as input."
+        )
 
         self.source = cfg.DEMO.WEBCAM if cfg.DEMO.WEBCAM > -1 else cfg.DEMO.INPUT_VIDEO
 

@@ -9,9 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-
 from pytorchvideo.layers.swish import Swish
-
 from slowfast.models.utils import get_gkern
 
 

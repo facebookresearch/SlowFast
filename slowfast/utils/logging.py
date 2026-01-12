@@ -12,7 +12,6 @@ import os
 import sys
 
 import simplejson
-
 import slowfast.utils.distributed as du
 from slowfast.utils.env import pathmgr
 

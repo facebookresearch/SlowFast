@@ -10,7 +10,6 @@ import pickle
 from collections import OrderedDict
 
 import numpy as np
-
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
 import torch

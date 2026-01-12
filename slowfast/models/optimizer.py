@@ -80,14 +80,14 @@ def construct_optimizer(model, cfg):
         # Check all parameters will be passed into optimizer.
         assert len(list(model.parameters())) == len(non_bn_parameters) + len(
             bn_parameters
-        ) + len(zero_parameters) + len(
-            no_grad_parameters
-        ), "parameter size does not match: {} + {} + {} + {} != {}".format(
-            len(non_bn_parameters),
-            len(bn_parameters),
-            len(zero_parameters),
-            len(no_grad_parameters),
-            len(list(model.parameters())),
+        ) + len(zero_parameters) + len(no_grad_parameters), (
+            "parameter size does not match: {} + {} + {} + {} != {}".format(
+                len(non_bn_parameters),
+                len(bn_parameters),
+                len(zero_parameters),
+                len(no_grad_parameters),
+                len(list(model.parameters())),
+            )
         )
         print(
             "bn {}, non bn {}, zero {}, no grad {}".format(
@@ -160,9 +160,9 @@ def get_param_groups(model, cfg):
         return layer_id, layer_decay
 
     for m in model.modules():
-        assert not isinstance(
-            m, torch.nn.modules.batchnorm._NormBase
-        ), "BN is not supported with layer decay"
+        assert not isinstance(m, torch.nn.modules.batchnorm._NormBase), (
+            "BN is not supported with layer decay"
+        )
 
     non_bn_parameters_count = 0
     zero_parameters_count = 0

@@ -32,7 +32,6 @@ import time
 from collections import defaultdict
 
 import numpy as np
-
 import slowfast.utils.distributed as du
 from slowfast.utils.env import pathmgr
 from vision.fair.slowfast.ava_evaluation import (
@@ -179,10 +178,7 @@ def run_evaluation(categories, groundtruth, detections, excluded_keys, verbose=T
     for image_key in boxes:
         if image_key in excluded_keys:
             logging.info(
-                (
-                    "Found excluded timestamp in ground truth: %s. "
-                    "It will be ignored."
-                ),
+                ("Found excluded timestamp in ground truth: %s. It will be ignored."),
                 image_key,
             )
             continue
@@ -208,7 +204,7 @@ def run_evaluation(categories, groundtruth, detections, excluded_keys, verbose=T
     for image_key in boxes:
         if image_key in excluded_keys:
             logging.info(
-                ("Found excluded timestamp in detections: %s. " "It will be ignored."),
+                ("Found excluded timestamp in detections: %s. It will be ignored."),
                 image_key,
             )
             continue
