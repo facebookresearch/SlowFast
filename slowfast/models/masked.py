@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from slowfast.models import head_helper
-from slowfast.models.attention import attention_pool
 from slowfast.models.utils import calc_mvit_feature_geometry
 from slowfast.models.video_model_builder import MViT
 from torch.nn.init import trunc_normal_
