@@ -3,7 +3,6 @@
 
 """ResNe(X)t 3D stem helper."""
 
-import torch
 import torch.nn as nn
 
 
