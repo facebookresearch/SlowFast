@@ -7,10 +7,10 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from pytorchvideo.layers.batch_norm import (
+from pytorchvideo.layers.batch_norm import (  # noqa: F401
     NaiveSyncBatchNorm1d,
     NaiveSyncBatchNorm3d,
-)  # noqa
+)
 
 
 def get_norm(cfg):

@@ -13,7 +13,6 @@ from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import (
     NaiveSyncBatchNorm1d as NaiveSyncBatchNorm1d,
 )
-from slowfast.models.nonlocal_helper import Nonlocal
 
 logger = logging.get_logger(__name__)
 
