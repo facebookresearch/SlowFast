@@ -5,14 +5,13 @@
 
 import itertools
 from functools import partial
-from typing import List
 
 import numpy as np
 import torch
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data.sampler import RandomSampler, Sampler
+from torch.utils.data.sampler import RandomSampler
 
 from . import utils as utils
 from .build import build_dataset
