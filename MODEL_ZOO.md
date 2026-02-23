@@ -59,8 +59,8 @@
 #### Charades
 | architecture | size |  pretrain |  frame length x sample rate | training | mAP |  model | config |
 | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
-| SlowFast | R50 | [Kinetics 400](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | 16 x 8 | Standard | 38.9 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/pyslowfast/model_zoo/multigrid/model_zoo/Charades/SLOWFAST_16x8_R50.pkl) | SSv2/SLOWFAST_16x8_R50 |
-| SlowFast | R50 | [Kinetics 400](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | 16 x 8 | Multigrid | 38.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/pyslowfast/model_zoo/multigrid/model_zoo/Charades/SLOWFAST_16x8_R50_multigrid.pkl) | SSv2/SLOWFAST_16x8_R50_multigrid |
+| SlowFast | R50 | [Kinetics 400](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | 16 x 8 | Standard | 38.9 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/pyslowfast/model_zoo/multigrid/model_zoo/Charades/SLOWFAST_16x8_R50.pkl) | Charades/SLOWFAST_16x8_R50 |
+| SlowFast | R50 | [Kinetics 400](https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/kinetics400/SLOWFAST_8x8_R50.pkl) | 16 x 8 | Multigrid | 38.6 | [`link`](https://dl.fbaipublicfiles.com/pyslowfast/pyslowfast/model_zoo/multigrid/model_zoo/Charades/SLOWFAST_16x8_R50_multigrid.pkl) | Charades/SLOWFAST_16x8_R50_multigrid |
 
 
 ## ImageNet
