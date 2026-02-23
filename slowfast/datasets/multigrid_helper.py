@@ -10,7 +10,7 @@ from torch.utils.data.sampler import Sampler
 TORCH_MAJOR = int(torch.__version__.split(".")[0])
 TORCH_MINOR = int(torch.__version__.split(".")[1])
 
-if TORCH_MAJOR >= 1 and TORCH_MINOR >= 8:
+if TORCH_MAJOR >= 2 or (TORCH_MAJOR == 1 and TORCH_MINOR >= 8):
     _int_classes = int
 else:
     from torch._six import int_classes as _int_classes
