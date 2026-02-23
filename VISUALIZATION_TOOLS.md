@@ -18,7 +18,7 @@ TENSORBOARD:
                  # Only classes in this file will be visualized in the confusion matrix.
   HISTOGRAM:
     ENABLE: True
-    TOP_K: 10   # Top-k most frequently predicted classes for each class in the dataset.
+    TOPK: 10   # Top-k most frequently predicted classes for each class in the dataset.
     SUBSET_PATH: # Path to txt file contains class names separated by newline characters.
                  # Only classes in this file will be visualized with histograms.
 ```
