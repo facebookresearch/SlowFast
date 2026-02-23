@@ -53,7 +53,7 @@ def random_short_side_scale_jitter(
     corresponding boxes.
     Args:
         images (tensor): images to perform scale jitter. Dimension is
-            `num frames` x `channel` x `height` x `width`.
+            `channel` x `num frames` x `height` x `width`.
         min_size (int): the minimal size to scale the frames.
         max_size (int): the maximal size to scale the frames.
         boxes (ndarray): optional. Corresponding boxes to images.
@@ -63,7 +63,7 @@ def random_short_side_scale_jitter(
             scale. If False, take a uniform sample from [min_scale, max_scale].
     Returns:
         (tensor): the scaled images with dimension of
-            `num frames` x `channel` x `new height` x `new width`.
+            `channel` x `num frames` x `new height` x `new width`.
         (ndarray or None): the scaled boxes with dimension of
             `num boxes` x 4.
     """
@@ -122,13 +122,13 @@ def random_crop(images, size, boxes=None):
     Perform random spatial crop on the given images and corresponding boxes.
     Args:
         images (tensor): images to perform random crop. The dimension is
-            `num frames` x `channel` x `height` x `width`.
+            `channel` x `num frames` x `height` x `width`.
         size (int): the size of height and width to crop on the image.
         boxes (ndarray or None): optional. Corresponding boxes to images.
             Dimension is `num boxes` x 4.
     Returns:
         cropped (tensor): cropped images with dimension of
-            `num frames` x `channel` x `size` x `size`.
+            `channel` x `num frames` x `size` x `size`.
         cropped_boxes (ndarray or None): the cropped boxes with dimension of
             `num boxes` x 4.
     """
@@ -155,12 +155,12 @@ def horizontal_flip(prob, images, boxes=None):
     Args:
         prob (float): probility to flip the images.
         images (tensor): images to perform horizontal flip, the dimension is
-            `num frames` x `channel` x `height` x `width`.
+            `channel` x `num frames` x `height` x `width`.
         boxes (ndarray or None): optional. Corresponding boxes to images.
             Dimension is `num boxes` x 4.
     Returns:
         images (tensor): images with dimension of
-            `num frames` x `channel` x `height` x `width`.
+            `channel` x `num frames` x `height` x `width`.
         flipped_boxes (ndarray or None): the flipped boxes with dimension of
             `num boxes` x 4.
     """
