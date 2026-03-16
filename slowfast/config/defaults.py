@@ -35,7 +35,7 @@ _C.CONTRASTIVE.QUEUE_LEN = 65536
 # momentum for momentum encoder updates
 _C.CONTRASTIVE.MOMENTUM = 0.5
 
-# wether to anneal momentum to value above with cosine schedule
+# whether to anneal momentum to value above with cosine schedule
 _C.CONTRASTIVE.MOMENTUM_ANNEALING = False
 
 # either memorybank, moco, simclr, byol, swav
