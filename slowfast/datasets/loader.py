@@ -16,6 +16,13 @@ from torch.utils.data.sampler import RandomSampler
 from . import utils as utils
 from .build import build_dataset
 
+## Adding safe_collate function
+def safe_collate(batch):
+    batch = [b for b in batch if b is not None]
+    if len(batch) == 0:
+        return None
+    return default_collate(batch)
+
 
 def multiple_samples_collate(batch, fold=False):
     """
@@ -119,7 +126,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
             num_workers=cfg.DATA_LOADER.NUM_WORKERS,
             pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
             drop_last=drop_last,
-            collate_fn=detection_collate if cfg.DETECTION.ENABLE else None,
+            collate_fn=safe_collate,
             worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
     else:
@@ -136,10 +143,18 @@ def construct_loader(cfg, split, is_precise_bn=False):
                 num_workers=cfg.DATA_LOADER.NUM_WORKERS,
                 pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
                 worker_init_fn=utils.loader_worker_init_fn(dataset),
+                collate_func=safe_collate
             )
         else:
             # Create a sampler for multi-process training
             sampler = utils.create_sampler(dataset, shuffle, cfg)
+            
+            # Define safe wrapper for multiple_samples_collate
+            def multiple_samples_safe(batch):
+                batch = [b for b in batch if b is not None]
+                if len(batch) == 0:
+                    return None
+                return multiple_samples_collate(batch, fold="imagenet" in dataset_name)
             # Create a loader
             if cfg.DETECTION.ENABLE:
                 collate_func = detection_collate
@@ -152,11 +167,11 @@ def construct_loader(cfg, split, is_precise_bn=False):
                 and split in ["train"]
                 and not cfg.MODEL.MODEL_NAME == "ContrastiveModel"
             ):
-                collate_func = partial(
-                    multiple_samples_collate, fold="imagenet" in dataset_name
-                )
+                ## Changed here
+                collate_func = multiple_samples_collate
             else:
-                collate_func = None
+                collate_func = safe_collate
+                
             loader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=batch_size,

@@ -370,7 +370,11 @@ class Kinetics(torch.utils.data.Dataset):
                 for _ in range(num_aug):
                     idx += 1
                     f_out[idx] = frames_decoded[i].clone()
-                    time_idx_out[idx] = time_idx_decoded[i, :]
+                    ## Adding time_index only if it's decoded
+                    if time_idx_decoded is not None and isinstance(time_idx_decoded, np.ndarray):
+                        time_idx_out[idx] = time_idx_decoded[i, :]
+                    else:
+                        time_idx_out[idx] = None
 
                     f_out[idx] = f_out[idx].float()
                     f_out[idx] = f_out[idx] / 255.0
@@ -450,22 +454,35 @@ class Kinetics(torch.utils.data.Dataset):
                     if self.cfg.AUG.GEN_MASK_LOADER:
                         mask = self._gen_mask()
                         f_out[idx] = f_out[idx] + [torch.Tensor(), mask]
+            # Final outputs
+            # Ensure everything is collate-compatible
             frames = f_out[0] if num_out == 1 else f_out
-            time_idx = np.array(time_idx_out)
-            if (
-                num_aug * num_decode > 1
-                and not self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-            ):
-                label = [label] * num_aug * num_decode
-                index = [index] * num_aug * num_decode
-            if self.cfg.DATA.DUMMY_LOAD:
-                if self.dummy_output is None:
-                    self.dummy_output = (frames, label, index, time_idx, {})
+            time_idx = torch.stack([
+                torch.tensor(t, dtype=torch.int32) if t is not None else torch.zeros_like(torch.tensor([0], dtype=torch.int32))
+                for t in time_idx_out
+            ])
+
+
+            # Fix label and index
+            if num_aug * num_decode > 1 and not self.cfg.MODEL.MODEL_NAME == "ContrastiveModel":
+                label = [label] * (num_aug * num_decode)
+                index = [index] * (num_aug * num_decode)
+
+            # Convert everything to torch/numpy-compatible types
+            if isinstance(frames, list):
+                frames = [f.clone() for f in frames]
+            elif isinstance(frames, torch.Tensor):
+                frames = frames.clone()
+
+            label = torch.tensor(label) if isinstance(label, list) else label
+            index = torch.tensor(index) if isinstance(index, list) else index
+
+            # DO NOT convert time_idx again — already a tensor
+            # time_idx = torch.tensor(time_idx) 
+
             return frames, label, index, time_idx, {}
-        else:
-            logger.warning(
-                "Failed to fetch video after {} retries.".format(self._num_retries)
-            )
+
+
 
     def _gen_mask(self):
         if self.cfg.AUG.MASK_TUBE:
